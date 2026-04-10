@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klingo
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  klingo envenenado caralho
 // @author       Alison
 // @match        *://samec.klingo.app/*
