@@ -2,7 +2,7 @@
 // @name         Klingo
 // @namespace    http://tampermonkey.net/
 // @version      1.1
-// @description  klingo envenenado porra
+// @description  klingo envenenado caralho
 // @author       Alison
 // @match        *://samec.klingo.app/*
 // @match        *://klingo.app/*
