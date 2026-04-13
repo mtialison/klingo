@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  envenenado
 // @match        *://.klingo.app/*
+// @match        *://samec.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
 // @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
 // @grant        none
