@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  envenenado
 // @match        *://.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -151,7 +151,7 @@
       return '';
     }
 
-    const line1 = `🧑‍⚕️ ${doctorName}`;
+    const line1 = `👨‍⚕️ ${doctorName}`;
     const line2 = `${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
 
     return `
@@ -168,7 +168,7 @@
       return '';
     }
 
-    return `🧑‍⚕️ ${doctorName}\n${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
+    return `👨‍⚕️ ${doctorName}\n${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
   }
 
   function showCopyFeedback(targetEl, message = 'Copiado') {
@@ -259,7 +259,7 @@
 
     const subtitleHtml = getSubtitleHtml(titleEl);
     const currentMain = titleEl.querySelector('.tm-main-title');
-    const expectedText = `🧑‍⚕️ ${doctorName} ${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
+    const expectedText = `👨‍⚕️ ${doctorName} ${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
 
     if (currentMain && norm(currentMain.textContent) === norm(expectedText)) return;
 
