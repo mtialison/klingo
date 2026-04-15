@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.1
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -409,12 +409,6 @@
     const style = document.createElement('style');
     style.id = 'tm-klingo-layout-style';
     style.textContent = `
-      
-      /* ocultar botão BR do celular */
-      .tm-klingo-root .input-group-prepend:has(.dropdown-toggle) {
-        display: none !important;
-      }
-
       .tm-hidden-by-script {
         display: none !important;
       }
@@ -503,8 +497,20 @@
       .tm-observation-layout .form-control[type="text"] {
         min-height: 80px !important;
         height: 80px !important;
-        padding-top: 10px !important;
-        padding-bottom: 10px !important;
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+        line-height: 1.35 !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+      }
+
+      .tm-observation-layout .input-group {
+        align-items: flex-start !important;
+      }
+
+      .tm-observation-layout .input-group > .form-control[type="text"] {
+        align-self: flex-start !important;
       }
 
       .tm-observation-layout select.form-control,
