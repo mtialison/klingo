@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -409,7 +409,7 @@
     const style = document.createElement('style');
     style.id = 'tm-hidden-fields-style';
     style.textContent = `
-      #minutoModal .tm-hidden-by-script {
+      .tm-hidden-by-script {
         display: none !important;
       }
     `;
@@ -418,40 +418,48 @@
 
   function hideElement(el) {
     if (!el) return;
+    if (el.dataset.tmHiddenByScript === '1') return;
+
+    el.dataset.tmHiddenByScript = '1';
     el.classList.add('tm-hidden-by-script');
     el.style.setProperty('display', 'none', 'important');
   }
 
-  function textEquals(el, value) {
-    return norm(el && el.textContent) === norm(value);
+  function getSchedulingModalRoot() {
+    const modalContents = document.querySelectorAll('.modal-content');
+
+    for (const modal of modalContents) {
+      const text = norm(modal.innerText || modal.textContent || '');
+      if (!text) continue;
+
+      const hasDadosPessoais = text.includes('Dados Pessoais');
+      const hasOrigemPacientes = text.includes('ORIGEM DE PACIENTES') || text.includes('Origem de Pacientes');
+      const hasConfirmar = text.includes('Confirmar');
+
+      if (hasDadosPessoais && hasOrigemPacientes && hasConfirmar) {
+        return modal;
+      }
+    }
+
+    return null;
   }
 
-  function findTelefoneBlock(modal) {
-    const labels = modal.querySelectorAll('small');
+  function findColByLabel(root, labelText) {
+    const labels = root.querySelectorAll('small.form-text.text-muted.text-nowrap.text-truncate, small.form-text, small');
+
     for (const label of labels) {
-      if (!textEquals(label, 'Telefone')) continue;
+      if (norm(label.textContent) !== labelText) continue;
 
       const formGroup = label.closest('.form-group.mb-1') || label.closest('.form-group');
       const col = label.closest('.col.col-12.col-md-3') || label.closest('.col');
       return col || formGroup || label.parentElement;
     }
+
     return null;
   }
 
-  function findNomeSocialBlock(modal) {
-    const labels = modal.querySelectorAll('small');
-    for (const label of labels) {
-      if (!textEquals(label, 'Nome Social')) continue;
-
-      const formGroup = label.closest('.form-group.mb-1') || label.closest('.form-group');
-      const col = label.closest('.col.col-12.col-md-3') || label.closest('.col');
-      return col || formGroup || label.parentElement;
-    }
-    return null;
-  }
-
-  function findMaterialMedicamentoTaxaBlock(modal) {
-    const input = modal.querySelector('input[placeholder="Incluir material, medicamento ou taxa..."]');
+  function findMaterialBlock(root) {
+    const input = root.querySelector('input[placeholder="Incluir material, medicamento ou taxa..."]');
     if (!input) return null;
 
     return (
@@ -464,12 +472,12 @@
   }
 
   function hideAppointmentModalFields() {
-    const modal = document.querySelector('#minutoModal');
-    if (!modal) return;
+    const root = getSchedulingModalRoot();
+    if (!root) return;
 
-    const telefoneBlock = findTelefoneBlock(modal);
-    const nomeSocialBlock = findNomeSocialBlock(modal);
-    const materialBlock = findMaterialMedicamentoTaxaBlock(modal);
+    const telefoneBlock = findColByLabel(root, 'Telefone');
+    const nomeSocialBlock = findColByLabel(root, 'Nome Social');
+    const materialBlock = findMaterialBlock(root);
 
     hideElement(telefoneBlock);
     hideElement(nomeSocialBlock);
