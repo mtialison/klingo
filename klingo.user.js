@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  envenenado
-// @match        *://.klingo.app/*
+// @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
 // @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
@@ -295,13 +295,138 @@
     }
   }
 
+  function parsePastedBirthDate(text) {
+    const raw = norm(text);
+    if (!raw) return '';
+
+    const onlyDigits = raw.replace(/\D/g, '');
+
+    // ddmmaaaa
+    if (onlyDigits.length === 8) {
+      const dd = onlyDigits.slice(0, 2);
+      const mm = onlyDigits.slice(2, 4);
+      const yyyy = onlyDigits.slice(4, 8);
+
+      if (isValidDate(dd, mm, yyyy)) {
+        return `${yyyy}-${mm}-${dd}`;
+      }
+
+      // aaaammdd
+      const yyyy2 = onlyDigits.slice(0, 4);
+      const mm2 = onlyDigits.slice(4, 6);
+      const dd2 = onlyDigits.slice(6, 8);
+
+      if (isValidDate(dd2, mm2, yyyy2)) {
+        return `${yyyy2}-${mm2}-${dd2}`;
+      }
+    }
+
+    // dd/mm/aaaa | dd-mm-aaaa | dd.mm.aaaa
+    let m = raw.match(/^(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})$/);
+    if (m && isValidDate(m[1], m[2], m[3])) {
+      return `${m[3]}-${m[2]}-${m[1]}`;
+    }
+
+    // aaaa-mm-dd | aaaa/mm/dd | aaaa.mm.dd
+    m = raw.match(/^(\d{4})[\/.\-](\d{2})[\/.\-](\d{2})$/);
+    if (m && isValidDate(m[3], m[2], m[1])) {
+      return `${m[1]}-${m[2]}-${m[3]}`;
+    }
+
+    return '';
+  }
+
+  function isValidDate(dd, mm, yyyy) {
+    const day = Number(dd);
+    const month = Number(mm);
+    const year = Number(yyyy);
+
+    if (!day || !month || !year) return false;
+    if (year < 1900 || year > 2100) return false;
+
+    const date = new Date(year, month - 1, day);
+    return (
+      date.getFullYear() === year &&
+      date.getMonth() === month - 1 &&
+      date.getDate() === day
+    );
+  }
+
+  function setNativeInputValue(el, value) {
+    const prototype = Object.getPrototypeOf(el);
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+    const setter = descriptor && descriptor.set;
+
+    if (setter) {
+      setter.call(el, value);
+    } else {
+      el.value = value;
+    }
+  }
+
+  function dispatchBirthDateEvents(el) {
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+  }
+
+  function isBirthDateInput(input) {
+    if (!(input instanceof HTMLInputElement)) return false;
+    if (input.type !== 'date') return false;
+    if (input.name !== 'teste') return false;
+    return !!input.closest('.input-group.input-group-sm');
+  }
+
+  function handleBirthDatePaste(event) {
+    const input = event.target;
+    if (!isBirthDateInput(input)) return;
+
+    const pasted = event.clipboardData ? event.clipboardData.getData('text') : '';
+    const normalized = parsePastedBirthDate(pasted);
+    if (!normalized) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    setNativeInputValue(input, normalized);
+    dispatchBirthDateEvents(input);
+  }
+
+  function enableBirthDatePaste() {
+    const inputs = document.querySelectorAll('input[type="date"][name="teste"]');
+
+    inputs.forEach((input) => {
+      if (!isBirthDateInput(input)) return;
+      if (input.dataset.tmBirthPasteEnabled === '1') return;
+
+      input.dataset.tmBirthPasteEnabled = '1';
+      input.addEventListener('paste', handleBirthDatePaste, true);
+    });
+  }
+
   function burstUpdate() {
     updateModalTitle();
-    setTimeout(updateModalTitle, 100);
-    setTimeout(updateModalTitle, 250);
-    setTimeout(updateModalTitle, 500);
-    setTimeout(updateModalTitle, 900);
-    setTimeout(updateModalTitle, 1400);
+    enableBirthDatePaste();
+    setTimeout(() => {
+      updateModalTitle();
+      enableBirthDatePaste();
+    }, 100);
+    setTimeout(() => {
+      updateModalTitle();
+      enableBirthDatePaste();
+    }, 250);
+    setTimeout(() => {
+      updateModalTitle();
+      enableBirthDatePaste();
+    }, 500);
+    setTimeout(() => {
+      updateModalTitle();
+      enableBirthDatePaste();
+    }, 900);
+    setTimeout(() => {
+      updateModalTitle();
+      enableBirthDatePaste();
+    }, 1400);
   }
 
   document.addEventListener('click', (e) => {
@@ -309,6 +434,10 @@
       captureSelectionFromClick(e.target, false);
     }
     burstUpdate();
+  }, true);
+
+  document.addEventListener('focusin', () => {
+    enableBirthDatePaste();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
@@ -332,6 +461,7 @@
 
   const observer = new MutationObserver(() => {
     applyLoginIndicator();
+    enableBirthDatePaste();
     burstUpdate();
   });
 
@@ -343,11 +473,21 @@
 
   function initScript() {
     applyLoginIndicator();
+    enableBirthDatePaste();
 
     burstUpdate();
-    setTimeout(burstUpdate, 300);
-    setTimeout(burstUpdate, 1000);
-    setTimeout(burstUpdate, 2000);
+    setTimeout(() => {
+      enableBirthDatePaste();
+      burstUpdate();
+    }, 300);
+    setTimeout(() => {
+      enableBirthDatePaste();
+      burstUpdate();
+    }, 1000);
+    setTimeout(() => {
+      enableBirthDatePaste();
+      burstUpdate();
+    }, 2000);
 
     console.log('[TM] script inicializado', location.href);
   }
@@ -362,6 +502,7 @@
   window.addEventListener('pageshow', initScript);
   window.addEventListener('focus', () => {
     applyLoginIndicator();
+    enableBirthDatePaste();
     burstUpdate();
   });
   window.addEventListener('hashchange', initScript);
@@ -369,6 +510,7 @@
   setInterval(() => {
     if (location.hostname.endsWith('klingo.app')) {
       applyLoginIndicator();
+      enableBirthDatePaste();
       burstUpdate();
     }
   }, 1500);
