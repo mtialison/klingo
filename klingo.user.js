@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -301,7 +301,6 @@
 
     const onlyDigits = raw.replace(/\D/g, '');
 
-    // ddmmaaaa
     if (onlyDigits.length === 8) {
       const dd = onlyDigits.slice(0, 2);
       const mm = onlyDigits.slice(2, 4);
@@ -311,7 +310,6 @@
         return `${yyyy}-${mm}-${dd}`;
       }
 
-      // aaaammdd
       const yyyy2 = onlyDigits.slice(0, 4);
       const mm2 = onlyDigits.slice(4, 6);
       const dd2 = onlyDigits.slice(6, 8);
@@ -321,13 +319,11 @@
       }
     }
 
-    // dd/mm/aaaa | dd-mm-aaaa | dd.mm.aaaa
     let m = raw.match(/^(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})$/);
     if (m && isValidDate(m[1], m[2], m[3])) {
       return `${m[3]}-${m[2]}-${m[1]}`;
     }
 
-    // aaaa-mm-dd | aaaa/mm/dd | aaaa.mm.dd
     m = raw.match(/^(\d{4})[\/.\-](\d{2})[\/.\-](\d{2})$/);
     if (m && isValidDate(m[3], m[2], m[1])) {
       return `${m[1]}-${m[2]}-${m[3]}`;
@@ -404,29 +400,53 @@
     });
   }
 
+  /* =========================
+     OCULTAR ELEMENTOS (CSS)
+  ========================= */
+  function applyHiddenFieldsCSS() {
+    if (document.getElementById('tm-hide-fields')) return;
+
+    const style = document.createElement('style');
+    style.id = 'tm-hide-fields';
+    style.innerHTML = `
+      /* Ocultar TELEFONE */
+      #minutoModal small:contains("Telefone"),
+      #minutoModal small:contains("Telefone") + .input-group,
+      #minutoModal small:contains("Telefone") ~ * {
+        display: none !important;
+      }
+
+      /* Ocultar NOME SOCIAL */
+      #minutoModal small:contains("Nome Social"),
+      #minutoModal small:contains("Nome Social") + .input-group,
+      #minutoModal small:contains("Nome Social") ~ * {
+        display: none !important;
+      }
+
+      /* Ocultar MATERIAL / MEDICAMENTO */
+      #minutoModal input[placeholder*="material, medicamento ou taxa"] {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function burstUpdate() {
     updateModalTitle();
     enableBirthDatePaste();
-    setTimeout(() => {
-      updateModalTitle();
-      enableBirthDatePaste();
-    }, 100);
-    setTimeout(() => {
-      updateModalTitle();
-      enableBirthDatePaste();
-    }, 250);
-    setTimeout(() => {
-      updateModalTitle();
-      enableBirthDatePaste();
-    }, 500);
-    setTimeout(() => {
-      updateModalTitle();
-      enableBirthDatePaste();
-    }, 900);
-    setTimeout(() => {
-      updateModalTitle();
-      enableBirthDatePaste();
-    }, 1400);
+    applyHiddenFieldsCSS();
+
+    setTimeout(burstUpdateLite, 100);
+    setTimeout(burstUpdateLite, 250);
+    setTimeout(burstUpdateLite, 500);
+    setTimeout(burstUpdateLite, 900);
+    setTimeout(burstUpdateLite, 1400);
+  }
+
+  function burstUpdateLite() {
+    updateModalTitle();
+    enableBirthDatePaste();
+    applyHiddenFieldsCSS();
   }
 
   document.addEventListener('click', (e) => {
@@ -474,20 +494,13 @@
   function initScript() {
     applyLoginIndicator();
     enableBirthDatePaste();
+    applyHiddenFieldsCSS();
 
     burstUpdate();
-    setTimeout(() => {
-      enableBirthDatePaste();
-      burstUpdate();
-    }, 300);
-    setTimeout(() => {
-      enableBirthDatePaste();
-      burstUpdate();
-    }, 1000);
-    setTimeout(() => {
-      enableBirthDatePaste();
-      burstUpdate();
-    }, 2000);
+
+    setTimeout(burstUpdate, 300);
+    setTimeout(burstUpdate, 1000);
+    setTimeout(burstUpdate, 2000);
 
     console.log('[TM] script inicializado', location.href);
   }
@@ -500,11 +513,7 @@
 
   window.addEventListener('load', initScript);
   window.addEventListener('pageshow', initScript);
-  window.addEventListener('focus', () => {
-    applyLoginIndicator();
-    enableBirthDatePaste();
-    burstUpdate();
-  });
+  window.addEventListener('focus', burstUpdate);
   window.addEventListener('hashchange', initScript);
 
   setInterval(() => {
@@ -514,4 +523,5 @@
       burstUpdate();
     }
   }, 1500);
+
 })();
