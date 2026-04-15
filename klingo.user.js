@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      1.7
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -419,39 +419,61 @@
   function hideElement(el) {
     if (!el) return;
     el.classList.add('tm-hidden-by-script');
+    el.style.setProperty('display', 'none', 'important');
   }
 
-  function findFieldBlockByLabel(modal, labelText) {
-    const labels = modal.querySelectorAll('small.form-text, small.text-muted, small');
+  function textEquals(el, value) {
+    return norm(el && el.textContent) === norm(value);
+  }
+
+  function findTelefoneBlock(modal) {
+    const labels = modal.querySelectorAll('small');
     for (const label of labels) {
-      if (norm(label.textContent) === labelText) {
-        return label.closest('.col') || label.closest('.form-group') || label.parentElement;
-      }
+      if (!textEquals(label, 'Telefone')) continue;
+
+      const formGroup = label.closest('.form-group.mb-1') || label.closest('.form-group');
+      const col = label.closest('.col.col-12.col-md-3') || label.closest('.col');
+      return col || formGroup || label.parentElement;
     }
     return null;
+  }
+
+  function findNomeSocialBlock(modal) {
+    const labels = modal.querySelectorAll('small');
+    for (const label of labels) {
+      if (!textEquals(label, 'Nome Social')) continue;
+
+      const formGroup = label.closest('.form-group.mb-1') || label.closest('.form-group');
+      const col = label.closest('.col.col-12.col-md-3') || label.closest('.col');
+      return col || formGroup || label.parentElement;
+    }
+    return null;
+  }
+
+  function findMaterialMedicamentoTaxaBlock(modal) {
+    const input = modal.querySelector('input[placeholder="Incluir material, medicamento ou taxa..."]');
+    if (!input) return null;
+
+    return (
+      input.closest('.form-group.mb-3.mb-1') ||
+      input.closest('.form-group') ||
+      input.closest('.autocomplete') ||
+      input.closest('.input-group') ||
+      input.parentElement
+    );
   }
 
   function hideAppointmentModalFields() {
     const modal = document.querySelector('#minutoModal');
     if (!modal) return;
 
-    // 1) Campo Telefone
-    const telefoneBlock = findFieldBlockByLabel(modal, 'Telefone');
+    const telefoneBlock = findTelefoneBlock(modal);
+    const nomeSocialBlock = findNomeSocialBlock(modal);
+    const materialBlock = findMaterialMedicamentoTaxaBlock(modal);
+
     hideElement(telefoneBlock);
-
-    // 2) Campo Nome Social
-    const nomeSocialBlock = findFieldBlockByLabel(modal, 'Nome Social');
     hideElement(nomeSocialBlock);
-
-    // 3) Campo "Incluir material, medicamento ou taxa..."
-    const materialInput = modal.querySelector('input[placeholder="Incluir material, medicamento ou taxa..."]');
-    if (materialInput) {
-      const materialBlock =
-        materialInput.closest('.form-group') ||
-        materialInput.closest('.autocomplete') ||
-        materialInput.closest('.input-group');
-      hideElement(materialBlock);
-    }
+    hideElement(materialBlock);
   }
 
   function burstUpdateLite() {
