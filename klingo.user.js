@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      1.9
+// @version      2.0
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -409,6 +409,12 @@
     const style = document.createElement('style');
     style.id = 'tm-klingo-layout-style';
     style.textContent = `
+      
+      /* ocultar botão BR do celular */
+      .tm-klingo-root .input-group-prepend:has(.dropdown-toggle) {
+        display: none !important;
+      }
+
       .tm-hidden-by-script {
         display: none !important;
       }
