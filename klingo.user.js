@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      1.8
+// @version      1.9
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -74,7 +74,7 @@
   }
 
   function normalizeHour(text) {
-    let t = norm(text);
+    const t = norm(text);
     if (/^\d{1,2}h$/i.test(t)) {
       const hour = t.replace(/h/i, '');
       return `${String(parseInt(hour, 10)).padStart(2, '0')}h`;
@@ -403,14 +403,130 @@
   /* =========================
      OCULTAR ELEMENTOS (CSS)
   ========================= */
-  function injectHiddenFieldsCSS() {
-    if (document.getElementById('tm-hidden-fields-style')) return;
+  function injectLayoutCSS() {
+    if (document.getElementById('tm-klingo-layout-style')) return;
 
     const style = document.createElement('style');
-    style.id = 'tm-hidden-fields-style';
+    style.id = 'tm-klingo-layout-style';
     style.textContent = `
       .tm-hidden-by-script {
         display: none !important;
+      }
+
+      .tm-layout-host {
+        margin-top: 10px;
+        margin-bottom: 8px;
+      }
+
+      .tm-top-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.65fr) minmax(250px, 0.95fr);
+        gap: 28px;
+        align-items: start;
+      }
+
+      .tm-left-panel,
+      .tm-right-panel {
+        min-width: 0;
+      }
+
+      .tm-grid-row {
+        display: grid;
+        gap: 14px 18px;
+        margin-bottom: 10px;
+        align-items: end;
+      }
+
+      .tm-row-name-birth {
+        grid-template-columns: minmax(0, 2.3fr) minmax(190px, 1fr);
+      }
+
+      .tm-row-cpf-sexo-origem {
+        grid-template-columns: minmax(150px, 1fr) minmax(180px, 0.95fr) minmax(170px, 1fr);
+      }
+
+      .tm-row-cel-email {
+        grid-template-columns: minmax(170px, 0.95fr) minmax(0, 1.75fr);
+      }
+
+      .tm-right-panel .tm-field-slot + .tm-field-slot {
+        margin-top: 16px;
+      }
+
+      .tm-field-slot,
+      .tm-field-slot > .col,
+      .tm-field-slot > .form-group,
+      .tm-field-slot > [class*="col-"] {
+        min-width: 0;
+      }
+
+      .tm-field-slot > .col,
+      .tm-field-slot > [class*="col-"] {
+        flex: unset !important;
+        max-width: none !important;
+        width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      .tm-field-slot .form-group {
+        margin-bottom: 0 !important;
+      }
+
+      .tm-field-slot .input-group,
+      .tm-field-slot .form-control,
+      .tm-field-slot select,
+      .tm-field-slot input {
+        width: 100% !important;
+      }
+
+      .tm-observation-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.7fr) minmax(250px, 0.9fr);
+        gap: 26px;
+        align-items: start;
+        margin-top: 6px;
+        margin-bottom: 10px;
+      }
+
+      .tm-observation-layout .tm-field-slot > .col,
+      .tm-observation-layout .tm-field-slot > [class*="col-"] {
+        width: 100% !important;
+      }
+
+      .tm-observation-layout .form-control[type="text"] {
+        min-height: 80px !important;
+        height: 80px !important;
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+      }
+
+      .tm-observation-layout select.form-control,
+      .tm-observation-layout .input-group-text {
+        height: 34px !important;
+      }
+
+      .tm-observation-layout .input-group {
+        align-items: start;
+      }
+
+      .tm-klingo-root .form-row.tm-hidden-original-row,
+      .tm-klingo-root .row.tm-hidden-original-row,
+      .tm-klingo-root .tm-hidden-original-row {
+        display: none !important;
+      }
+
+      @media (max-width: 1200px) {
+        .tm-top-layout,
+        .tm-observation-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .tm-row-name-birth,
+        .tm-row-cpf-sexo-origem,
+        .tm-row-cel-email {
+          grid-template-columns: 1fr;
+        }
       }
     `;
     document.head.appendChild(style);
@@ -418,10 +534,14 @@
 
   function hideElement(el) {
     if (!el) return;
-    if (el.dataset.tmHiddenByScript === '1') return;
-
     el.dataset.tmHiddenByScript = '1';
     el.classList.add('tm-hidden-by-script');
+    el.style.setProperty('display', 'none', 'important');
+  }
+
+  function hideOriginalRow(el) {
+    if (!el) return;
+    el.classList.add('tm-hidden-original-row');
     el.style.setProperty('display', 'none', 'important');
   }
 
@@ -437,6 +557,7 @@
       const hasConfirmar = text.includes('Confirmar');
 
       if (hasDadosPessoais && hasOrigemPacientes && hasConfirmar) {
+        modal.classList.add('tm-klingo-root');
         return modal;
       }
     }
@@ -444,18 +565,62 @@
     return null;
   }
 
-  function findColByLabel(root, labelText) {
-    const labels = root.querySelectorAll('small.form-text.text-muted.text-nowrap.text-truncate, small.form-text, small');
-
-    for (const label of labels) {
-      if (norm(label.textContent) !== labelText) continue;
-
-      const formGroup = label.closest('.form-group.mb-1') || label.closest('.form-group');
-      const col = label.closest('.col.col-12.col-md-3') || label.closest('.col');
-      return col || formGroup || label.parentElement;
+  function findTextSmall(root, labelText) {
+    const smalls = root.querySelectorAll('small');
+    for (const small of smalls) {
+      if (norm(small.textContent) === labelText) return small;
     }
-
     return null;
+  }
+
+  function findColByLabel(root, labelText) {
+    const label = findTextSmall(root, labelText);
+    if (!label) return null;
+
+    return (
+      label.closest('.col') ||
+      label.closest('[class*="col-"]') ||
+      label.closest('.form-group') ||
+      label.parentElement
+    );
+  }
+
+  function getCadTemp(root) {
+    return root.querySelector('#cadTemp');
+  }
+
+  function getCadTempTitleRow(root) {
+    const cadTemp = getCadTemp(root);
+    if (!cadTemp) return null;
+
+    const title = findTextSmall(cadTemp, 'Dados Pessoais');
+    return title ? title.closest('.border-bottom') : null;
+  }
+
+  function getObservationTitleRow(root) {
+    const title = findTextSmall(root, 'Observação');
+    return title ? title.closest('.border-bottom') : null;
+  }
+
+  function getObservationFieldsRow(root) {
+    const titleRow = getObservationTitleRow(root);
+    if (!titleRow) return null;
+
+    let current = titleRow.nextElementSibling;
+    while (current) {
+      if (current.classList && current.classList.contains('form-row')) return current;
+      current = current.nextElementSibling;
+    }
+    return null;
+  }
+
+  function getOriginTitleRow(root) {
+    const title = findTextSmall(root, 'ORIGEM DE PACIENTES');
+    return title ? title.closest('.border-bottom') : null;
+  }
+
+  function findOriginFieldBlock(root) {
+    return findColByLabel(root, 'Origem de Pacientes');
   }
 
   function findMaterialBlock(root) {
@@ -469,6 +634,145 @@
       input.closest('.input-group') ||
       input.parentElement
     );
+  }
+
+  function ensureHost(parent, id, className) {
+    let host = parent.querySelector('#' + id);
+    if (!host) {
+      host = document.createElement('div');
+      host.id = id;
+      host.className = className;
+      parent.appendChild(host);
+    }
+    return host;
+  }
+
+  function moveToSlot(slot, block) {
+    if (!slot || !block) return;
+    slot.innerHTML = '';
+    slot.appendChild(block);
+  }
+
+  function reorganizeSchedulingModalLayout() {
+    const root = getSchedulingModalRoot();
+    if (!root) return;
+
+    const cadTemp = getCadTemp(root);
+    const cadTempTitleRow = getCadTempTitleRow(root);
+    const observationTitleRow = getObservationTitleRow(root);
+    const observationFieldsRow = getObservationFieldsRow(root);
+    const originTitleRow = getOriginTitleRow(root);
+
+    if (!cadTemp || !cadTempTitleRow || !observationTitleRow || !observationFieldsRow) return;
+
+    const sexoBlock = findColByLabel(cadTemp, 'Sexo');
+    const birthBlock = findColByLabel(cadTemp, 'Data de Nascimento');
+    const celularBlock = findColByLabel(cadTemp, 'Celular');
+    const emailBlock = findColByLabel(cadTemp, 'e-mail');
+    const nomeBlock = findColByLabel(cadTemp, 'Nome');
+    const cpfBlock = findColByLabel(cadTemp, 'CPF');
+    const carteiraBlock = findColByLabel(cadTemp, 'No. da Carteira do Plano');
+    const validadeBlock = findColByLabel(cadTemp, 'Validade da Carteira');
+    const origemBlock = findOriginFieldBlock(root);
+
+    const observationInputBlock = observationFieldsRow.children[0] || null;
+    const observationSelectBlock = observationFieldsRow.children[1] || null;
+
+    if (
+      !sexoBlock ||
+      !birthBlock ||
+      !celularBlock ||
+      !emailBlock ||
+      !nomeBlock ||
+      !cpfBlock ||
+      !carteiraBlock ||
+      !validadeBlock ||
+      !origemBlock ||
+      !observationInputBlock ||
+      !observationSelectBlock
+    ) {
+      return;
+    }
+
+    const topLayoutHost = ensureHost(cadTemp, 'tm-top-layout-host', 'tm-layout-host');
+    cadTemp.insertBefore(topLayoutHost, cadTempTitleRow.nextSibling);
+
+    topLayoutHost.innerHTML = `
+      <div class="tm-top-layout">
+        <div class="tm-left-panel">
+          <div class="tm-grid-row tm-row-name-birth">
+            <div class="tm-field-slot" data-slot="nome"></div>
+            <div class="tm-field-slot" data-slot="nascimento"></div>
+          </div>
+          <div class="tm-grid-row tm-row-cpf-sexo-origem">
+            <div class="tm-field-slot" data-slot="cpf"></div>
+            <div class="tm-field-slot" data-slot="sexo"></div>
+            <div class="tm-field-slot" data-slot="origem"></div>
+          </div>
+          <div class="tm-grid-row tm-row-cel-email">
+            <div class="tm-field-slot" data-slot="celular"></div>
+            <div class="tm-field-slot" data-slot="email"></div>
+          </div>
+        </div>
+        <div class="tm-right-panel">
+          <div class="tm-field-slot" data-slot="carteira"></div>
+          <div class="tm-field-slot" data-slot="validade"></div>
+        </div>
+      </div>
+    `;
+
+    moveToSlot(topLayoutHost.querySelector('[data-slot="nome"]'), nomeBlock);
+    moveToSlot(topLayoutHost.querySelector('[data-slot="nascimento"]'), birthBlock);
+    moveToSlot(topLayoutHost.querySelector('[data-slot="cpf"]'), cpfBlock);
+    moveToSlot(topLayoutHost.querySelector('[data-slot="sexo"]'), sexoBlock);
+    moveToSlot(topLayoutHost.querySelector('[data-slot="origem"]'), origemBlock);
+    moveToSlot(topLayoutHost.querySelector('[data-slot="celular"]'), celularBlock);
+    moveToSlot(topLayoutHost.querySelector('[data-slot="email"]'), emailBlock);
+    moveToSlot(topLayoutHost.querySelector('[data-slot="carteira"]'), carteiraBlock);
+    moveToSlot(topLayoutHost.querySelector('[data-slot="validade"]'), validadeBlock);
+
+    const observationHostParent = observationTitleRow.parentElement;
+    const observationHost = ensureHost(observationHostParent, 'tm-observation-layout-host', 'tm-observation-layout');
+    if (observationTitleRow.nextSibling !== observationHost) {
+      observationHostParent.insertBefore(observationHost, observationTitleRow.nextSibling);
+    }
+
+    observationHost.innerHTML = `
+      <div class="tm-field-slot" data-slot="observacao-input"></div>
+      <div class="tm-field-slot" data-slot="observacao-select"></div>
+    `;
+
+    moveToSlot(observationHost.querySelector('[data-slot="observacao-input"]'), observationInputBlock);
+    moveToSlot(observationHost.querySelector('[data-slot="observacao-select"]'), observationSelectBlock);
+
+    cadTemp.querySelectorAll('.form-row').forEach((row) => hideOriginalRow(row));
+    hideOriginalRow(observationFieldsRow);
+
+    if (originTitleRow) {
+      const originMainRow = originTitleRow.closest('.row');
+      hideOriginalRow(originTitleRow);
+      hideOriginalRow(originMainRow);
+    }
+
+    [
+      sexoBlock,
+      birthBlock,
+      celularBlock,
+      emailBlock,
+      nomeBlock,
+      cpfBlock,
+      carteiraBlock,
+      validadeBlock,
+      origemBlock,
+      observationInputBlock,
+      observationSelectBlock
+    ].forEach((block) => {
+      block.style.setProperty('width', '100%', 'important');
+      block.style.setProperty('max-width', 'none', 'important');
+      block.style.setProperty('padding-left', '0', 'important');
+      block.style.setProperty('padding-right', '0', 'important');
+      block.style.setProperty('flex', 'unset', 'important');
+    });
   }
 
   function hideAppointmentModalFields() {
@@ -487,8 +791,9 @@
   function burstUpdateLite() {
     updateModalTitle();
     enableBirthDatePaste();
-    injectHiddenFieldsCSS();
+    injectLayoutCSS();
     hideAppointmentModalFields();
+    reorganizeSchedulingModalLayout();
   }
 
   function burstUpdate() {
@@ -510,6 +815,7 @@
   document.addEventListener('focusin', () => {
     enableBirthDatePaste();
     hideAppointmentModalFields();
+    reorganizeSchedulingModalLayout();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
@@ -546,8 +852,9 @@
   function initScript() {
     applyLoginIndicator();
     enableBirthDatePaste();
-    injectHiddenFieldsCSS();
+    injectLayoutCSS();
     hideAppointmentModalFields();
+    reorganizeSchedulingModalLayout();
 
     burstUpdate();
 
