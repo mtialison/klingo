@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      1.5
+// @version      1.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -403,50 +403,71 @@
   /* =========================
      OCULTAR ELEMENTOS (CSS)
   ========================= */
-  function applyHiddenFieldsCSS() {
-    if (document.getElementById('tm-hide-fields')) return;
+  function injectHiddenFieldsCSS() {
+    if (document.getElementById('tm-hidden-fields-style')) return;
 
     const style = document.createElement('style');
-    style.id = 'tm-hide-fields';
-    style.innerHTML = `
-      /* Ocultar TELEFONE */
-      #minutoModal small:contains("Telefone"),
-      #minutoModal small:contains("Telefone") + .input-group,
-      #minutoModal small:contains("Telefone") ~ * {
-        display: none !important;
-      }
-
-      /* Ocultar NOME SOCIAL */
-      #minutoModal small:contains("Nome Social"),
-      #minutoModal small:contains("Nome Social") + .input-group,
-      #minutoModal small:contains("Nome Social") ~ * {
-        display: none !important;
-      }
-
-      /* Ocultar MATERIAL / MEDICAMENTO */
-      #minutoModal input[placeholder*="material, medicamento ou taxa"] {
+    style.id = 'tm-hidden-fields-style';
+    style.textContent = `
+      #minutoModal .tm-hidden-by-script {
         display: none !important;
       }
     `;
     document.head.appendChild(style);
   }
 
-  function burstUpdate() {
-    updateModalTitle();
-    enableBirthDatePaste();
-    applyHiddenFieldsCSS();
+  function hideElement(el) {
+    if (!el) return;
+    el.classList.add('tm-hidden-by-script');
+  }
 
-    setTimeout(burstUpdateLite, 100);
-    setTimeout(burstUpdateLite, 250);
-    setTimeout(burstUpdateLite, 500);
-    setTimeout(burstUpdateLite, 900);
-    setTimeout(burstUpdateLite, 1400);
+  function findFieldBlockByLabel(modal, labelText) {
+    const labels = modal.querySelectorAll('small.form-text, small.text-muted, small');
+    for (const label of labels) {
+      if (norm(label.textContent) === labelText) {
+        return label.closest('.col') || label.closest('.form-group') || label.parentElement;
+      }
+    }
+    return null;
+  }
+
+  function hideAppointmentModalFields() {
+    const modal = document.querySelector('#minutoModal');
+    if (!modal) return;
+
+    // 1) Campo Telefone
+    const telefoneBlock = findFieldBlockByLabel(modal, 'Telefone');
+    hideElement(telefoneBlock);
+
+    // 2) Campo Nome Social
+    const nomeSocialBlock = findFieldBlockByLabel(modal, 'Nome Social');
+    hideElement(nomeSocialBlock);
+
+    // 3) Campo "Incluir material, medicamento ou taxa..."
+    const materialInput = modal.querySelector('input[placeholder="Incluir material, medicamento ou taxa..."]');
+    if (materialInput) {
+      const materialBlock =
+        materialInput.closest('.form-group') ||
+        materialInput.closest('.autocomplete') ||
+        materialInput.closest('.input-group');
+      hideElement(materialBlock);
+    }
   }
 
   function burstUpdateLite() {
     updateModalTitle();
     enableBirthDatePaste();
-    applyHiddenFieldsCSS();
+    injectHiddenFieldsCSS();
+    hideAppointmentModalFields();
+  }
+
+  function burstUpdate() {
+    burstUpdateLite();
+    setTimeout(burstUpdateLite, 100);
+    setTimeout(burstUpdateLite, 250);
+    setTimeout(burstUpdateLite, 500);
+    setTimeout(burstUpdateLite, 900);
+    setTimeout(burstUpdateLite, 1400);
   }
 
   document.addEventListener('click', (e) => {
@@ -458,6 +479,7 @@
 
   document.addEventListener('focusin', () => {
     enableBirthDatePaste();
+    hideAppointmentModalFields();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
@@ -482,7 +504,7 @@
   const observer = new MutationObserver(() => {
     applyLoginIndicator();
     enableBirthDatePaste();
-    burstUpdate();
+    burstUpdateLite();
   });
 
   observer.observe(document.body, {
@@ -494,13 +516,25 @@
   function initScript() {
     applyLoginIndicator();
     enableBirthDatePaste();
-    applyHiddenFieldsCSS();
+    injectHiddenFieldsCSS();
+    hideAppointmentModalFields();
 
     burstUpdate();
 
-    setTimeout(burstUpdate, 300);
-    setTimeout(burstUpdate, 1000);
-    setTimeout(burstUpdate, 2000);
+    setTimeout(() => {
+      enableBirthDatePaste();
+      burstUpdate();
+    }, 300);
+
+    setTimeout(() => {
+      enableBirthDatePaste();
+      burstUpdate();
+    }, 1000);
+
+    setTimeout(() => {
+      enableBirthDatePaste();
+      burstUpdate();
+    }, 2000);
 
     console.log('[TM] script inicializado', location.href);
   }
@@ -513,7 +547,11 @@
 
   window.addEventListener('load', initScript);
   window.addEventListener('pageshow', initScript);
-  window.addEventListener('focus', burstUpdate);
+  window.addEventListener('focus', () => {
+    applyLoginIndicator();
+    enableBirthDatePaste();
+    burstUpdate();
+  });
   window.addEventListener('hashchange', initScript);
 
   setInterval(() => {
@@ -523,5 +561,4 @@
       burstUpdate();
     }
   }, 1500);
-
 })();
