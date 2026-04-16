@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.9
+// @version      2.10
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -595,7 +595,13 @@
         color: #f4b400 !important;
       }
 
-      .tm-klingo-root .tm-procedure-title {
+      
+      /* OCULTAR CONSULTÓRIO AO LADO DA UNIDADE (HEADER) */
+      .tm-klingo-root .list-group-item.list-group-item-success small.text-muted {
+        display: none !important;
+      }
+
+.tm-klingo-root .tm-procedure-title {
         display: block !important;
         margin-bottom: 8px !important;
         font-size: 20px !important;
