@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.7
+// @version      2.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -405,18 +405,13 @@
     });
   }
 
-  /* =========================
-     OCULTAR ELEMENTOS (CSS)
-  ========================= */
   function injectLayoutCSS() {
     if (document.getElementById('tm-klingo-layout-style')) return;
 
     const style = document.createElement('style');
     style.id = 'tm-klingo-layout-style';
     style.textContent = `
-      .tm-hidden-by-script {
-        display: none !important;
-      }
+      .tm-hidden-by-script { display: none !important; }
 
       .tm-layout-host {
         margin-top: 8px;
@@ -424,46 +419,33 @@
       }
 
       .tm-top-layout {
-        display: block;
-        width: 572px;
-        max-width: 572px;
-      }
-
-      .tm-left-panel,
-      .tm-right-panel {
-        min-width: 0;
-      }
-
-      .tm-right-panel {
-        display: none !important;
+        display: grid;
+        grid-template-columns: 580px;
+        gap: 16px;
+        align-items: start;
       }
 
       .tm-grid-row {
         display: grid;
-        gap: 10px 12px;
+        gap: 10px 14px;
         margin-bottom: 10px;
         align-items: end;
       }
 
       .tm-row-name-birth {
-        grid-template-columns: 382px 178px;
+        grid-template-columns: 390px 175px;
       }
 
       .tm-row-cpf-sexo-origem {
-        grid-template-columns: 172px 198px 176px;
+        grid-template-columns: 180px 180px 180px;
       }
 
       .tm-row-cel-email {
-        grid-template-columns: 172px 388px;
+        grid-template-columns: 180px 372px;
       }
 
       .tm-row-carteira-validade {
         grid-template-columns: 280px 160px;
-        width: 452px;
-      }
-
-      .tm-right-panel .tm-field-slot + .tm-field-slot {
-        margin-top: 0 !important;
       }
 
       .tm-field-slot,
@@ -506,8 +488,8 @@
 
       .tm-observation-layout {
         display: grid;
-        grid-template-columns: 572px 254px;
-        gap: 40px;
+        grid-template-columns: 580px 255px;
+        gap: 34px;
         align-items: start;
         margin-top: 6px;
         margin-bottom: 10px;
@@ -519,8 +501,8 @@
       }
 
       .tm-observation-textarea {
-        min-height: 68px !important;
-        height: 68px !important;
+        min-height: 78px !important;
+        height: 78px !important;
         padding: 8px 10px !important;
         line-height: 1.35 !important;
         resize: none !important;
@@ -539,7 +521,6 @@
 
       .tm-observation-layout .input-group-prepend {
         display: flex !important;
-        margin-right: 0 !important;
         flex: 0 0 auto !important;
       }
 
@@ -547,22 +528,16 @@
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        height: 44px !important;
-        min-width: 42px !important;
-        width: 42px !important;
+        height: 48px !important;
+        min-width: 48px !important;
         border-top-right-radius: 0 !important;
         border-bottom-right-radius: 0 !important;
       }
 
-      .tm-observation-layout [data-slot="observacao-select"] {
-        width: 254px !important;
-        max-width: 254px !important;
-      }
-
       .tm-observation-layout select.form-control {
-        height: 44px !important;
-        max-width: 212px !important;
-        width: 212px !important;
+        height: 48px !important;
+        width: 210px !important;
+        max-width: 210px !important;
         border-top-left-radius: 0 !important;
         border-bottom-left-radius: 0 !important;
       }
@@ -573,63 +548,64 @@
         display: none !important;
       }
 
-
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group,
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success {
-        max-width: 1178px !important;
-        width: 1178px !important;
+        width: 610px !important;
+        max-width: 610px !important;
       }
 
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group {
-        max-width: 1178px !important;
+      .tm-klingo-root .tm-header-label {
+        display: block !important;
       }
 
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group .h4.mb-1 {
-        font-size: 23px !important;
-        line-height: 1.2 !important;
+      .tm-klingo-root .tm-header-title {
+        display: block !important;
         margin-bottom: 10px !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group .lead {
-        font-size: 16px !important;
         line-height: 1.25 !important;
+        font-size: 20px !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
       }
 
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group .d-flex.justify-content-between {
+      .tm-klingo-root .tm-header-row-2,
+      .tm-klingo-root .tm-header-row-3 {
         display: flex !important;
-        justify-content: space-between !important;
-        align-items: flex-start !important;
-        gap: 12px !important;
+        flex-wrap: wrap !important;
+        gap: 8px 14px !important;
+        margin-bottom: 8px !important;
+        align-items: center !important;
       }
 
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group .d-flex.justify-content-between > div:first-child {
-        min-width: 0 !important;
-        flex: 1 1 auto !important;
+      .tm-klingo-root .tm-header-row-2 .lead,
+      .tm-klingo-root .tm-header-row-3 .lead,
+      .tm-klingo-root .tm-header-notes,
+      .tm-klingo-root .tm-header-notes footer {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
       }
 
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group .d-flex.justify-content-between > div.lead {
-        flex: 0 0 auto !important;
-        white-space: nowrap !important;
-        text-align: right !important;
+      .tm-klingo-root .tm-header-notes {
+        margin-top: 4px !important;
       }
 
-      .tm-klingo-root [data-slot="validade"] {
-        margin-top: 0 !important;
-        align-self: start !important;
-      }
-
-      .tm-klingo-root [data-slot="validade"] .form-control {
-        max-width: 160px !important;
-        width: 160px !important;
+      .tm-klingo-root .tm-header-notes footer {
+        display: block !important;
+        font-size: 12px !important;
+        line-height: 1.35 !important;
       }
 
       .tm-klingo-root input[placeholder="Adicionar procedimento..."] {
-        max-width: 1178px !important;
-        width: 1178px !important;
+        width: 840px !important;
+        max-width: 840px !important;
       }
 
       .tm-klingo-root .modal-footer {
         justify-content: flex-start !important;
-        padding-left: 18px !important;
+        padding-left: 22px !important;
       }
 
       @media (max-width: 1200px) {
@@ -640,8 +616,16 @@
 
         .tm-row-name-birth,
         .tm-row-cpf-sexo-origem,
-        .tm-row-cel-email {
+        .tm-row-cel-email,
+        .tm-row-carteira-validade {
           grid-template-columns: 1fr;
+        }
+
+        .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group,
+        .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success,
+        .tm-klingo-root input[placeholder="Adicionar procedimento..."] {
+          width: 100% !important;
+          max-width: 100% !important;
         }
       }
     `;
@@ -669,10 +653,9 @@
       if (!text) continue;
 
       const hasDadosPessoais = text.includes('Dados Pessoais');
-      const hasOrigemPacientes = text.includes('ORIGEM DE PACIENTES') || text.includes('Origem de Pacientes');
       const hasConfirmar = text.includes('Confirmar');
 
-      if (hasDadosPessoais && hasOrigemPacientes && hasConfirmar) {
+      if (hasDadosPessoais && hasConfirmar) {
         modal.classList.add('tm-klingo-root');
         return modal;
       }
@@ -818,6 +801,48 @@
     }
   }
 
+  function reorganizeHeader(root) {
+    const headerItem = root.querySelector('.list-group > .list-group-item.list-group-item-success');
+    if (!headerItem) return;
+
+    const label = headerItem.querySelector('label.mb-0.w-100');
+    const titleDiv = label ? label.querySelector('.h4.mb-1') : null;
+    const metaRow = label ? label.querySelector('.d-flex.justify-content-between') : null;
+    if (!label || !titleDiv || !metaRow) return;
+    if (label.dataset.tmHeaderReady === '1') return;
+
+    const leftWrap = metaRow.children[0] || null;
+    const dateWrap = metaRow.children[1] || null;
+    if (!leftWrap) return;
+
+    const spans = leftWrap.querySelectorAll(':scope > span');
+    const paymentSpan = spans[0] || null;
+    const doctorSpan = spans[1] || null;
+    const unitSpan = spans[2] || null;
+
+    const notesWrap = [...label.children].find((el) => el !== titleDiv && el !== metaRow && norm(el.textContent));
+    const row2 = document.createElement('div');
+    row2.className = 'tm-header-row-2';
+
+    const row3 = document.createElement('div');
+    row3.className = 'tm-header-row-3';
+
+    if (paymentSpan) row2.appendChild(paymentSpan);
+    if (doctorSpan) row2.appendChild(doctorSpan);
+    if (unitSpan) row3.appendChild(unitSpan);
+    if (dateWrap) row3.appendChild(dateWrap);
+
+    titleDiv.classList.add('tm-header-title');
+    label.classList.add('tm-header-label');
+
+    metaRow.remove();
+    label.insertBefore(row2, notesWrap || null);
+    label.insertBefore(row3, notesWrap || null);
+
+    if (notesWrap) notesWrap.classList.add('tm-header-notes');
+    label.dataset.tmHeaderReady = '1';
+  }
+
   function reorganizeSchedulingModalLayout() {
     const root = getSchedulingModalRoot();
     if (!root) return;
@@ -844,17 +869,9 @@
     const observationSelectBlock = observationFieldsRow.children[1] || null;
 
     if (
-      !sexoBlock ||
-      !birthBlock ||
-      !celularBlock ||
-      !emailBlock ||
-      !nomeBlock ||
-      !cpfBlock ||
-      !carteiraBlock ||
-      !validadeBlock ||
-      !origemBlock ||
-      !observationInputBlock ||
-      !observationSelectBlock
+      !sexoBlock || !birthBlock || !celularBlock || !emailBlock || !nomeBlock ||
+      !cpfBlock || !carteiraBlock || !validadeBlock || !origemBlock ||
+      !observationInputBlock || !observationSelectBlock
     ) {
       return;
     }
@@ -864,26 +881,23 @@
 
     topLayoutHost.innerHTML = `
       <div class="tm-top-layout">
-        <div class="tm-left-panel">
-          <div class="tm-grid-row tm-row-name-birth">
-            <div class="tm-field-slot" data-slot="nome"></div>
-            <div class="tm-field-slot" data-slot="nascimento"></div>
-          </div>
-          <div class="tm-grid-row tm-row-cpf-sexo-origem">
-            <div class="tm-field-slot" data-slot="cpf"></div>
-            <div class="tm-field-slot" data-slot="sexo"></div>
-            <div class="tm-field-slot" data-slot="origem"></div>
-          </div>
-          <div class="tm-grid-row tm-row-cel-email">
-            <div class="tm-field-slot" data-slot="celular"></div>
-            <div class="tm-field-slot" data-slot="email"></div>
-          </div>
-          <div class="tm-grid-row tm-row-carteira-validade">
-            <div class="tm-field-slot" data-slot="carteira"></div>
-            <div class="tm-field-slot" data-slot="validade"></div>
-          </div>
+        <div class="tm-grid-row tm-row-name-birth">
+          <div class="tm-field-slot" data-slot="nome"></div>
+          <div class="tm-field-slot" data-slot="nascimento"></div>
         </div>
-        <div class="tm-right-panel"></div>
+        <div class="tm-grid-row tm-row-cpf-sexo-origem">
+          <div class="tm-field-slot" data-slot="cpf"></div>
+          <div class="tm-field-slot" data-slot="sexo"></div>
+          <div class="tm-field-slot" data-slot="origem"></div>
+        </div>
+        <div class="tm-grid-row tm-row-cel-email">
+          <div class="tm-field-slot" data-slot="celular"></div>
+          <div class="tm-field-slot" data-slot="email"></div>
+        </div>
+        <div class="tm-grid-row tm-row-carteira-validade">
+          <div class="tm-field-slot" data-slot="carteira"></div>
+          <div class="tm-field-slot" data-slot="validade"></div>
+        </div>
       </div>
     `;
 
@@ -921,17 +935,9 @@
     }
 
     [
-      sexoBlock,
-      birthBlock,
-      celularBlock,
-      emailBlock,
-      nomeBlock,
-      cpfBlock,
-      carteiraBlock,
-      validadeBlock,
-      origemBlock,
-      observationInputBlock,
-      observationSelectBlock
+      sexoBlock, birthBlock, celularBlock, emailBlock, nomeBlock,
+      cpfBlock, carteiraBlock, validadeBlock, origemBlock,
+      observationInputBlock, observationSelectBlock
     ].forEach((block) => {
       block.style.setProperty('width', '100%', 'important');
       block.style.setProperty('max-width', 'none', 'important');
@@ -958,11 +964,13 @@
   }
 
   function burstUpdateLite() {
+    const root = getSchedulingModalRoot();
     updateModalTitle();
     enableBirthDatePaste();
     injectLayoutCSS();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
+    if (root) reorganizeHeader(root);
   }
 
   function burstUpdate() {
@@ -984,7 +992,7 @@
   document.addEventListener('focusin', () => {
     enableBirthDatePaste();
     hideAppointmentModalFields();
-    reorganizeSchedulingModalLayout();
+    burstUpdateLite();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
@@ -1023,8 +1031,6 @@
     enableBirthDatePaste();
     injectLayoutCSS();
     hideAppointmentModalFields();
-    reorganizeSchedulingModalLayout();
-
     burstUpdate();
 
     setTimeout(() => {
