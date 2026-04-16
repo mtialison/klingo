@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.6
+// @version      2.7
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -424,10 +424,9 @@
       }
 
       .tm-top-layout {
-        display: grid;
-        grid-template-columns: 509px 226px;
-        gap: 36px;
-        align-items: start;
+        display: block;
+        width: 572px;
+        max-width: 572px;
       }
 
       .tm-left-panel,
@@ -436,10 +435,7 @@
       }
 
       .tm-right-panel {
-        display: grid;
-        grid-template-rows: auto auto;
-        row-gap: 18px;
-        align-content: start;
+        display: none !important;
       }
 
       .tm-grid-row {
@@ -450,15 +446,20 @@
       }
 
       .tm-row-name-birth {
-        grid-template-columns: 342px 155px;
+        grid-template-columns: 382px 178px;
       }
 
       .tm-row-cpf-sexo-origem {
-        grid-template-columns: 155px 175px 155px;
+        grid-template-columns: 172px 198px 176px;
       }
 
       .tm-row-cel-email {
-        grid-template-columns: 155px 342px;
+        grid-template-columns: 172px 388px;
+      }
+
+      .tm-row-carteira-validade {
+        grid-template-columns: 280px 160px;
+        width: 452px;
       }
 
       .tm-right-panel .tm-field-slot + .tm-field-slot {
@@ -505,8 +506,8 @@
 
       .tm-observation-layout {
         display: grid;
-        grid-template-columns: 509px 226px;
-        gap: 36px;
+        grid-template-columns: 572px 254px;
+        gap: 40px;
         align-items: start;
         margin-top: 6px;
         margin-bottom: 10px;
@@ -547,15 +548,21 @@
         align-items: center !important;
         justify-content: center !important;
         height: 44px !important;
-        min-width: 38px !important;
+        min-width: 42px !important;
+        width: 42px !important;
         border-top-right-radius: 0 !important;
         border-bottom-right-radius: 0 !important;
       }
 
+      .tm-observation-layout [data-slot="observacao-select"] {
+        width: 254px !important;
+        max-width: 254px !important;
+      }
+
       .tm-observation-layout select.form-control {
         height: 44px !important;
-        max-width: 188px !important;
-        width: 188px !important;
+        max-width: 212px !important;
+        width: 212px !important;
         border-top-left-radius: 0 !important;
         border-bottom-left-radius: 0 !important;
       }
@@ -568,34 +575,56 @@
 
 
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success {
-        max-width: 1046px !important;
-        width: 1046px !important;
+        max-width: 1178px !important;
+        width: 1178px !important;
       }
 
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group {
-        max-width: 1046px !important;
+        max-width: 1178px !important;
+      }
+
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group .h4.mb-1 {
+        font-size: 23px !important;
+        line-height: 1.2 !important;
+        margin-bottom: 10px !important;
+      }
+
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group .lead {
+        font-size: 16px !important;
+        line-height: 1.25 !important;
+      }
+
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group .d-flex.justify-content-between {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+      }
+
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group .d-flex.justify-content-between > div:first-child {
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+      }
+
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group .d-flex.justify-content-between > div.lead {
+        flex: 0 0 auto !important;
+        white-space: nowrap !important;
+        text-align: right !important;
       }
 
       .tm-klingo-root [data-slot="validade"] {
-        margin-top: 2px !important;
+        margin-top: 0 !important;
+        align-self: start !important;
       }
 
       .tm-klingo-root [data-slot="validade"] .form-control {
-        max-width: 202px !important;
-        width: 202px !important;
-      }
-
-      .tm-klingo-root [data-slot="observacao-select"] {
-        max-width: 226px !important;
-      }
-
-      .tm-klingo-root [data-slot="observacao-select"] .form-group {
-        width: 226px !important;
+        max-width: 160px !important;
+        width: 160px !important;
       }
 
       .tm-klingo-root input[placeholder="Adicionar procedimento..."] {
-        max-width: 1046px !important;
-        width: 1046px !important;
+        max-width: 1178px !important;
+        width: 1178px !important;
       }
 
       .tm-klingo-root .modal-footer {
@@ -849,11 +878,12 @@
             <div class="tm-field-slot" data-slot="celular"></div>
             <div class="tm-field-slot" data-slot="email"></div>
           </div>
+          <div class="tm-grid-row tm-row-carteira-validade">
+            <div class="tm-field-slot" data-slot="carteira"></div>
+            <div class="tm-field-slot" data-slot="validade"></div>
+          </div>
         </div>
-        <div class="tm-right-panel">
-          <div class="tm-field-slot" data-slot="carteira"></div>
-          <div class="tm-field-slot" data-slot="validade"></div>
-        </div>
+        <div class="tm-right-panel"></div>
       </div>
     `;
 
