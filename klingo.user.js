@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.5
+// @version      2.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -425,14 +425,21 @@
 
       .tm-top-layout {
         display: grid;
-        grid-template-columns: 509px 250px;
-        gap: 24px;
+        grid-template-columns: 509px 226px;
+        gap: 36px;
         align-items: start;
       }
 
       .tm-left-panel,
       .tm-right-panel {
         min-width: 0;
+      }
+
+      .tm-right-panel {
+        display: grid;
+        grid-template-rows: auto auto;
+        row-gap: 18px;
+        align-content: start;
       }
 
       .tm-grid-row {
@@ -455,7 +462,7 @@
       }
 
       .tm-right-panel .tm-field-slot + .tm-field-slot {
-        margin-top: 16px;
+        margin-top: 0 !important;
       }
 
       .tm-field-slot,
@@ -498,8 +505,8 @@
 
       .tm-observation-layout {
         display: grid;
-        grid-template-columns: 509px 240px;
-        gap: 24px;
+        grid-template-columns: 509px 226px;
+        gap: 36px;
         align-items: start;
         margin-top: 6px;
         margin-bottom: 10px;
@@ -524,18 +531,76 @@
       }
 
       .tm-observation-layout .input-group {
-        align-items: flex-start !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
       }
 
-      .tm-observation-layout select.form-control,
+      .tm-observation-layout .input-group-prepend {
+        display: flex !important;
+        margin-right: 0 !important;
+        flex: 0 0 auto !important;
+      }
+
       .tm-observation-layout .input-group-text {
-        height: 38px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        height: 44px !important;
+        min-width: 38px !important;
+        border-top-right-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+      }
+
+      .tm-observation-layout select.form-control {
+        height: 44px !important;
+        max-width: 188px !important;
+        width: 188px !important;
+        border-top-left-radius: 0 !important;
+        border-bottom-left-radius: 0 !important;
       }
 
       .tm-klingo-root .form-row.tm-hidden-original-row,
       .tm-klingo-root .row.tm-hidden-original-row,
       .tm-klingo-root .tm-hidden-original-row {
         display: none !important;
+      }
+
+
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success {
+        max-width: 1046px !important;
+        width: 1046px !important;
+      }
+
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group {
+        max-width: 1046px !important;
+      }
+
+      .tm-klingo-root [data-slot="validade"] {
+        margin-top: 2px !important;
+      }
+
+      .tm-klingo-root [data-slot="validade"] .form-control {
+        max-width: 202px !important;
+        width: 202px !important;
+      }
+
+      .tm-klingo-root [data-slot="observacao-select"] {
+        max-width: 226px !important;
+      }
+
+      .tm-klingo-root [data-slot="observacao-select"] .form-group {
+        width: 226px !important;
+      }
+
+      .tm-klingo-root input[placeholder="Adicionar procedimento..."] {
+        max-width: 1046px !important;
+        width: 1046px !important;
+      }
+
+      .tm-klingo-root .modal-footer {
+        justify-content: flex-start !important;
+        padding-left: 18px !important;
       }
 
       @media (max-width: 1200px) {
@@ -550,60 +615,7 @@
           grid-template-columns: 1fr;
         }
       }
-    
-/* ===== AJUSTES FINOS DE ALINHAMENTO v2.5 ===== */
-
-.tm-top-layout {
-  column-gap: 32px !important;
-}
-
-.tm-row-name-birth,
-.tm-row-cpf-sexo-origem,
-.tm-row-cel-email {
-  column-gap: 16px !important;
-}
-
-.tm-right-panel {
-  padding-left: 10px !important;
-}
-
-[data-slot="validade"] .form-control {
-  max-width: 180px !important;
-}
-
-[data-slot="validade"] {
-  margin-top: -4px !important;
-}
-
-.tm-observation-layout .input-group-prepend {
-  position: static !important;
-  margin-right: 8px !important;
-}
-
-.tm-observation-layout .input-group {
-  display: flex !important;
-  align-items: center !important;
-}
-
-.tm-observation-layout [data-slot="observacao-select"] {
-  max-width: 260px !important;
-}
-
-input[placeholder="Adicionar procedimento..."] {
-  max-width: 760px !important;
-}
-
-.modal-content .bg-success,
-.modal-content .card {
-  max-width: 760px !important;
-}
-
-.modal-content .modal-footer {
-  justify-content: flex-start !important;
-  padding-left: 24px !important;
-}
-
-`;
+    `;
     document.head.appendChild(style);
   }
 
