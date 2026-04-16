@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.14
+// @version      2.15
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -569,8 +569,8 @@
       }
 
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success {
-        max-width: 600px !important;
-        width: 600px !important;
+        max-width: 509px !important;
+        width: 509px !important;
         background: #d5edff !important;
         color: #003358 !important;
         border-color: #b7d9ee !important;
@@ -578,7 +578,7 @@
       }
 
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group {
-        max-width: 600px !important;
+        max-width: 509px !important;
       }
 
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success,
