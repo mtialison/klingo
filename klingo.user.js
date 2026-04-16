@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.6
+// @version      2.9
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -425,21 +425,13 @@
 
       .tm-top-layout {
         display: grid;
-        grid-template-columns: 509px 226px;
-        gap: 36px;
+        grid-template-columns: 509px;
+        gap: 18px;
         align-items: start;
       }
 
-      .tm-left-panel,
-      .tm-right-panel {
+      .tm-left-panel {
         min-width: 0;
-      }
-
-      .tm-right-panel {
-        display: grid;
-        grid-template-rows: auto auto;
-        row-gap: 18px;
-        align-content: start;
       }
 
       .tm-grid-row {
@@ -461,8 +453,8 @@
         grid-template-columns: 155px 342px;
       }
 
-      .tm-right-panel .tm-field-slot + .tm-field-slot {
-        margin-top: 0 !important;
+      .tm-row-carteira-validade {
+        grid-template-columns: 235px 202px;
       }
 
       .tm-field-slot,
@@ -566,7 +558,6 @@
         display: none !important;
       }
 
-
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success {
         max-width: 1046px !important;
         width: 1046px !important;
@@ -577,7 +568,7 @@
       }
 
       .tm-klingo-root [data-slot="validade"] {
-        margin-top: 2px !important;
+        margin-top: 0 !important;
       }
 
       .tm-klingo-root [data-slot="validade"] .form-control {
@@ -611,7 +602,8 @@
 
         .tm-row-name-birth,
         .tm-row-cpf-sexo-origem,
-        .tm-row-cel-email {
+        .tm-row-cel-email,
+        .tm-row-carteira-validade {
           grid-template-columns: 1fr;
         }
       }
@@ -849,10 +841,10 @@
             <div class="tm-field-slot" data-slot="celular"></div>
             <div class="tm-field-slot" data-slot="email"></div>
           </div>
-        </div>
-        <div class="tm-right-panel">
-          <div class="tm-field-slot" data-slot="carteira"></div>
-          <div class="tm-field-slot" data-slot="validade"></div>
+          <div class="tm-grid-row tm-row-carteira-validade">
+            <div class="tm-field-slot" data-slot="carteira"></div>
+            <div class="tm-field-slot" data-slot="validade"></div>
+          </div>
         </div>
       </div>
     `;
