@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.8
+// @version      2.9
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -495,11 +495,6 @@
         margin-bottom: 10px;
       }
 
-      .tm-observation-layout .tm-field-slot > .col,
-      .tm-observation-layout .tm-field-slot > [class*="col-"] {
-        width: 100% !important;
-      }
-
       .tm-observation-textarea {
         min-height: 78px !important;
         height: 78px !important;
@@ -560,9 +555,10 @@
 
       .tm-klingo-root .tm-header-title {
         display: block !important;
-        margin-bottom: 10px !important;
+        margin-bottom: 12px !important;
         line-height: 1.25 !important;
         font-size: 20px !important;
+        font-weight: 500 !important;
         white-space: normal !important;
         overflow-wrap: anywhere !important;
         word-break: break-word !important;
@@ -572,15 +568,21 @@
       .tm-klingo-root .tm-header-row-3 {
         display: flex !important;
         flex-wrap: wrap !important;
-        gap: 8px 14px !important;
+        gap: 8px 18px !important;
         margin-bottom: 8px !important;
         align-items: center !important;
       }
 
-      .tm-klingo-root .tm-header-row-2 .lead,
-      .tm-klingo-root .tm-header-row-3 .lead,
-      .tm-klingo-root .tm-header-notes,
-      .tm-klingo-root .tm-header-notes footer {
+      .tm-klingo-root .tm-header-row-2 > *,
+      .tm-klingo-root .tm-header-row-3 > * {
+        display: inline-flex !important;
+        align-items: center !important;
+      }
+
+      .tm-klingo-root .tm-header-row-2 small,
+      .tm-klingo-root .tm-header-row-3 small {
+        font-size: 16px !important;
+        line-height: 1.3 !important;
         white-space: normal !important;
         overflow: visible !important;
         text-overflow: clip !important;
@@ -588,14 +590,25 @@
         word-break: break-word !important;
       }
 
+      .tm-klingo-root .tm-header-row-2 .lead,
+      .tm-klingo-root .tm-header-row-3 .lead {
+        margin-bottom: 0 !important;
+      }
+
       .tm-klingo-root .tm-header-notes {
-        margin-top: 4px !important;
+        margin-top: 10px !important;
+        display: block !important;
       }
 
       .tm-klingo-root .tm-header-notes footer {
         display: block !important;
         font-size: 12px !important;
         line-height: 1.35 !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
       }
 
       .tm-klingo-root input[placeholder="Adicionar procedimento..."] {
@@ -809,38 +822,55 @@
     const titleDiv = label ? label.querySelector('.h4.mb-1') : null;
     const metaRow = label ? label.querySelector('.d-flex.justify-content-between') : null;
     if (!label || !titleDiv || !metaRow) return;
-    if (label.dataset.tmHeaderReady === '1') return;
 
-    const leftWrap = metaRow.children[0] || null;
-    const dateWrap = metaRow.children[1] || null;
-    if (!leftWrap) return;
+    let row2 = label.querySelector('.tm-header-row-2');
+    let row3 = label.querySelector('.tm-header-row-3');
+    const notesWrap = label.querySelector('blockquote') ? label.querySelector('blockquote').closest('div') : null;
 
-    const spans = leftWrap.querySelectorAll(':scope > span');
-    const paymentSpan = spans[0] || null;
-    const doctorSpan = spans[1] || null;
-    const unitSpan = spans[2] || null;
+    if (!row2 || !row3) {
+      const leftWrap = metaRow.children[0] || null;
+      const dateWrap = metaRow.children[1] || null;
+      if (!leftWrap) return;
 
-    const notesWrap = [...label.children].find((el) => el !== titleDiv && el !== metaRow && norm(el.textContent));
-    const row2 = document.createElement('div');
-    row2.className = 'tm-header-row-2';
+      const spans = leftWrap.querySelectorAll(':scope > span');
+      const paymentSpan = spans[0] || null;
+      const doctorSpan = spans[1] || null;
+      const unitSpan = spans[2] || null;
 
-    const row3 = document.createElement('div');
-    row3.className = 'tm-header-row-3';
+      row2 = document.createElement('div');
+      row2.className = 'tm-header-row-2';
 
-    if (paymentSpan) row2.appendChild(paymentSpan);
-    if (doctorSpan) row2.appendChild(doctorSpan);
-    if (unitSpan) row3.appendChild(unitSpan);
-    if (dateWrap) row3.appendChild(dateWrap);
+      row3 = document.createElement('div');
+      row3.className = 'tm-header-row-3';
 
-    titleDiv.classList.add('tm-header-title');
+      if (paymentSpan) row2.appendChild(paymentSpan);
+      if (doctorSpan) row2.appendChild(doctorSpan);
+      if (unitSpan) row3.appendChild(unitSpan);
+      if (dateWrap) row3.appendChild(dateWrap);
+
+      titleDiv.classList.add('tm-header-title');
+      label.classList.add('tm-header-label');
+
+      metaRow.remove();
+      if (notesWrap) {
+        label.insertBefore(row2, notesWrap);
+        label.insertBefore(row3, notesWrap);
+      } else {
+        label.appendChild(row2);
+        label.appendChild(row3);
+      }
+    }
+
+    const hasTitle = titleDiv.classList.contains('tm-header-title');
+    if (!hasTitle) titleDiv.classList.add('tm-header-title');
     label.classList.add('tm-header-label');
 
-    metaRow.remove();
-    label.insertBefore(row2, notesWrap || null);
-    label.insertBefore(row3, notesWrap || null);
-
-    if (notesWrap) notesWrap.classList.add('tm-header-notes');
-    label.dataset.tmHeaderReady = '1';
+    if (notesWrap) {
+      notesWrap.classList.add('tm-header-notes');
+      if (notesWrap.previousElementSibling !== row3) {
+        label.appendChild(notesWrap);
+      }
+    }
   }
 
   function reorganizeSchedulingModalLayout() {
