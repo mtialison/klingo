@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.8
+// @version      2.9
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -559,15 +559,16 @@
       }
 
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success {
-        max-width: 1046px !important;
-        width: 1046px !important;
+        max-width: 760px !important;
+        width: 760px !important;
         background: #d5edff !important;
         color: #003358 !important;
         border-color: #b7d9ee !important;
+        padding: 12px 14px !important;
       }
 
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group {
-        max-width: 1046px !important;
+        max-width: 760px !important;
       }
 
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success,
@@ -592,6 +593,55 @@
 
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success i.fa-exclamation-triangle.text-warning {
         color: #f4b400 !important;
+      }
+
+      .tm-klingo-root .tm-procedure-title {
+        display: block !important;
+        margin-bottom: 8px !important;
+        font-size: 20px !important;
+        line-height: 1.25 !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+      }
+
+      .tm-klingo-root .tm-header-line {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        gap: 6px 10px !important;
+        margin-bottom: 6px !important;
+        line-height: 1.3 !important;
+      }
+
+      .tm-klingo-root .tm-header-line > * {
+        display: inline-flex !important;
+        align-items: center !important;
+        min-width: 0 !important;
+      }
+
+      .tm-klingo-root .tm-header-line small,
+      .tm-klingo-root .tm-header-line .lead {
+        margin-bottom: 0 !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+      }
+
+      .tm-klingo-root .tm-header-infos {
+        margin-top: 6px !important;
+      }
+
+      .tm-klingo-root .tm-header-infos footer {
+        display: block !important;
+        font-size: 12px !important;
+        line-height: 1.35 !important;
+        white-space: pre-wrap !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+        margin: 0 !important;
       }
 
       .tm-klingo-root [data-slot="validade"] {
@@ -808,6 +858,74 @@
     }
   }
 
+
+  function ensureHeaderLine(label, className, beforeNode = null) {
+    let line = label.querySelector(`.${className}`);
+    if (!line) {
+      line = document.createElement('div');
+      line.className = className;
+    } else {
+      line.innerHTML = '';
+    }
+
+    if (beforeNode) {
+      label.insertBefore(line, beforeNode);
+    } else if (!line.parentElement) {
+      label.appendChild(line);
+    }
+
+    if (!line.parentElement) {
+      label.appendChild(line);
+    }
+
+    return line;
+  }
+
+  function reorganizeHeaderStructure(root) {
+    const headerItem = root.querySelector('.list-group > .list-group-item.list-group-item-success');
+    if (!headerItem) return;
+
+    const label = headerItem.querySelector('label.mb-0.w-100');
+    if (!label) return;
+
+    const titleDiv = label.querySelector('.h4.mb-1');
+    const metaRow = label.querySelector('.d-flex.justify-content-between');
+    const infosWrap = label.querySelector('blockquote') ? label.querySelector('blockquote').closest('div') : null;
+
+    if (!titleDiv || !metaRow) return;
+
+    titleDiv.classList.add('tm-procedure-title');
+
+    const leftMeta = metaRow.children[0] || null;
+    const rightMeta = metaRow.children[1] || null;
+    if (!leftMeta || !rightMeta) return;
+
+    const spans = leftMeta.querySelectorAll(':scope > span');
+    const paymentNode = spans[0] || null;
+    const doctorNode = spans[1] || null;
+    const unitNode = spans[2] || null;
+
+    const dateNode = rightMeta.querySelector('small:not(.mx-2)') || rightMeta.children[0] || null;
+    const timeNode = rightMeta.querySelector('small.mx-2') || rightMeta.children[1] || null;
+
+    const line2 = ensureHeaderLine(label, 'tm-header-line-2 tm-header-line', infosWrap || null);
+    const line3 = ensureHeaderLine(label, 'tm-header-line-3 tm-header-line', infosWrap || null);
+
+    if (paymentNode) line2.appendChild(paymentNode);
+    if (doctorNode) line2.appendChild(doctorNode);
+
+    if (unitNode) line3.appendChild(unitNode);
+    if (dateNode) line3.appendChild(dateNode);
+    if (timeNode) line3.appendChild(timeNode);
+
+    metaRow.remove();
+
+    if (infosWrap) {
+      infosWrap.classList.add('tm-header-infos');
+      label.appendChild(infosWrap);
+    }
+  }
+
   function reorganizeSchedulingModalLayout() {
     const root = getSchedulingModalRoot();
     if (!root) return;
@@ -947,11 +1065,13 @@
   }
 
   function burstUpdateLite() {
+    const root = getSchedulingModalRoot();
     updateModalTitle();
     enableBirthDatePaste();
     injectLayoutCSS();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
+    if (root) reorganizeHeaderStructure(root);
   }
 
   function burstUpdate() {
