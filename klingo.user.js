@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.11
+// @version      2.12
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -665,15 +665,30 @@
       }
 
       .tm-klingo-root .tm-header-infos footer {
-        display: block !important;
+        display: -webkit-box !important;
+        -webkit-box-orient: vertical !important;
+        -webkit-line-clamp: 3 !important;
+        line-clamp: 3 !important;
         font-size: 12px !important;
         line-height: 1.35 !important;
         white-space: pre-wrap !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
         overflow-wrap: anywhere !important;
         word-break: break-word !important;
         margin: 0 !important;
+        max-height: calc(1.35em * 3) !important;
+        transition: max-height 0.15s ease !important;
+        cursor: default !important;
+      }
+
+      .tm-klingo-root .tm-header-infos:hover footer {
+        display: block !important;
+        -webkit-line-clamp: unset !important;
+        line-clamp: unset !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        max-height: 1000px !important;
       }
 
       .tm-klingo-root [data-slot="validade"] {
