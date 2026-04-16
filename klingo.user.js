@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.24
+// @version      2.25
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -735,6 +735,9 @@
         overflow-x: hidden !important;
         overflow-y: auto !important;
         box-sizing: content-box !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
       }
 
       .tm-klingo-root .modal-body > div,
@@ -763,6 +766,33 @@
       .tm-klingo-root .modal-footer {
         justify-content: flex-start !important;
         padding-left: 18px !important;
+      }
+
+
+      .tm-klingo-root .modal-body > *,
+      .tm-klingo-root #cadTemp,
+      .tm-klingo-root #tm-top-layout-host,
+      .tm-klingo-root #tm-observation-layout-host,
+      .tm-klingo-root .border-bottom,
+      .tm-klingo-root .nav-tabs,
+      .tm-klingo-root .tab-content,
+      .tm-klingo-root .tab-pane,
+      .tm-klingo-root hr,
+      .tm-klingo-root .modal-footer {
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .tm-klingo-root #cadTemp,
+      .tm-klingo-root #tm-top-layout-host,
+      .tm-klingo-root #tm-observation-layout-host,
+      .tm-klingo-root .border-bottom,
+      .tm-klingo-root .nav-tabs,
+      .tm-klingo-root .tab-content,
+      .tm-klingo-root .tab-pane,
+      .tm-klingo-root hr {
+        width: 568px !important;
+        max-width: 568px !important;
       }
 
       @media (max-width: 1200px) {
@@ -1048,6 +1078,9 @@
       body.style.setProperty('overflow-x', 'hidden', 'important');
       body.style.setProperty('overflow-y', 'auto', 'important');
       body.style.setProperty('box-sizing', 'content-box', 'important');
+      body.style.setProperty('display', 'flex', 'important');
+      body.style.setProperty('flex-direction', 'column', 'important');
+      body.style.setProperty('align-items', 'center', 'important');
     }
 
     const mainBlocks = root.querySelectorAll('.modal-body > div, .modal-body .mt-3, .modal-body .tab-content, .modal-body .tab-pane');
