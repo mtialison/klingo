@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.9
+// @version      2.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -561,10 +561,37 @@
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success {
         max-width: 1046px !important;
         width: 1046px !important;
+        background: #d5edff !important;
+        color: #003358 !important;
+        border-color: #b7d9ee !important;
       }
 
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group {
         max-width: 1046px !important;
+      }
+
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success,
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success label,
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success .h4,
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success .lead,
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success small,
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success span,
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success i {
+        color: #003358 !important;
+      }
+
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success .badge.badge-light {
+        background: #ffffff !important;
+        color: #003358 !important;
+      }
+
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success .text-muted,
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success small.text-muted {
+        color: #4d7088 !important;
+      }
+
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success i.fa-exclamation-triangle.text-warning {
+        color: #f4b400 !important;
       }
 
       .tm-klingo-root [data-slot="validade"] {
