@@ -550,7 +550,60 @@
           grid-template-columns: 1fr;
         }
       }
-    `;
+    
+/* ===== AJUSTES FINOS DE ALINHAMENTO v2.5 ===== */
+
+.tm-top-layout {
+  column-gap: 32px !important;
+}
+
+.tm-row-name-birth,
+.tm-row-cpf-sexo-origem,
+.tm-row-cel-email {
+  column-gap: 16px !important;
+}
+
+.tm-right-panel {
+  padding-left: 10px !important;
+}
+
+[data-slot="validade"] .form-control {
+  max-width: 180px !important;
+}
+
+[data-slot="validade"] {
+  margin-top: -4px !important;
+}
+
+.tm-observation-layout .input-group-prepend {
+  position: static !important;
+  margin-right: 8px !important;
+}
+
+.tm-observation-layout .input-group {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.tm-observation-layout [data-slot="observacao-select"] {
+  max-width: 260px !important;
+}
+
+input[placeholder="Adicionar procedimento..."] {
+  max-width: 760px !important;
+}
+
+.modal-content .bg-success,
+.modal-content .card {
+  max-width: 760px !important;
+}
+
+.modal-content .modal-footer {
+  justify-content: flex-start !important;
+  padding-left: 24px !important;
+}
+
+`;
     document.head.appendChild(style);
   }
 
