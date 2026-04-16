@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2.2
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -360,10 +360,15 @@
     }
   }
 
+  function dispatchEvents(el, names) {
+    names.forEach((name) => {
+      const ev = new Event(name, { bubbles: true });
+      el.dispatchEvent(ev);
+    });
+  }
+
   function dispatchBirthDateEvents(el) {
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    el.dispatchEvent(new Event('blur', { bubbles: true }));
+    dispatchEvents(el, ['input', 'change', 'blur']);
   }
 
   function isBirthDateInput(input) {
@@ -414,14 +419,14 @@
       }
 
       .tm-layout-host {
-        margin-top: 10px;
+        margin-top: 8px;
         margin-bottom: 8px;
       }
 
       .tm-top-layout {
         display: grid;
-        grid-template-columns: minmax(0, 1.65fr) minmax(250px, 0.95fr);
-        gap: 28px;
+        grid-template-columns: 720px 360px;
+        gap: 20px;
         align-items: start;
       }
 
@@ -432,21 +437,21 @@
 
       .tm-grid-row {
         display: grid;
-        gap: 14px 18px;
+        gap: 12px 16px;
         margin-bottom: 10px;
         align-items: end;
       }
 
       .tm-row-name-birth {
-        grid-template-columns: minmax(0, 2.3fr) minmax(190px, 1fr);
+        grid-template-columns: 380px 210px;
       }
 
       .tm-row-cpf-sexo-origem {
-        grid-template-columns: minmax(150px, 1fr) minmax(180px, 0.95fr) minmax(170px, 1fr);
+        grid-template-columns: 180px 210px 210px;
       }
 
       .tm-row-cel-email {
-        grid-template-columns: minmax(170px, 0.95fr) minmax(0, 1.75fr);
+        grid-template-columns: 230px 420px;
       }
 
       .tm-right-panel .tm-field-slot + .tm-field-slot {
@@ -476,14 +481,25 @@
       .tm-field-slot .input-group,
       .tm-field-slot .form-control,
       .tm-field-slot select,
-      .tm-field-slot input {
+      .tm-field-slot input,
+      .tm-field-slot textarea {
         width: 100% !important;
+      }
+
+      .tm-cell-input-group .input-group-prepend,
+      .tm-cell-input-group .dropdown {
+        display: none !important;
+      }
+
+      .tm-cell-input-group .form-control {
+        border-top-left-radius: .25rem !important;
+        border-bottom-left-radius: .25rem !important;
       }
 
       .tm-observation-layout {
         display: grid;
-        grid-template-columns: minmax(0, 1.7fr) minmax(250px, 0.9fr);
-        gap: 26px;
+        grid-template-columns: 760px 360px;
+        gap: 28px;
         align-items: start;
         margin-top: 6px;
         margin-bottom: 10px;
@@ -494,32 +510,26 @@
         width: 100% !important;
       }
 
-      .tm-observation-layout .form-control[type="text"] {
-        min-height: 80px !important;
-        height: 80px !important;
-        padding-top: 8px !important;
-        padding-bottom: 8px !important;
+      .tm-observation-textarea {
+        min-height: 88px !important;
+        height: 88px !important;
+        padding: 8px 10px !important;
         line-height: 1.35 !important;
-        white-space: normal !important;
+        resize: none !important;
         overflow-wrap: anywhere !important;
         word-break: break-word !important;
+        white-space: pre-wrap !important;
+        overflow-y: auto !important;
+        vertical-align: top !important;
       }
 
       .tm-observation-layout .input-group {
         align-items: flex-start !important;
       }
 
-      .tm-observation-layout .input-group > .form-control[type="text"] {
-        align-self: flex-start !important;
-      }
-
       .tm-observation-layout select.form-control,
       .tm-observation-layout .input-group-text {
-        height: 34px !important;
-      }
-
-      .tm-observation-layout .input-group {
-        align-items: start;
+        height: 38px !important;
       }
 
       .tm-klingo-root .form-row.tm-hidden-original-row,
@@ -665,6 +675,55 @@
     slot.appendChild(block);
   }
 
+  function ensureObservationTextarea(block) {
+    if (!block) return;
+
+    const input = block.querySelector('input.form-control[type="text"]');
+    if (!input) return;
+
+    let textarea = block.querySelector('textarea.tm-observation-textarea');
+    if (!textarea) {
+      textarea = document.createElement('textarea');
+      textarea.className = `${input.className} tm-observation-textarea`;
+      textarea.placeholder = input.placeholder || '';
+      textarea.autocomplete = input.autocomplete || 'off';
+      textarea.value = input.value || '';
+      textarea.rows = 4;
+      input.insertAdjacentElement('afterend', textarea);
+      input.classList.add('tm-hidden-by-script');
+      input.style.setProperty('display', 'none', 'important');
+
+      const syncToInput = () => {
+        setNativeInputValue(input, textarea.value);
+        dispatchEvents(input, ['input', 'change']);
+      };
+
+      textarea.addEventListener('input', syncToInput, true);
+      textarea.addEventListener('change', syncToInput, true);
+      textarea.addEventListener('blur', () => {
+        syncToInput();
+        dispatchEvents(input, ['blur']);
+      }, true);
+    }
+
+    if (textarea.value !== (input.value || '')) {
+      textarea.value = input.value || '';
+    }
+  }
+
+  function hideCellCountryButton(celularBlock) {
+    if (!celularBlock) return;
+    const inputGroup = celularBlock.querySelector('.input-group');
+    if (!inputGroup) return;
+    inputGroup.classList.add('tm-cell-input-group');
+
+    const prepend = inputGroup.querySelector('.input-group-prepend');
+    if (prepend) {
+      prepend.classList.add('tm-hidden-by-script');
+      prepend.style.setProperty('display', 'none', 'important');
+    }
+  }
+
   function reorganizeSchedulingModalLayout() {
     const root = getSchedulingModalRoot();
     if (!root) return;
@@ -785,6 +844,9 @@
       block.style.setProperty('padding-right', '0', 'important');
       block.style.setProperty('flex', 'unset', 'important');
     });
+
+    hideCellCountryButton(celularBlock);
+    ensureObservationTextarea(observationInputBlock);
   }
 
   function hideAppointmentModalFields() {
