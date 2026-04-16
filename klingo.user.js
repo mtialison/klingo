@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      3.0
+// @version      2.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -405,13 +405,18 @@
     });
   }
 
+  /* =========================
+     OCULTAR ELEMENTOS (CSS)
+  ========================= */
   function injectLayoutCSS() {
     if (document.getElementById('tm-klingo-layout-style')) return;
 
     const style = document.createElement('style');
     style.id = 'tm-klingo-layout-style';
     style.textContent = `
-      .tm-hidden-by-script { display: none !important; }
+      .tm-hidden-by-script {
+        display: none !important;
+      }
 
       .tm-layout-host {
         margin-top: 8px;
@@ -420,32 +425,44 @@
 
       .tm-top-layout {
         display: grid;
-        grid-template-columns: 580px;
-        gap: 16px;
+        grid-template-columns: 509px 226px;
+        gap: 36px;
         align-items: start;
+      }
+
+      .tm-left-panel,
+      .tm-right-panel {
+        min-width: 0;
+      }
+
+      .tm-right-panel {
+        display: grid;
+        grid-template-rows: auto auto;
+        row-gap: 18px;
+        align-content: start;
       }
 
       .tm-grid-row {
         display: grid;
-        gap: 10px 14px;
+        gap: 10px 12px;
         margin-bottom: 10px;
         align-items: end;
       }
 
       .tm-row-name-birth {
-        grid-template-columns: 390px 175px;
+        grid-template-columns: 342px 155px;
       }
 
       .tm-row-cpf-sexo-origem {
-        grid-template-columns: 180px 180px 180px;
+        grid-template-columns: 155px 175px 155px;
       }
 
       .tm-row-cel-email {
-        grid-template-columns: 180px 372px;
+        grid-template-columns: 155px 342px;
       }
 
-      .tm-row-carteira-validade {
-        grid-template-columns: 280px 160px;
+      .tm-right-panel .tm-field-slot + .tm-field-slot {
+        margin-top: 0 !important;
       }
 
       .tm-field-slot,
@@ -488,16 +505,21 @@
 
       .tm-observation-layout {
         display: grid;
-        grid-template-columns: 580px 255px;
-        gap: 34px;
+        grid-template-columns: 509px 226px;
+        gap: 36px;
         align-items: start;
         margin-top: 6px;
         margin-bottom: 10px;
       }
 
+      .tm-observation-layout .tm-field-slot > .col,
+      .tm-observation-layout .tm-field-slot > [class*="col-"] {
+        width: 100% !important;
+      }
+
       .tm-observation-textarea {
-        min-height: 78px !important;
-        height: 78px !important;
+        min-height: 68px !important;
+        height: 68px !important;
         padding: 8px 10px !important;
         line-height: 1.35 !important;
         resize: none !important;
@@ -516,6 +538,7 @@
 
       .tm-observation-layout .input-group-prepend {
         display: flex !important;
+        margin-right: 0 !important;
         flex: 0 0 auto !important;
       }
 
@@ -523,16 +546,16 @@
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        height: 48px !important;
-        min-width: 48px !important;
+        height: 44px !important;
+        min-width: 38px !important;
         border-top-right-radius: 0 !important;
         border-bottom-right-radius: 0 !important;
       }
 
       .tm-observation-layout select.form-control {
-        height: 48px !important;
-        width: 210px !important;
-        max-width: 210px !important;
+        height: 44px !important;
+        max-width: 188px !important;
+        width: 188px !important;
         border-top-left-radius: 0 !important;
         border-bottom-left-radius: 0 !important;
       }
@@ -543,82 +566,41 @@
         display: none !important;
       }
 
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group,
+
       .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success {
-        width: 610px !important;
-        max-width: 610px !important;
+        max-width: 1046px !important;
+        width: 1046px !important;
       }
 
-      .tm-klingo-root .tm-header-label {
-        display: block !important;
+      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group {
+        max-width: 1046px !important;
       }
 
-      .tm-klingo-root .tm-header-title {
-        display: block !important;
-        margin-bottom: 12px !important;
-        line-height: 1.25 !important;
-        font-size: 20px !important;
-        font-weight: 500 !important;
-        white-space: normal !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
+      .tm-klingo-root [data-slot="validade"] {
+        margin-top: 2px !important;
       }
 
-      .tm-klingo-root .tm-header-row-2,
-      .tm-klingo-root .tm-header-row-3 {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 8px 18px !important;
-        margin-bottom: 8px !important;
-        align-items: center !important;
+      .tm-klingo-root [data-slot="validade"] .form-control {
+        max-width: 202px !important;
+        width: 202px !important;
       }
 
-      .tm-klingo-root .tm-header-row-2 > *,
-      .tm-klingo-root .tm-header-row-3 > * {
-        display: inline-flex !important;
-        align-items: center !important;
+      .tm-klingo-root [data-slot="observacao-select"] {
+        max-width: 226px !important;
       }
 
-      .tm-klingo-root .tm-header-row-2 small,
-      .tm-klingo-root .tm-header-row-3 small {
-        font-size: 16px !important;
-        line-height: 1.3 !important;
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
-      }
-
-      .tm-klingo-root .tm-header-row-2 .lead,
-      .tm-klingo-root .tm-header-row-3 .lead {
-        margin-bottom: 0 !important;
-      }
-
-      .tm-klingo-root .tm-header-notes {
-        margin-top: 10px !important;
-        display: block !important;
-      }
-
-      .tm-klingo-root .tm-header-notes footer {
-        display: block !important;
-        font-size: 12px !important;
-        line-height: 1.35 !important;
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
+      .tm-klingo-root [data-slot="observacao-select"] .form-group {
+        width: 226px !important;
       }
 
       .tm-klingo-root input[placeholder="Adicionar procedimento..."] {
-        width: 840px !important;
-        max-width: 840px !important;
+        max-width: 1046px !important;
+        width: 1046px !important;
       }
 
       .tm-klingo-root .modal-footer {
         justify-content: flex-start !important;
-        padding-left: 22px !important;
+        padding-left: 18px !important;
       }
 
       @media (max-width: 1200px) {
@@ -629,16 +611,8 @@
 
         .tm-row-name-birth,
         .tm-row-cpf-sexo-origem,
-        .tm-row-cel-email,
-        .tm-row-carteira-validade {
+        .tm-row-cel-email {
           grid-template-columns: 1fr;
-        }
-
-        .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group,
-        .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success,
-        .tm-klingo-root input[placeholder="Adicionar procedimento..."] {
-          width: 100% !important;
-          max-width: 100% !important;
         }
       }
     `;
@@ -666,9 +640,10 @@
       if (!text) continue;
 
       const hasDadosPessoais = text.includes('Dados Pessoais');
+      const hasOrigemPacientes = text.includes('ORIGEM DE PACIENTES') || text.includes('Origem de Pacientes');
       const hasConfirmar = text.includes('Confirmar');
 
-      if (hasDadosPessoais && hasConfirmar) {
+      if (hasDadosPessoais && hasOrigemPacientes && hasConfirmar) {
         modal.classList.add('tm-klingo-root');
         return modal;
       }
@@ -814,60 +789,6 @@
     }
   }
 
-  function reorganizeHeader(root) {
-    const headerItem = root.querySelector('.list-group > .list-group-item.list-group-item-success');
-    if (!headerItem) return;
-
-    const label = headerItem.querySelector('label.mb-0.w-100, label.tm-header-label');
-    const titleDiv = label ? label.querySelector('.h4.mb-1, .tm-header-title') : null;
-    if (!label || !titleDiv) return;
-
-    const findNodeByIcon = (selector, closestSelector) => {
-      const icon = label.querySelector(selector);
-      if (!icon) return null;
-      return icon.closest(closestSelector) || icon.parentElement;
-    };
-
-    const paymentNode = findNodeByIcon('i.fa-credit-card, i.fa-credit-card.fa-fw, i.far.fa-credit-card', 'span, small');
-    const doctorNode = findNodeByIcon('i.fa-user-md, i.fas.fa-user-md', 'span, small');
-    const unitNode = findNodeByIcon('i.fa-building, i.far.fa-building', 'span, small');
-    const dateNode = findNodeByIcon('i.fa-calendar-alt, i.far.fa-calendar-alt', 'small, span');
-    const timeNode = findNodeByIcon('i.fa-clock, i.fas.fa-clock', 'small, span');
-    const notesWrap = label.querySelector('blockquote') ? label.querySelector('blockquote').closest('div') : null;
-
-    // remove wrappers antigos que atrapalham a remontagem
-    label.querySelectorAll('.tm-header-row-2, .tm-header-row-3').forEach((row) => row.remove());
-    const oldMeta = label.querySelector('.d-flex.justify-content-between');
-    if (oldMeta) oldMeta.remove();
-
-    const row2 = document.createElement('div');
-    row2.className = 'tm-header-row-2';
-
-    const row3 = document.createElement('div');
-    row3.className = 'tm-header-row-3';
-
-    if (paymentNode) row2.appendChild(paymentNode);
-    if (doctorNode) row2.appendChild(doctorNode);
-    if (unitNode) row3.appendChild(unitNode);
-    if (dateNode) row3.appendChild(dateNode);
-    if (timeNode) row3.appendChild(timeNode);
-
-    titleDiv.classList.add('tm-header-title');
-    label.classList.add('tm-header-label');
-
-    // Título sempre primeiro
-    // Linha 2 sempre pagamento + profissional
-    // Linha 3 sempre unidade + data + hora
-    // Linha 4 observações, se existir
-    label.insertBefore(row2, notesWrap || null);
-    label.insertBefore(row3, notesWrap || null);
-
-    if (notesWrap) {
-      notesWrap.classList.add('tm-header-notes');
-      label.appendChild(notesWrap);
-    }
-  }
-
   function reorganizeSchedulingModalLayout() {
     const root = getSchedulingModalRoot();
     if (!root) return;
@@ -894,9 +815,17 @@
     const observationSelectBlock = observationFieldsRow.children[1] || null;
 
     if (
-      !sexoBlock || !birthBlock || !celularBlock || !emailBlock || !nomeBlock ||
-      !cpfBlock || !carteiraBlock || !validadeBlock || !origemBlock ||
-      !observationInputBlock || !observationSelectBlock
+      !sexoBlock ||
+      !birthBlock ||
+      !celularBlock ||
+      !emailBlock ||
+      !nomeBlock ||
+      !cpfBlock ||
+      !carteiraBlock ||
+      !validadeBlock ||
+      !origemBlock ||
+      !observationInputBlock ||
+      !observationSelectBlock
     ) {
       return;
     }
@@ -906,20 +835,22 @@
 
     topLayoutHost.innerHTML = `
       <div class="tm-top-layout">
-        <div class="tm-grid-row tm-row-name-birth">
-          <div class="tm-field-slot" data-slot="nome"></div>
-          <div class="tm-field-slot" data-slot="nascimento"></div>
+        <div class="tm-left-panel">
+          <div class="tm-grid-row tm-row-name-birth">
+            <div class="tm-field-slot" data-slot="nome"></div>
+            <div class="tm-field-slot" data-slot="nascimento"></div>
+          </div>
+          <div class="tm-grid-row tm-row-cpf-sexo-origem">
+            <div class="tm-field-slot" data-slot="cpf"></div>
+            <div class="tm-field-slot" data-slot="sexo"></div>
+            <div class="tm-field-slot" data-slot="origem"></div>
+          </div>
+          <div class="tm-grid-row tm-row-cel-email">
+            <div class="tm-field-slot" data-slot="celular"></div>
+            <div class="tm-field-slot" data-slot="email"></div>
+          </div>
         </div>
-        <div class="tm-grid-row tm-row-cpf-sexo-origem">
-          <div class="tm-field-slot" data-slot="cpf"></div>
-          <div class="tm-field-slot" data-slot="sexo"></div>
-          <div class="tm-field-slot" data-slot="origem"></div>
-        </div>
-        <div class="tm-grid-row tm-row-cel-email">
-          <div class="tm-field-slot" data-slot="celular"></div>
-          <div class="tm-field-slot" data-slot="email"></div>
-        </div>
-        <div class="tm-grid-row tm-row-carteira-validade">
+        <div class="tm-right-panel">
           <div class="tm-field-slot" data-slot="carteira"></div>
           <div class="tm-field-slot" data-slot="validade"></div>
         </div>
@@ -960,9 +891,17 @@
     }
 
     [
-      sexoBlock, birthBlock, celularBlock, emailBlock, nomeBlock,
-      cpfBlock, carteiraBlock, validadeBlock, origemBlock,
-      observationInputBlock, observationSelectBlock
+      sexoBlock,
+      birthBlock,
+      celularBlock,
+      emailBlock,
+      nomeBlock,
+      cpfBlock,
+      carteiraBlock,
+      validadeBlock,
+      origemBlock,
+      observationInputBlock,
+      observationSelectBlock
     ].forEach((block) => {
       block.style.setProperty('width', '100%', 'important');
       block.style.setProperty('max-width', 'none', 'important');
@@ -989,13 +928,11 @@
   }
 
   function burstUpdateLite() {
-    const root = getSchedulingModalRoot();
     updateModalTitle();
     enableBirthDatePaste();
     injectLayoutCSS();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    if (root) reorganizeHeader(root);
   }
 
   function burstUpdate() {
@@ -1017,7 +954,7 @@
   document.addEventListener('focusin', () => {
     enableBirthDatePaste();
     hideAppointmentModalFields();
-    burstUpdateLite();
+    reorganizeSchedulingModalLayout();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
@@ -1056,6 +993,8 @@
     enableBirthDatePaste();
     injectLayoutCSS();
     hideAppointmentModalFields();
+    reorganizeSchedulingModalLayout();
+
     burstUpdate();
 
     setTimeout(() => {
