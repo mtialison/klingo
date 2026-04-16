@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.2
+// @version      2.3
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -425,8 +425,8 @@
 
       .tm-top-layout {
         display: grid;
-        grid-template-columns: 720px 360px;
-        gap: 20px;
+        grid-template-columns: 505px 250px;
+        gap: 24px;
         align-items: start;
       }
 
@@ -437,21 +437,24 @@
 
       .tm-grid-row {
         display: grid;
-        gap: 12px 16px;
+        gap: 10px 12px;
         margin-bottom: 10px;
         align-items: end;
       }
 
+      /* Nome tem largura própria */
       .tm-row-name-birth {
-        grid-template-columns: 380px 210px;
+        grid-template-columns: 315px 178px;
       }
 
+      /* CPF e Celular iguais; Sexo não ultrapassa Nome */
       .tm-row-cpf-sexo-origem {
-        grid-template-columns: 180px 210px 210px;
+        grid-template-columns: 155px 175px 155px;
       }
 
+      /* Celular igual ao CPF; email menor que nascimento/origem */
       .tm-row-cel-email {
-        grid-template-columns: 230px 420px;
+        grid-template-columns: 155px 242px;
       }
 
       .tm-right-panel .tm-field-slot + .tm-field-slot {
@@ -496,10 +499,11 @@
         border-bottom-left-radius: .25rem !important;
       }
 
+      /* Observação não ultrapassa email */
       .tm-observation-layout {
         display: grid;
-        grid-template-columns: 760px 360px;
-        gap: 28px;
+        grid-template-columns: 470px 240px;
+        gap: 24px;
         align-items: start;
         margin-top: 6px;
         margin-bottom: 10px;
@@ -511,8 +515,8 @@
       }
 
       .tm-observation-textarea {
-        min-height: 88px !important;
-        height: 88px !important;
+        min-height: 68px !important;
+        height: 68px !important;
         padding: 8px 10px !important;
         line-height: 1.35 !important;
         resize: none !important;
