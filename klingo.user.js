@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.18
+// @version      2.19
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -713,8 +713,8 @@
       .tm-klingo-root .autocomplete,
       .tm-klingo-root .autocomplete .input-group,
       .tm-klingo-root input.az-autocomplete {
-        width: 680px !important;
-        max-width: 680px !important;
+        width: 509px !important;
+        max-width: 509px !important;
       }
 
       .tm-klingo-root input[placeholder="Adicionar procedimento..."] {
