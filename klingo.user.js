@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.9
+// @version      3.0
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -818,58 +818,53 @@
     const headerItem = root.querySelector('.list-group > .list-group-item.list-group-item-success');
     if (!headerItem) return;
 
-    const label = headerItem.querySelector('label.mb-0.w-100');
-    const titleDiv = label ? label.querySelector('.h4.mb-1') : null;
-    const metaRow = label ? label.querySelector('.d-flex.justify-content-between') : null;
-    if (!label || !titleDiv || !metaRow) return;
+    const label = headerItem.querySelector('label.mb-0.w-100, label.tm-header-label');
+    const titleDiv = label ? label.querySelector('.h4.mb-1, .tm-header-title') : null;
+    if (!label || !titleDiv) return;
 
-    let row2 = label.querySelector('.tm-header-row-2');
-    let row3 = label.querySelector('.tm-header-row-3');
+    const findNodeByIcon = (selector, closestSelector) => {
+      const icon = label.querySelector(selector);
+      if (!icon) return null;
+      return icon.closest(closestSelector) || icon.parentElement;
+    };
+
+    const paymentNode = findNodeByIcon('i.fa-credit-card, i.fa-credit-card.fa-fw, i.far.fa-credit-card', 'span, small');
+    const doctorNode = findNodeByIcon('i.fa-user-md, i.fas.fa-user-md', 'span, small');
+    const unitNode = findNodeByIcon('i.fa-building, i.far.fa-building', 'span, small');
+    const dateNode = findNodeByIcon('i.fa-calendar-alt, i.far.fa-calendar-alt', 'small, span');
+    const timeNode = findNodeByIcon('i.fa-clock, i.fas.fa-clock', 'small, span');
     const notesWrap = label.querySelector('blockquote') ? label.querySelector('blockquote').closest('div') : null;
 
-    if (!row2 || !row3) {
-      const leftWrap = metaRow.children[0] || null;
-      const dateWrap = metaRow.children[1] || null;
-      if (!leftWrap) return;
+    // remove wrappers antigos que atrapalham a remontagem
+    label.querySelectorAll('.tm-header-row-2, .tm-header-row-3').forEach((row) => row.remove());
+    const oldMeta = label.querySelector('.d-flex.justify-content-between');
+    if (oldMeta) oldMeta.remove();
 
-      const spans = leftWrap.querySelectorAll(':scope > span');
-      const paymentSpan = spans[0] || null;
-      const doctorSpan = spans[1] || null;
-      const unitSpan = spans[2] || null;
+    const row2 = document.createElement('div');
+    row2.className = 'tm-header-row-2';
 
-      row2 = document.createElement('div');
-      row2.className = 'tm-header-row-2';
+    const row3 = document.createElement('div');
+    row3.className = 'tm-header-row-3';
 
-      row3 = document.createElement('div');
-      row3.className = 'tm-header-row-3';
+    if (paymentNode) row2.appendChild(paymentNode);
+    if (doctorNode) row2.appendChild(doctorNode);
+    if (unitNode) row3.appendChild(unitNode);
+    if (dateNode) row3.appendChild(dateNode);
+    if (timeNode) row3.appendChild(timeNode);
 
-      if (paymentSpan) row2.appendChild(paymentSpan);
-      if (doctorSpan) row2.appendChild(doctorSpan);
-      if (unitSpan) row3.appendChild(unitSpan);
-      if (dateWrap) row3.appendChild(dateWrap);
-
-      titleDiv.classList.add('tm-header-title');
-      label.classList.add('tm-header-label');
-
-      metaRow.remove();
-      if (notesWrap) {
-        label.insertBefore(row2, notesWrap);
-        label.insertBefore(row3, notesWrap);
-      } else {
-        label.appendChild(row2);
-        label.appendChild(row3);
-      }
-    }
-
-    const hasTitle = titleDiv.classList.contains('tm-header-title');
-    if (!hasTitle) titleDiv.classList.add('tm-header-title');
+    titleDiv.classList.add('tm-header-title');
     label.classList.add('tm-header-label');
+
+    // Título sempre primeiro
+    // Linha 2 sempre pagamento + profissional
+    // Linha 3 sempre unidade + data + hora
+    // Linha 4 observações, se existir
+    label.insertBefore(row2, notesWrap || null);
+    label.insertBefore(row3, notesWrap || null);
 
     if (notesWrap) {
       notesWrap.classList.add('tm-header-notes');
-      if (notesWrap.previousElementSibling !== row3) {
-        label.appendChild(notesWrap);
-      }
+      label.appendChild(notesWrap);
     }
   }
 
