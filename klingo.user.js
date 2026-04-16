@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.19
+// @version      2.20
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -982,6 +982,30 @@
     }
   }
 
+
+  function resizeSchedulingModal() {
+    const root = getSchedulingModalRoot();
+    if (!root) return;
+
+    const dialog = root.closest('.modal-dialog');
+    if (!dialog) return;
+
+    dialog.style.width = '820px';
+    dialog.style.maxWidth = '820px';
+    dialog.style.minWidth = '820px';
+    dialog.style.marginLeft = 'auto';
+    dialog.style.marginRight = 'auto';
+
+    root.style.width = '100%';
+    root.style.maxWidth = '100%';
+
+    const body = root.querySelector('.modal-body');
+    if (body) {
+      body.style.paddingLeft = '16px';
+      body.style.paddingRight = '16px';
+    }
+  }
+
   function reorganizeSchedulingModalLayout() {
     const root = getSchedulingModalRoot();
     if (!root) return;
@@ -1127,6 +1151,7 @@
     injectLayoutCSS();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
+    resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
   }
 
@@ -1189,6 +1214,7 @@
     injectLayoutCSS();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
+    resizeSchedulingModal();
 
     burstUpdate();
 
