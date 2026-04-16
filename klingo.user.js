@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.22
+// @version      2.23
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -724,14 +724,17 @@
 
 
       .tm-klingo-root {
-        width: 640px !important;
-        max-width: 640px !important;
+        width: 600px !important;
+        max-width: 600px !important;
+        overflow: hidden !important;
       }
 
       .tm-klingo-root .modal-body {
-        width: 608px !important;
-        max-width: 608px !important;
+        width: 568px !important;
+        max-width: 568px !important;
         overflow-x: hidden !important;
+        overflow-y: auto !important;
+        box-sizing: content-box !important;
       }
 
       .tm-klingo-root .modal-body > div,
@@ -739,8 +742,9 @@
       .tm-klingo-root .tab-content,
       .tm-klingo-root .tab-pane,
       .tm-klingo-root #myTab {
-        width: 608px !important;
-        max-width: 608px !important;
+        width: 568px !important;
+        max-width: 568px !important;
+        box-sizing: border-box !important;
       }
 
       .tm-klingo-root .modal-footer {
@@ -1011,41 +1015,47 @@
     const dialog = root.closest('.modal-dialog');
     if (!dialog) return;
 
-    dialog.style.setProperty('width', '640px', 'important');
-    dialog.style.setProperty('max-width', '640px', 'important');
-    dialog.style.setProperty('min-width', '640px', 'important');
+    dialog.style.setProperty('width', '600px', 'important');
+    dialog.style.setProperty('max-width', '600px', 'important');
+    dialog.style.setProperty('min-width', '600px', 'important');
     dialog.style.setProperty('margin-left', 'auto', 'important');
     dialog.style.setProperty('margin-right', 'auto', 'important');
 
-    root.style.setProperty('width', '640px', 'important');
-    root.style.setProperty('max-width', '640px', 'important');
-    root.style.setProperty('min-width', '640px', 'important');
+    root.style.setProperty('width', '600px', 'important');
+    root.style.setProperty('max-width', '600px', 'important');
+    root.style.setProperty('min-width', '600px', 'important');
+    root.style.setProperty('overflow', 'hidden', 'important');
 
     const body = root.querySelector('.modal-body');
     if (body) {
-      body.style.setProperty('width', '608px', 'important');
-      body.style.setProperty('max-width', '608px', 'important');
+      body.style.setProperty('width', '568px', 'important');
+      body.style.setProperty('max-width', '568px', 'important');
       body.style.setProperty('padding-left', '16px', 'important');
-      body.style.setProperty('padding-right', '16px', 'important');
+      body.style.setProperty('padding-right', '8px', 'important');
       body.style.setProperty('overflow-x', 'hidden', 'important');
+      body.style.setProperty('overflow-y', 'auto', 'important');
+      body.style.setProperty('box-sizing', 'content-box', 'important');
     }
 
     const mainBlocks = root.querySelectorAll('.modal-body > div, .modal-body .mt-3, .modal-body .tab-content, .modal-body .tab-pane');
     mainBlocks.forEach((el) => {
-      el.style.setProperty('max-width', '608px', 'important');
-      el.style.setProperty('width', '608px', 'important');
+      el.style.setProperty('max-width', '568px', 'important');
+      el.style.setProperty('width', '568px', 'important');
+      el.style.setProperty('box-sizing', 'border-box', 'important');
     });
 
     const navTabs = root.querySelector('#myTab');
     if (navTabs) {
-      navTabs.style.setProperty('max-width', '608px', 'important');
-      navTabs.style.setProperty('width', '608px', 'important');
+      navTabs.style.setProperty('max-width', '568px', 'important');
+      navTabs.style.setProperty('width', '568px', 'important');
     }
 
     const footer = root.querySelector('.modal-footer');
     if (footer) {
-      footer.style.setProperty('width', '608px', 'important');
-      footer.style.setProperty('max-width', '608px', 'important');
+      footer.style.setProperty('width', '568px', 'important');
+      footer.style.setProperty('max-width', '568px', 'important');
+      footer.style.setProperty('padding-right', '8px', 'important');
+      footer.style.setProperty('box-sizing', 'border-box', 'important');
     }
   }
 
