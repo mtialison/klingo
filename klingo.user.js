@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.10
+// @version      2.11
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -13,6 +13,16 @@
 
 (function () {
   'use strict';
+
+  /* =========================
+     CONFIGURAÇÃO HEADER (FONTE)
+  ========================= */
+  const TM_HEADER_CONFIG = {
+    titulo: '16px',
+    linha: '12px',
+    detalhes: '11px'
+  };
+
 
   const state = {
     selectedDate: '',
@@ -597,6 +607,22 @@
 
       
       /* OCULTAR CONSULTÓRIO AO LADO DA UNIDADE (HEADER) */
+      /* =========================
+         HEADER - TAMANHO CONFIGURÁVEL
+      ========================= */
+
+      .tm-klingo-root .list-group-item.list-group-item-success .h4 {
+        font-size: ${TM_HEADER_CONFIG.titulo} !important;
+      }
+
+      .tm-klingo-root .list-group-item.list-group-item-success .lead {
+        font-size: ${TM_HEADER_CONFIG.linha} !important;
+      }
+
+      .tm-klingo-root .list-group-item.list-group-item-success small {
+        font-size: ${TM_HEADER_CONFIG.detalhes} !important;
+      }
+
       .tm-klingo-root .list-group-item.list-group-item-success small.text-muted {
         display: none !important;
       }
