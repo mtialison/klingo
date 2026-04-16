@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.23
+// @version      2.24
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -745,6 +745,19 @@
         width: 568px !important;
         max-width: 568px !important;
         box-sizing: border-box !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .tm-klingo-root .modal-footer {
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .tm-klingo-root .list-group,
+      .tm-klingo-root .list-group-item.list-group-item-success {
+        margin-left: auto !important;
+        margin-right: auto !important;
       }
 
       .tm-klingo-root .modal-footer {
@@ -1042,12 +1055,16 @@
       el.style.setProperty('max-width', '568px', 'important');
       el.style.setProperty('width', '568px', 'important');
       el.style.setProperty('box-sizing', 'border-box', 'important');
+      el.style.setProperty('margin-left', 'auto', 'important');
+      el.style.setProperty('margin-right', 'auto', 'important');
     });
 
     const navTabs = root.querySelector('#myTab');
     if (navTabs) {
       navTabs.style.setProperty('max-width', '568px', 'important');
       navTabs.style.setProperty('width', '568px', 'important');
+      navTabs.style.setProperty('margin-left', 'auto', 'important');
+      navTabs.style.setProperty('margin-right', 'auto', 'important');
     }
 
     const footer = root.querySelector('.modal-footer');
@@ -1056,6 +1073,19 @@
       footer.style.setProperty('max-width', '568px', 'important');
       footer.style.setProperty('padding-right', '8px', 'important');
       footer.style.setProperty('box-sizing', 'border-box', 'important');
+      footer.style.setProperty('margin-left', 'auto', 'important');
+      footer.style.setProperty('margin-right', 'auto', 'important');
+    }
+
+    const headerList = root.querySelector('.list-group');
+    const headerItem = root.querySelector('.list-group-item.list-group-item-success');
+    if (headerList) {
+      headerList.style.setProperty('margin-left', 'auto', 'important');
+      headerList.style.setProperty('margin-right', 'auto', 'important');
+    }
+    if (headerItem) {
+      headerItem.style.setProperty('margin-left', 'auto', 'important');
+      headerItem.style.setProperty('margin-right', 'auto', 'important');
     }
   }
 
