@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.3
+// @version      2.4
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -425,7 +425,7 @@
 
       .tm-top-layout {
         display: grid;
-        grid-template-columns: 505px 250px;
+        grid-template-columns: 509px 250px;
         gap: 24px;
         align-items: start;
       }
@@ -442,19 +442,16 @@
         align-items: end;
       }
 
-      /* Nome tem largura própria */
       .tm-row-name-birth {
-        grid-template-columns: 315px 178px;
+        grid-template-columns: 342px 155px;
       }
 
-      /* CPF e Celular iguais; Sexo não ultrapassa Nome */
       .tm-row-cpf-sexo-origem {
         grid-template-columns: 155px 175px 155px;
       }
 
-      /* Celular igual ao CPF; email menor que nascimento/origem */
       .tm-row-cel-email {
-        grid-template-columns: 155px 242px;
+        grid-template-columns: 155px 342px;
       }
 
       .tm-right-panel .tm-field-slot + .tm-field-slot {
@@ -499,10 +496,9 @@
         border-bottom-left-radius: .25rem !important;
       }
 
-      /* Observação não ultrapassa email */
       .tm-observation-layout {
         display: grid;
-        grid-template-columns: 470px 240px;
+        grid-template-columns: 509px 240px;
         gap: 24px;
         align-items: start;
         margin-top: 6px;
