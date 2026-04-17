@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.51
+// @version      2.52
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -438,11 +438,42 @@
     const style = document.createElement('style');
     style.id = 'tm-font-fix';
     style.innerHTML = `
-.tm-header-line-2 .fa-credit-card,
-.tm-header-line-2 .fa-credit-card + span,
-.tm-header-line-2 small.lead {
-    font-size: 14px !important;
-    font-weight: normal !important;
+.tm-klingo-root .list-group-item.list-group-item-success .tm-procedure-title,
+.tm-klingo-root .list-group-item.list-group-item-info .tm-procedure-title {
+  font-size: 20px !important;
+  line-height: 1.25 !important;
+  font-weight: 400 !important;
+}
+
+.tm-klingo-root .list-group-item.list-group-item-success .tm-header-line,
+.tm-klingo-root .list-group-item.list-group-item-info .tm-header-line {
+  font-size: 14px !important;
+  line-height: 1.3 !important;
+}
+
+.tm-klingo-root .list-group-item.list-group-item-success .tm-header-line small,
+.tm-klingo-root .list-group-item.list-group-item-success .tm-header-line .lead,
+.tm-klingo-root .list-group-item.list-group-item-info .tm-header-line small,
+.tm-klingo-root .list-group-item.list-group-item-info .tm-header-line .lead {
+  font-size: 14px !important;
+  line-height: 1.3 !important;
+  font-weight: 400 !important;
+}
+
+.tm-klingo-root .list-group-item.list-group-item-success .tm-header-line i,
+.tm-klingo-root .list-group-item.list-group-item-info .tm-header-line i {
+  font-size: 14px !important;
+}
+
+.tm-klingo-root .list-group-item.list-group-item-success .tm-header-line .text-muted,
+.tm-klingo-root .list-group-item.list-group-item-info .tm-header-line .text-muted {
+  font-size: 14px !important;
+}
+
+.tm-klingo-root .list-group-item.list-group-item-success .tm-header-infos footer,
+.tm-klingo-root .list-group-item.list-group-item-info .tm-header-infos footer {
+  font-size: 12px !important;
+  line-height: 1.35 !important;
 }
 `;
     document.head.appendChild(style);
