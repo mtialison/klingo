@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.58
+// @version      2.55
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1632,53 +1632,6 @@
     }
   }
 
-
-  function simplifyUnits() {
-    if (!isCallCenterRoute()) return;
-
-    const unitLabels = document.querySelectorAll('.tm-header-line-3 span.mr-2 small.lead');
-    unitLabels.forEach((el) => {
-      const icon = el.querySelector('i');
-      const consultorio = el.querySelector('small.text-muted');
-
-      const raw = (el.textContent || '').replace(/\s+/g, ' ').trim();
-      let unit = '';
-
-      if (raw.includes('COPACABANA')) unit = 'COPACABANA';
-      else if (raw.includes('BARRA')) unit = 'BARRA';
-      else if (raw.includes('SAMEC')) unit = 'SAMEC';
-      else if (raw.includes('BANGU')) unit = 'BANGU';
-      else return;
-
-      // preserva o ícone e remove o restante do texto visível
-      el.childNodes.forEach((node) => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          node.textContent = '';
-        }
-      });
-
-      const textSpanClass = 'tm-unit-short-text';
-      let shortText = el.querySelector('.' + textSpanClass);
-      if (!shortText) {
-        shortText = document.createElement('span');
-        shortText.className = textSpanClass;
-        if (icon && icon.nextSibling) {
-          icon.parentNode.insertBefore(shortText, icon.nextSibling);
-        } else if (icon) {
-          el.appendChild(shortText);
-        } else {
-          el.insertBefore(shortText, el.firstChild);
-        }
-      }
-      shortText.textContent = ' ' + unit + ' ';
-
-      if (consultorio) {
-        consultorio.style.display = 'none';
-      }
-    });
-  }
-
-
   function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
     const root = getSchedulingModalRoot();
@@ -1690,7 +1643,6 @@
     reorganizeSchedulingModalLayout();
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
-    simplifyUnits();
   }
 
   function burstUpdate() {
