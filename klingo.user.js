@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.39
+// @version      2.40
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1380,6 +1380,48 @@
     hideElement(telefoneBlock);
     hideElement(nomeSocialBlock);
     hideElement(materialBlock);
+  }
+
+
+  function forceObservationSelectHeight() {
+    const root = getSchedulingModalRoot();
+    if (!root) return;
+
+    const slot = root.querySelector('.tm-field-slot[data-slot="observacao-select"]');
+    if (!slot) return;
+
+    const col = slot.querySelector(':scope > .col.col-12.col-md-3');
+    const formGroup = slot.querySelector('.form-group.mb-1');
+    const inputGroup = slot.querySelector('.input-group.input-group-sm');
+    const prepend = slot.querySelector('.input-group-prepend');
+    const inputText = slot.querySelector('.input-group-text');
+    const select = slot.querySelector('select.form.form-control, select.form-control, select');
+
+    [col, formGroup, inputGroup, prepend, inputText, select].forEach((el) => {
+      if (!el) return;
+      el.style.setProperty('height', '30px', 'important');
+      el.style.setProperty('min-height', '30px', 'important');
+      el.style.setProperty('max-height', '30px', 'important');
+      el.style.setProperty('margin', '0', 'important');
+      el.style.setProperty('box-sizing', 'border-box', 'important');
+    });
+
+    if (formGroup) {
+      formGroup.style.setProperty('margin-bottom', '0', 'important');
+    }
+
+    if (select) {
+      select.style.setProperty('line-height', '30px', 'important');
+      select.style.setProperty('padding-top', '0', 'important');
+      select.style.setProperty('padding-bottom', '0', 'important');
+    }
+
+    if (inputText) {
+      inputText.style.setProperty('display', 'flex', 'important');
+      inputText.style.setProperty('align-items', 'center', 'important');
+      inputText.style.setProperty('padding-left', '8px', 'important');
+      inputText.style.setProperty('padding-right', '8px', 'important');
+    }
   }
 
   function burstUpdateLite() {
