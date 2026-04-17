@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.49
+// @version      2.50
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1082,8 +1082,14 @@
   function reorganizeHeaderStructure(root) {
     if (!isCallCenterRoute()) return;
 
-    const headerItems = root.querySelectorAll('.list-group > .list-group-item.list-group-item-success, .list-group > .list-group-item.list-group-item-info');
+    const listGroup = root.querySelector('.list-group');
+    if (!listGroup) return;
+
+    const headerItems = listGroup.querySelectorAll(':scope > .list-group-item.list-group-item-success, :scope > .list-group-item.list-group-item-info');
     if (!headerItems.length) return;
+
+    const paymentSourceItem = listGroup.querySelector(':scope > .list-group-item:not(.list-group-item-success):not(.list-group-item-info)');
+    const paymentSourceSmall = paymentSourceItem ? paymentSourceItem.querySelector('small.lead') : null;
 
     headerItems.forEach((headerItem) => {
       const label = headerItem.querySelector('label.mb-0.w-100');
@@ -1101,10 +1107,20 @@
       const rightMeta = metaRow.children[1] || null;
       if (!leftMeta || !rightMeta) return;
 
-      const spans = leftMeta.querySelectorAll(':scope > span');
-      const paymentNode = spans[0] || null;
-      const doctorNode = spans[1] || null;
-      const unitNode = spans[2] || null;
+      const spans = Array.from(leftMeta.querySelectorAll(':scope > span'));
+      const paymentOwn = spans.find((span) => span.querySelector('.fa-credit-card'));
+      const doctorNode = spans.find((span) => span.querySelector('.fa-user-md')) || null;
+      const unitNode = spans.find((span) => span.querySelector('.fa-building')) || null;
+
+      let paymentNode = null;
+      if (paymentOwn) {
+        paymentNode = paymentOwn;
+      } else if (paymentSourceSmall) {
+        const wrapper = document.createElement('span');
+        wrapper.className = 'mr-3';
+        wrapper.appendChild(paymentSourceSmall.cloneNode(true));
+        paymentNode = wrapper;
+      }
 
       const dateNode = rightMeta.querySelector('small:not(.mx-2)') || rightMeta.children[0] || null;
       const timeNode = rightMeta.querySelector('small.mx-2') || rightMeta.children[1] || null;
@@ -1126,6 +1142,10 @@
         label.appendChild(infosWrap);
       }
     });
+
+    if (paymentSourceItem && headerItems.length > 1) {
+      paymentSourceItem.style.display = 'none';
+    }
   }
 
   function resizeSchedulingModal() {
