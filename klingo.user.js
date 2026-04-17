@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.50
+// @version      2.51
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -432,6 +432,22 @@
   /* =========================
      OCULTAR ELEMENTOS (CSS)
   ========================= */
+  
+  function injectFontFix() {
+    if (document.getElementById('tm-font-fix')) return;
+    const style = document.createElement('style');
+    style.id = 'tm-font-fix';
+    style.innerHTML = `
+.tm-header-line-2 .fa-credit-card,
+.tm-header-line-2 .fa-credit-card + span,
+.tm-header-line-2 small.lead {
+    font-size: 14px !important;
+    font-weight: normal !important;
+}
+`;
+    document.head.appendChild(style);
+  }
+
   function injectLayoutCSS() {
     if (!isCallCenterRoute()) return;
     if (document.getElementById('tm-klingo-layout-style')) return;
@@ -1528,6 +1544,7 @@
     updateModalTitle();
     enableBirthDatePaste();
     injectLayoutCSS();
+    injectFontFix();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
     resizeSchedulingModal();
@@ -1595,6 +1612,7 @@
     if (!isCallCenterRoute()) return;
     enableBirthDatePaste();
     injectLayoutCSS();
+    injectFontFix();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
     resizeSchedulingModal();
