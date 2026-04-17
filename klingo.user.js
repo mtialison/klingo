@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.33
+// @version      2.34
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -470,7 +470,7 @@
       }
 
       .tm-row-carteira-validade {
-        grid-template-columns: 235px 202px;
+        grid-template-columns: 342px 155px;
       }
 
       .tm-field-slot,
@@ -706,8 +706,8 @@
       }
 
       .tm-klingo-root [data-slot="validade"] .form-control {
-        max-width: 202px !important;
-        width: 202px !important;
+        max-width: 155px !important;
+        width: 155px !important;
       }
 
       .tm-klingo-root [data-slot="observacao-select"] {
