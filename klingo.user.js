@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.54
+// @version      2.55
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -509,6 +509,28 @@
 
 .tm-klingo-root .tm-header-infos footer {
   font-size: 12px !important;
+}
+
+
+/* FIX DEFINITIVO TAMANHO (override do H4 do bootstrap) */
+.tm-klingo-root .tm-procedure-title.h4,
+.tm-klingo-root .h4.tm-procedure-title {
+  font-size: 16px !important;
+  font-weight: 500 !important;
+}
+
+.tm-klingo-root .tm-header-line,
+.tm-klingo-root .tm-header-line * {
+  font-size: 12px !important;
+}
+
+/* garantir que não herde tamanho maior */
+.tm-klingo-root .list-group-item * {
+  font-size: 12px;
+}
+
+.tm-klingo-root .tm-procedure-title * {
+  font-size: 16px !important;
 }
 
 /* ocultar consultorio */
