@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.55
+// @version      2.56
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -247,7 +247,26 @@
     });
 
     clearTimeout(bubble._hideTimer);
-    bubble._hideTimer = setTimeout(() => {
+    bubble._hideTimer = 
+// =========================
+// SIMPLIFICAR NOME DAS UNIDADES NOS HEADERS
+// =========================
+function simplifyUnits() {
+  if (!location.hash.includes('/call-center')) return;
+
+  document.querySelectorAll('.tm-header-line-3 small.lead').forEach(el => {
+    let txt = el.innerText;
+
+    if (!txt) return;
+
+    if (txt.includes('BANGU')) el.innerText = 'BANGU';
+    else if (txt.includes('BARRA')) el.innerText = 'BARRA';
+    else if (txt.includes('COPACABANA')) el.innerText = 'COPACABANA';
+    else if (txt.includes('SAMEC')) el.innerText = 'SAMEC';
+  });
+}
+
+setTimeout(() => {
       bubble.style.opacity = '0';
       setTimeout(() => bubble.remove(), 180);
     }, 1000);
