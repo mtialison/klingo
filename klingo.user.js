@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.46
+// @version      2.47
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1081,50 +1081,52 @@
 
   function reorganizeHeaderStructure(root) {
     if (!isCallCenterRoute()) return;
-    const headerItem = root.querySelector('.list-group > .list-group-item.list-group-item-success');
-    if (!headerItem) return;
 
-    const label = headerItem.querySelector('label.mb-0.w-100');
-    if (!label) return;
+    const headerItems = root.querySelectorAll('.list-group > .list-group-item.list-group-item-success');
+    if (!headerItems.length) return;
 
-    const titleDiv = label.querySelector('.h4.mb-1');
-    const metaRow = label.querySelector('.d-flex.justify-content-between');
-    const infosWrap = label.querySelector('blockquote') ? label.querySelector('blockquote').closest('div') : null;
+    headerItems.forEach((headerItem) => {
+      const label = headerItem.querySelector('label.mb-0.w-100');
+      if (!label) return;
 
-    if (!titleDiv || !metaRow) return;
+      const titleDiv = label.querySelector('.h4.mb-1');
+      const metaRow = label.querySelector('.d-flex.justify-content-between');
+      const infosWrap = label.querySelector('blockquote') ? label.querySelector('blockquote').closest('div') : null;
 
-    titleDiv.classList.add('tm-procedure-title');
+      if (!titleDiv || !metaRow) return;
 
-    const leftMeta = metaRow.children[0] || null;
-    const rightMeta = metaRow.children[1] || null;
-    if (!leftMeta || !rightMeta) return;
+      titleDiv.classList.add('tm-procedure-title');
 
-    const spans = leftMeta.querySelectorAll(':scope > span');
-    const paymentNode = spans[0] || null;
-    const doctorNode = spans[1] || null;
-    const unitNode = spans[2] || null;
+      const leftMeta = metaRow.children[0] || null;
+      const rightMeta = metaRow.children[1] || null;
+      if (!leftMeta || !rightMeta) return;
 
-    const dateNode = rightMeta.querySelector('small:not(.mx-2)') || rightMeta.children[0] || null;
-    const timeNode = rightMeta.querySelector('small.mx-2') || rightMeta.children[1] || null;
+      const spans = leftMeta.querySelectorAll(':scope > span');
+      const paymentNode = spans[0] || null;
+      const doctorNode = spans[1] || null;
+      const unitNode = spans[2] || null;
 
-    const line2 = ensureHeaderLine(label, 'tm-header-line-2 tm-header-line', infosWrap || null);
-    const line3 = ensureHeaderLine(label, 'tm-header-line-3 tm-header-line', infosWrap || null);
+      const dateNode = rightMeta.querySelector('small:not(.mx-2)') || rightMeta.children[0] || null;
+      const timeNode = rightMeta.querySelector('small.mx-2') || rightMeta.children[1] || null;
 
-    if (paymentNode) line2.appendChild(paymentNode);
-    if (doctorNode) line2.appendChild(doctorNode);
+      const line2 = ensureHeaderLine(label, 'tm-header-line tm-header-line-2', infosWrap || null);
+      const line3 = ensureHeaderLine(label, 'tm-header-line tm-header-line-3', infosWrap || null);
 
-    if (unitNode) line3.appendChild(unitNode);
-    if (dateNode) line3.appendChild(dateNode);
-    if (timeNode) line3.appendChild(timeNode);
+      if (paymentNode) line2.appendChild(paymentNode);
+      if (doctorNode) line2.appendChild(doctorNode);
 
-    metaRow.remove();
+      if (unitNode) line3.appendChild(unitNode);
+      if (dateNode) line3.appendChild(dateNode);
+      if (timeNode) line3.appendChild(timeNode);
 
-    if (infosWrap) {
-      infosWrap.classList.add('tm-header-infos');
-      label.appendChild(infosWrap);
-    }
+      metaRow.remove();
+
+      if (infosWrap) {
+        infosWrap.classList.add('tm-header-infos');
+        label.appendChild(infosWrap);
+      }
+    });
   }
-
 
   function resizeSchedulingModal() {
     if (!isCallCenterRoute()) return;
