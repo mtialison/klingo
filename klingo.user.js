@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.25
+// @version      2.26
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -724,17 +724,16 @@
 
 
       .tm-klingo-root {
-        width: 600px !important;
-        max-width: 600px !important;
+        width: 760px !important;
+        max-width: 760px !important;
         overflow: hidden !important;
       }
 
       .tm-klingo-root .modal-body {
-        width: 568px !important;
-        max-width: 568px !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
         overflow-x: hidden !important;
         overflow-y: auto !important;
-        box-sizing: content-box !important;
         display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
@@ -744,9 +743,14 @@
       .tm-klingo-root .mt-3,
       .tm-klingo-root .tab-content,
       .tm-klingo-root .tab-pane,
-      .tm-klingo-root #myTab {
-        width: 568px !important;
-        max-width: 568px !important;
+      .tm-klingo-root #myTab,
+      .tm-klingo-root #cadTemp,
+      .tm-klingo-root #tm-top-layout-host,
+      .tm-klingo-root #tm-observation-layout-host,
+      .tm-klingo-root hr,
+      .tm-klingo-root .modal-footer {
+        width: 640px !important;
+        max-width: 640px !important;
         box-sizing: border-box !important;
         margin-left: auto !important;
         margin-right: auto !important;
@@ -765,7 +769,8 @@
 
       .tm-klingo-root .modal-footer {
         justify-content: flex-start !important;
-        padding-left: 18px !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
       }
 
 
@@ -1058,67 +1063,59 @@
     const dialog = root.closest('.modal-dialog');
     if (!dialog) return;
 
-    dialog.style.setProperty('width', '600px', 'important');
-    dialog.style.setProperty('max-width', '600px', 'important');
-    dialog.style.setProperty('min-width', '600px', 'important');
+    const MODAL_W = '760px';
+    const CONTENT_W = '640px';
+
+    dialog.style.setProperty('width', MODAL_W, 'important');
+    dialog.style.setProperty('max-width', MODAL_W, 'important');
+    dialog.style.setProperty('min-width', MODAL_W, 'important');
     dialog.style.setProperty('margin-left', 'auto', 'important');
     dialog.style.setProperty('margin-right', 'auto', 'important');
 
-    root.style.setProperty('width', '600px', 'important');
-    root.style.setProperty('max-width', '600px', 'important');
-    root.style.setProperty('min-width', '600px', 'important');
+    root.style.setProperty('width', MODAL_W, 'important');
+    root.style.setProperty('max-width', MODAL_W, 'important');
+    root.style.setProperty('min-width', MODAL_W, 'important');
     root.style.setProperty('overflow', 'hidden', 'important');
 
     const body = root.querySelector('.modal-body');
     if (body) {
-      body.style.setProperty('width', '568px', 'important');
-      body.style.setProperty('max-width', '568px', 'important');
-      body.style.setProperty('padding-left', '16px', 'important');
-      body.style.setProperty('padding-right', '8px', 'important');
+      body.style.setProperty('padding-left', '0', 'important');
+      body.style.setProperty('padding-right', '0', 'important');
       body.style.setProperty('overflow-x', 'hidden', 'important');
       body.style.setProperty('overflow-y', 'auto', 'important');
-      body.style.setProperty('box-sizing', 'content-box', 'important');
       body.style.setProperty('display', 'flex', 'important');
       body.style.setProperty('flex-direction', 'column', 'important');
       body.style.setProperty('align-items', 'center', 'important');
     }
 
-    const mainBlocks = root.querySelectorAll('.modal-body > div, .modal-body .mt-3, .modal-body .tab-content, .modal-body .tab-pane');
-    mainBlocks.forEach((el) => {
-      el.style.setProperty('max-width', '568px', 'important');
-      el.style.setProperty('width', '568px', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-    });
+    const selectors = [
+      '.modal-body > div',
+      '.modal-body .mt-3',
+      '.modal-body #cadTemp',
+      '.modal-body #tm-top-layout-host',
+      '.modal-body #tm-observation-layout-host',
+      '.modal-body #myTab',
+      '.modal-body .tab-content',
+      '.modal-body .tab-pane',
+      '.modal-body hr',
+      '.modal-footer'
+    ];
 
-    const navTabs = root.querySelector('#myTab');
-    if (navTabs) {
-      navTabs.style.setProperty('max-width', '568px', 'important');
-      navTabs.style.setProperty('width', '568px', 'important');
-      navTabs.style.setProperty('margin-left', 'auto', 'important');
-      navTabs.style.setProperty('margin-right', 'auto', 'important');
-    }
+    selectors.forEach((selector) => {
+      root.querySelectorAll(selector).forEach((el) => {
+        el.style.setProperty('width', CONTENT_W, 'important');
+        el.style.setProperty('max-width', CONTENT_W, 'important');
+        el.style.setProperty('margin-left', 'auto', 'important');
+        el.style.setProperty('margin-right', 'auto', 'important');
+        el.style.setProperty('box-sizing', 'border-box', 'important');
+      });
+    });
 
     const footer = root.querySelector('.modal-footer');
     if (footer) {
-      footer.style.setProperty('width', '568px', 'important');
-      footer.style.setProperty('max-width', '568px', 'important');
-      footer.style.setProperty('padding-right', '8px', 'important');
-      footer.style.setProperty('box-sizing', 'border-box', 'important');
-      footer.style.setProperty('margin-left', 'auto', 'important');
-      footer.style.setProperty('margin-right', 'auto', 'important');
-    }
-
-    const headerList = root.querySelector('.list-group');
-    const headerItem = root.querySelector('.list-group-item.list-group-item-success');
-    if (headerList) {
-      headerList.style.setProperty('margin-left', 'auto', 'important');
-      headerList.style.setProperty('margin-right', 'auto', 'important');
-    }
-    if (headerItem) {
-      headerItem.style.setProperty('margin-left', 'auto', 'important');
-      headerItem.style.setProperty('margin-right', 'auto', 'important');
+      footer.style.setProperty('justify-content', 'flex-start', 'important');
+      footer.style.setProperty('padding-left', '0', 'important');
+      footer.style.setProperty('padding-right', '0', 'important');
     }
   }
 
