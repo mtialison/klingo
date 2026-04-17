@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.31
+// @version      2.32
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -837,6 +837,17 @@
         max-width: 568px !important;
       }
 
+
+      /* AJUSTE TÍTULOS (Dados Pessoais / Observação) */
+      .tm-klingo-root .border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.text-primary,
+      .tm-klingo-root .border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.mt-1.text-primary {
+        width: 509px !important;
+        max-width: 509px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        box-sizing: border-box !important;
+      }
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -1200,6 +1211,14 @@
       leftPanel.style.setProperty('width', '509px', 'important');
       leftPanel.style.setProperty('max-width', '509px', 'important');
     }
+
+    root.querySelectorAll('.border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.text-primary, .border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.mt-1.text-primary').forEach((el) => {
+      el.style.setProperty('width', '509px', 'important');
+      el.style.setProperty('max-width', '509px', 'important');
+      el.style.setProperty('margin-left', 'auto', 'important');
+      el.style.setProperty('margin-right', 'auto', 'important');
+      el.style.setProperty('box-sizing', 'border-box', 'important');
+    });
 
     const footer = root.querySelector('.modal-footer');
     if (footer) {
