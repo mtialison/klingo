@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.28
+// @version      2.29
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -518,6 +518,10 @@
         align-items: start;
         margin-top: 6px;
         margin-bottom: 10px;
+        width: 509px !important;
+        max-width: 509px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
       }
 
       .tm-observation-layout .tm-field-slot > .col,
@@ -752,12 +756,39 @@
       .tm-klingo-root #myTab,
       .tm-klingo-root #cadTemp,
       .tm-klingo-root #tm-top-layout-host,
-      .tm-klingo-root #tm-observation-layout-host,
       .tm-klingo-root hr,
       .tm-klingo-root .modal-footer {
         width: 640px !important;
         max-width: 640px !important;
         box-sizing: border-box !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .tm-klingo-root #tm-observation-layout-host,
+      .tm-klingo-root #myTab,
+      .tm-klingo-root .tab-content,
+      .tm-klingo-root .tab-pane,
+      .tm-klingo-root .modal-footer,
+      .tm-klingo-root .tab-pane .mt-3,
+      .tm-klingo-root .tab-pane .form-group.mb-1 {
+        width: 509px !important;
+        max-width: 509px !important;
+        box-sizing: border-box !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .tm-klingo-root .tab-pane .autocomplete,
+      .tm-klingo-root .tab-pane .autocomplete .input-group,
+      .tm-klingo-root .tab-pane input.az-autocomplete {
+        width: 509px !important;
+        max-width: 509px !important;
+      }
+
+      .tm-klingo-root .tab-pane hr {
+        width: 509px !important;
+        max-width: 509px !important;
         margin-left: auto !important;
         margin-right: auto !important;
       }
@@ -1125,6 +1156,46 @@
       topLayout.style.setProperty('margin-right', 'auto', 'important');
     }
 
+    const observationHost = root.querySelector('#tm-observation-layout-host');
+    if (observationHost) {
+      observationHost.style.setProperty('width', '509px', 'important');
+      observationHost.style.setProperty('max-width', '509px', 'important');
+      observationHost.style.setProperty('margin-left', 'auto', 'important');
+      observationHost.style.setProperty('margin-right', 'auto', 'important');
+    }
+
+    const tabNav = root.querySelector('#myTab');
+    if (tabNav) {
+      tabNav.style.setProperty('width', '509px', 'important');
+      tabNav.style.setProperty('max-width', '509px', 'important');
+      tabNav.style.setProperty('margin-left', 'auto', 'important');
+      tabNav.style.setProperty('margin-right', 'auto', 'important');
+    }
+
+    const tabContent = root.querySelector('.tab-content');
+    if (tabContent) {
+      tabContent.style.setProperty('width', '509px', 'important');
+      tabContent.style.setProperty('max-width', '509px', 'important');
+      tabContent.style.setProperty('margin-left', 'auto', 'important');
+      tabContent.style.setProperty('margin-right', 'auto', 'important');
+    }
+
+    root.querySelectorAll('.tab-pane, .tab-pane .mt-3, .tab-pane .form-group.mb-1').forEach((el) => {
+      el.style.setProperty('width', '509px', 'important');
+      el.style.setProperty('max-width', '509px', 'important');
+      el.style.setProperty('margin-left', 'auto', 'important');
+      el.style.setProperty('margin-right', 'auto', 'important');
+      el.style.setProperty('box-sizing', 'border-box', 'important');
+    });
+
+    root.querySelectorAll('.tab-pane .autocomplete, .tab-pane .autocomplete .input-group, .tab-pane input.az-autocomplete, .tab-pane hr').forEach((el) => {
+      el.style.setProperty('width', '509px', 'important');
+      el.style.setProperty('max-width', '509px', 'important');
+      el.style.setProperty('margin-left', 'auto', 'important');
+      el.style.setProperty('margin-right', 'auto', 'important');
+    });
+
+    const footer = root.querySelector('.modal-footer');
     const leftPanel = root.querySelector('.tm-left-panel');
     if (leftPanel) {
       leftPanel.style.setProperty('width', '509px', 'important');
