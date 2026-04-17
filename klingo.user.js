@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.44
+// @version      2.45
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -23,6 +23,15 @@
     detalhes: '11px'
   };
 
+
+
+  function isCallCenterRoute() {
+    return (
+      location.hostname === 'samec.klingo.app' &&
+      typeof location.hash === 'string' &&
+      location.hash.startsWith('#/call-center')
+    );
+  }
 
   const state = {
     selectedDate: '',
@@ -419,6 +428,7 @@
      OCULTAR ELEMENTOS (CSS)
   ========================= */
   function injectLayoutCSS() {
+    if (!isCallCenterRoute()) return;
     if (document.getElementById('tm-klingo-layout-style')) return;
 
     const style = document.createElement('style');
@@ -884,6 +894,7 @@
   }
 
   function getSchedulingModalRoot() {
+    if (!isCallCenterRoute()) return null;
     const modalContents = document.querySelectorAll('.modal-content');
 
     for (const modal of modalContents) {
@@ -1064,6 +1075,7 @@
   }
 
   function reorganizeHeaderStructure(root) {
+    if (!isCallCenterRoute()) return;
     const headerItem = root.querySelector('.list-group > .list-group-item.list-group-item-success');
     if (!headerItem) return;
 
@@ -1110,6 +1122,7 @@
 
 
   function resizeSchedulingModal() {
+    if (!isCallCenterRoute()) return;
     const root = getSchedulingModalRoot();
     if (!root) return;
 
@@ -1250,6 +1263,7 @@
   }
 
   function reorganizeSchedulingModalLayout() {
+    if (!isCallCenterRoute()) return;
     const root = getSchedulingModalRoot();
     if (!root) return;
 
@@ -1375,6 +1389,7 @@
   }
 
   function hideAppointmentModalFields() {
+    if (!isCallCenterRoute()) return;
     const root = getSchedulingModalRoot();
     if (!root) return;
 
@@ -1390,6 +1405,7 @@
 
 
   function forceObservationSelectHeight() {
+    if (!isCallCenterRoute()) return;
     const root = getSchedulingModalRoot();
     if (!root) return;
 
@@ -1433,6 +1449,7 @@
 
 
   function forceObservationSelectHeightExact() {
+    if (!isCallCenterRoute()) return;
     const root = getSchedulingModalRoot();
     if (!root) return;
 
@@ -1479,6 +1496,7 @@
   }
 
   function burstUpdateLite() {
+    if (!isCallCenterRoute()) return;
     const root = getSchedulingModalRoot();
     updateModalTitle();
     enableBirthDatePaste();
@@ -1490,6 +1508,7 @@
   }
 
   function burstUpdate() {
+    if (!isCallCenterRoute()) return;
     burstUpdateLite();
     setTimeout(burstUpdateLite, 100);
     setTimeout(burstUpdateLite, 250);
@@ -1499,6 +1518,7 @@
   }
 
   document.addEventListener('click', (e) => {
+    if (!isCallCenterRoute()) return;
     if (!e.target.closest('#minutoModal')) {
       captureSelectionFromClick(e.target, false);
     }
@@ -1506,6 +1526,7 @@
   }, true);
 
   document.addEventListener('focusin', () => {
+    if (!isCallCenterRoute()) return;
     enableBirthDatePaste();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
@@ -1544,6 +1565,7 @@
 
   function initScript() {
     applyLoginIndicator();
+    if (!isCallCenterRoute()) return;
     enableBirthDatePaste();
     injectLayoutCSS();
     hideAppointmentModalFields();
@@ -1580,6 +1602,7 @@
   window.addEventListener('pageshow', initScript);
   window.addEventListener('focus', () => {
     applyLoginIndicator();
+    if (!isCallCenterRoute()) return;
     enableBirthDatePaste();
     burstUpdate();
   });
@@ -1588,6 +1611,7 @@
   setInterval(() => {
     if (location.hostname.endsWith('klingo.app')) {
       applyLoginIndicator();
+      if (!isCallCenterRoute()) return;
       enableBirthDatePaste();
       burstUpdate();
     }
