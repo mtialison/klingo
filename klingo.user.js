@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.55
+// @version      2.59
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1632,7 +1632,49 @@
     }
   }
 
-  function burstUpdateLite() {
+  
+  function simplifyUnitsSafe() {
+    if (!isCallCenterRoute()) return;
+
+    document.querySelectorAll('span.mr-2 small.lead').forEach(el => {
+      const txt = el.innerText || '';
+
+      let unit = null;
+
+      if (txt.includes('CLINICA DO SONO')) {
+        if (txt.includes('BANGU')) unit = 'BANGU';
+        else if (txt.includes('BARRA')) unit = 'BARRA';
+        else if (txt.includes('COPACABANA')) unit = 'COPACABANA';
+      }
+
+      if (txt.includes('SAMEC')) {
+        unit = 'SAMEC';
+      }
+
+      if (!unit) return;
+
+      const consultorio = el.querySelector('.text-muted');
+
+      // mantém ícone
+      const icon = el.querySelector('i');
+
+      el.innerHTML = '';
+
+      if (icon) {
+        el.appendChild(icon.cloneNode(true));
+        el.appendChild(document.createTextNode(' ' + unit + ' '));
+      } else {
+        el.textContent = unit;
+      }
+
+      if (consultorio) {
+        consultorio.style.display = 'none';
+        el.appendChild(consultorio);
+      }
+    });
+  }
+
+function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
     const root = getSchedulingModalRoot();
     updateModalTitle();
@@ -1643,6 +1685,7 @@
     reorganizeSchedulingModalLayout();
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
+    simplifyUnitsSafe();
   }
 
   function burstUpdate() {
