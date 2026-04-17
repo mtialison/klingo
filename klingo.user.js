@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.53
+// @version      2.54
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -496,6 +496,26 @@
   font-size: 12px !important;
   line-height: 1.35 !important;
 }
+
+.tm-klingo-root .tm-procedure-title {
+  font-size: 16px !important;
+}
+
+.tm-klingo-root .tm-header-line,
+.tm-klingo-root .tm-header-line small,
+.tm-klingo-root .tm-header-line .lead {
+  font-size: 12px !important;
+}
+
+.tm-klingo-root .tm-header-infos footer {
+  font-size: 12px !important;
+}
+
+/* ocultar consultorio */
+.tm-klingo-root .tm-header-line small .text-muted {
+  display: none !important;
+}
+
 `;
     document.head.appendChild(style);
   }
