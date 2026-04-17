@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.32
+// @version      2.33
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -758,8 +758,8 @@
       .tm-klingo-root #tm-top-layout-host,
       .tm-klingo-root hr,
       .tm-klingo-root .modal-footer {
-        width: 640px !important;
-        max-width: 640px !important;
+        width: 540px !important;
+        max-width: 540px !important;
         box-sizing: border-box !important;
         margin-left: auto !important;
         margin-right: auto !important;
@@ -1111,8 +1111,8 @@
     const dialog = root.closest('.modal-dialog');
     if (!dialog) return;
 
-    const MODAL_W = '680px';
-    const CONTENT_W = '640px';
+    const MODAL_W = '580px';
+    const CONTENT_W = '540px';
 
     dialog.style.setProperty('width', MODAL_W, 'important');
     dialog.style.setProperty('max-width', MODAL_W, 'important');
