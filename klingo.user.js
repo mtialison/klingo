@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.47
+// @version      2.48
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1109,8 +1109,8 @@
       const dateNode = rightMeta.querySelector('small:not(.mx-2)') || rightMeta.children[0] || null;
       const timeNode = rightMeta.querySelector('small.mx-2') || rightMeta.children[1] || null;
 
-      const line2 = ensureHeaderLine(label, 'tm-header-line tm-header-line-2', infosWrap || null);
-      const line3 = ensureHeaderLine(label, 'tm-header-line tm-header-line-3', infosWrap || null);
+      const line2 = ensureHeaderLine(label, 'tm-header-line-2 tm-header-line', infosWrap || null);
+      const line3 = ensureHeaderLine(label, 'tm-header-line-3 tm-header-line', infosWrap || null);
 
       if (paymentNode) line2.appendChild(paymentNode);
       if (doctorNode) line2.appendChild(doctorNode);
