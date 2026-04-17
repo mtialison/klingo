@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.56
+// @version      2.57
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -248,23 +248,6 @@
 
     clearTimeout(bubble._hideTimer);
     bubble._hideTimer = 
-// =========================
-// SIMPLIFICAR NOME DAS UNIDADES NOS HEADERS
-// =========================
-function simplifyUnits() {
-  if (!location.hash.includes('/call-center')) return;
-
-  document.querySelectorAll('.tm-header-line-3 small.lead').forEach(el => {
-    let txt = el.innerText;
-
-    if (!txt) return;
-
-    if (txt.includes('BANGU')) el.innerText = 'BANGU';
-    else if (txt.includes('BARRA')) el.innerText = 'BARRA';
-    else if (txt.includes('COPACABANA')) el.innerText = 'COPACABANA';
-    else if (txt.includes('SAMEC')) el.innerText = 'SAMEC';
-  });
-}
 
 setTimeout(() => {
       bubble.style.opacity = '0';
@@ -1651,6 +1634,43 @@ setTimeout(() => {
     }
   }
 
+  
+// =========================
+// SIMPLIFICAR NOME DAS UNIDADES NOS HEADERS
+// =========================
+function simplifyUnits() {
+  if (!isCallCenterRoute()) return;
+
+  document.querySelectorAll('.tm-header-line-3 span.mr-2 small.lead').forEach((el) => {
+    const icon = el.querySelector('i');
+    const consultorio = el.querySelector('small.text-muted');
+
+    let unit = '';
+    const raw = el.textContent || '';
+
+    if (raw.includes('COPACABANA')) unit = 'COPACABANA';
+    else if (raw.includes('BARRA')) unit = 'BARRA';
+    else if (raw.includes('SAMEC')) unit = 'SAMEC';
+    else if (raw.includes('BANGU')) unit = 'BANGU';
+    else return;
+
+    el.innerHTML = '';
+
+    if (icon) {
+      el.appendChild(icon.cloneNode(true));
+      el.appendChild(document.createTextNode(' ' + unit + ' '));
+    } else {
+      el.textContent = unit;
+    }
+
+    if (consultorio) {
+      consultorio.style.display = 'none';
+      el.appendChild(consultorio);
+    }
+  });
+}
+
+
   function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
     const root = getSchedulingModalRoot();
@@ -1660,6 +1680,7 @@ setTimeout(() => {
     injectFontFix();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
+    simplifyUnits();
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
   }
