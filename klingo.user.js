@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.27
+// @version      2.28
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -438,10 +438,16 @@
         grid-template-columns: 509px;
         gap: 18px;
         align-items: start;
+        width: 509px !important;
+        max-width: 509px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
       }
 
       .tm-left-panel {
         min-width: 0;
+        width: 509px !important;
+        max-width: 509px !important;
       }
 
       .tm-grid-row {
@@ -1110,6 +1116,20 @@
         el.style.setProperty('box-sizing', 'border-box', 'important');
       });
     });
+
+    const topLayout = root.querySelector('.tm-top-layout');
+    if (topLayout) {
+      topLayout.style.setProperty('width', '509px', 'important');
+      topLayout.style.setProperty('max-width', '509px', 'important');
+      topLayout.style.setProperty('margin-left', 'auto', 'important');
+      topLayout.style.setProperty('margin-right', 'auto', 'important');
+    }
+
+    const leftPanel = root.querySelector('.tm-left-panel');
+    if (leftPanel) {
+      leftPanel.style.setProperty('width', '509px', 'important');
+      leftPanel.style.setProperty('max-width', '509px', 'important');
+    }
 
     const footer = root.querySelector('.modal-footer');
     if (footer) {
