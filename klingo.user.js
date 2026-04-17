@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.45
+// @version      2.46
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -26,10 +26,15 @@
 
 
   function isCallCenterRoute() {
+    if (location.hostname !== 'samec.klingo.app') return false;
+    if (typeof location.hash !== 'string') return false;
+
+    const hash = location.hash.trim();
+
     return (
-      location.hostname === 'samec.klingo.app' &&
-      typeof location.hash === 'string' &&
-      location.hash.startsWith('#/call-center')
+      hash === '#/call-center' ||
+      hash === '#/call-center/' ||
+      hash === '#/call-center/marcacao'
     );
   }
 
