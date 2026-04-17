@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.48
+// @version      2.49
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1082,7 +1082,7 @@
   function reorganizeHeaderStructure(root) {
     if (!isCallCenterRoute()) return;
 
-    const headerItems = root.querySelectorAll('.list-group > .list-group-item.list-group-item-success');
+    const headerItems = root.querySelectorAll('.list-group > .list-group-item.list-group-item-success, .list-group > .list-group-item.list-group-item-info');
     if (!headerItems.length) return;
 
     headerItems.forEach((headerItem) => {
