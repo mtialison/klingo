@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.57
+// @version      2.58
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -247,9 +247,7 @@
     });
 
     clearTimeout(bubble._hideTimer);
-    bubble._hideTimer = 
-
-setTimeout(() => {
+    bubble._hideTimer = setTimeout(() => {
       bubble.style.opacity = '0';
       setTimeout(() => bubble.remove(), 180);
     }, 1000);
@@ -1634,41 +1632,51 @@ setTimeout(() => {
     }
   }
 
-  
-// =========================
-// SIMPLIFICAR NOME DAS UNIDADES NOS HEADERS
-// =========================
-function simplifyUnits() {
-  if (!isCallCenterRoute()) return;
 
-  document.querySelectorAll('.tm-header-line-3 span.mr-2 small.lead').forEach((el) => {
-    const icon = el.querySelector('i');
-    const consultorio = el.querySelector('small.text-muted');
+  function simplifyUnits() {
+    if (!isCallCenterRoute()) return;
 
-    let unit = '';
-    const raw = el.textContent || '';
+    const unitLabels = document.querySelectorAll('.tm-header-line-3 span.mr-2 small.lead');
+    unitLabels.forEach((el) => {
+      const icon = el.querySelector('i');
+      const consultorio = el.querySelector('small.text-muted');
 
-    if (raw.includes('COPACABANA')) unit = 'COPACABANA';
-    else if (raw.includes('BARRA')) unit = 'BARRA';
-    else if (raw.includes('SAMEC')) unit = 'SAMEC';
-    else if (raw.includes('BANGU')) unit = 'BANGU';
-    else return;
+      const raw = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      let unit = '';
 
-    el.innerHTML = '';
+      if (raw.includes('COPACABANA')) unit = 'COPACABANA';
+      else if (raw.includes('BARRA')) unit = 'BARRA';
+      else if (raw.includes('SAMEC')) unit = 'SAMEC';
+      else if (raw.includes('BANGU')) unit = 'BANGU';
+      else return;
 
-    if (icon) {
-      el.appendChild(icon.cloneNode(true));
-      el.appendChild(document.createTextNode(' ' + unit + ' '));
-    } else {
-      el.textContent = unit;
-    }
+      // preserva o ícone e remove o restante do texto visível
+      el.childNodes.forEach((node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          node.textContent = '';
+        }
+      });
 
-    if (consultorio) {
-      consultorio.style.display = 'none';
-      el.appendChild(consultorio);
-    }
-  });
-}
+      const textSpanClass = 'tm-unit-short-text';
+      let shortText = el.querySelector('.' + textSpanClass);
+      if (!shortText) {
+        shortText = document.createElement('span');
+        shortText.className = textSpanClass;
+        if (icon && icon.nextSibling) {
+          icon.parentNode.insertBefore(shortText, icon.nextSibling);
+        } else if (icon) {
+          el.appendChild(shortText);
+        } else {
+          el.insertBefore(shortText, el.firstChild);
+        }
+      }
+      shortText.textContent = ' ' + unit + ' ';
+
+      if (consultorio) {
+        consultorio.style.display = 'none';
+      }
+    });
+  }
 
 
   function burstUpdateLite() {
@@ -1680,9 +1688,9 @@ function simplifyUnits() {
     injectFontFix();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    simplifyUnits();
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
+    simplifyUnits();
   }
 
   function burstUpdate() {
