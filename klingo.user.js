@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.43
+// @version      2.44
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -558,18 +558,23 @@
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        height: 44px !important;
+        height: 30px !important;
         min-width: 38px !important;
         border-top-right-radius: 0 !important;
         border-bottom-right-radius: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
       }
 
       .tm-observation-layout select.form-control {
-        height: 44px !important;
+        height: 30px !important;
         max-width: 188px !important;
         width: 188px !important;
         border-top-left-radius: 0 !important;
         border-bottom-left-radius: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        line-height: 30px !important;
       }
 
       .tm-klingo-root .form-row.tm-hidden-original-row,
