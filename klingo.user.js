@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.59
+// @version      2.60
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -978,6 +978,36 @@
         box-sizing: border-box !important;
       }
 
+
+      /* DATA DE NASCIMENTO: idade inline e sem botão calendário */
+      .tm-klingo-root [data-slot="nascimento"] .input-group {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .input-group > .form-control,
+      .tm-klingo-root [data-slot="nascimento"] .input-group > input.form-control {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .tm-age-append-inline {
+        display: flex !important;
+        margin-left: 0 !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .tm-age-append-inline .input-group-text {
+        min-width: 52px !important;
+        justify-content: center !important;
+        border-top-left-radius: 0 !important;
+        border-bottom-left-radius: 0 !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .tm-calendar-hidden {
+        display: none !important;
+      }
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -1683,6 +1713,7 @@ function burstUpdateLite() {
     injectFontFix();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
+    adjustBirthDateAgeInline();
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
@@ -1711,6 +1742,7 @@ function burstUpdateLite() {
     enableBirthDatePaste();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
+    adjustBirthDateAgeInline();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
