@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.60
+// @version      2.61
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -979,33 +979,34 @@
       }
 
 
-      /* DATA DE NASCIMENTO: idade inline e sem botão calendário */
+      /* DATA DE NASCIMENTO: esconder calendário e manter idade inline */
+      .tm-klingo-root [data-slot="nascimento"] .tm-birth-calendar-hidden {
+        display: none !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline {
+        display: flex !important;
+        margin-left: 0 !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline .input-group-text {
+        min-width: 48px !important;
+        justify-content: center !important;
+        border-top-left-radius: 0 !important;
+        border-bottom-left-radius: 0 !important;
+        padding: 0 8px !important;
+      }
+
       .tm-klingo-root [data-slot="nascimento"] .input-group {
         display: flex !important;
         flex-wrap: nowrap !important;
         align-items: stretch !important;
       }
 
-      .tm-klingo-root [data-slot="nascimento"] .input-group > .form-control,
-      .tm-klingo-root [data-slot="nascimento"] .input-group > input.form-control {
-        flex: 1 1 auto !important;
+      .tm-klingo-root [data-slot="nascimento"] .input-group > input.form-control,
+      .tm-klingo-root [data-slot="nascimento"] .input-group > .form-control {
         min-width: 0 !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .tm-age-append-inline {
-        display: flex !important;
-        margin-left: 0 !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .tm-age-append-inline .input-group-text {
-        min-width: 52px !important;
-        justify-content: center !important;
-        border-top-left-radius: 0 !important;
-        border-bottom-left-radius: 0 !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .tm-calendar-hidden {
-        display: none !important;
+        flex: 1 1 auto !important;
       }
 
       @media (max-width: 1200px) {
@@ -1713,7 +1714,7 @@ function burstUpdateLite() {
     injectFontFix();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    adjustBirthDateAgeInline();
+    adjustBirthDateInlineSafe();
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
@@ -1742,7 +1743,7 @@ function burstUpdateLite() {
     enableBirthDatePaste();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    adjustBirthDateAgeInline();
+    adjustBirthDateInlineSafe();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
