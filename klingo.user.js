@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.59
+// @version      2.63
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1632,49 +1632,63 @@
     }
   }
 
-  
+
   function simplifyUnitsSafe() {
     if (!isCallCenterRoute()) return;
 
-    document.querySelectorAll('span.mr-2 small.lead').forEach(el => {
-      const txt = el.innerText || '';
+    const root = getSchedulingModalRoot();
+    if (!root) return;
 
-      let unit = null;
+    root.querySelectorAll('.tm-header-line-3 span.mr-2 small.lead').forEach((el) => {
+      if (el.dataset.tmUnitShortApplied === '1') return;
 
-      if (txt.includes('CLINICA DO SONO')) {
-        if (txt.includes('BANGU')) unit = 'BANGU';
-        else if (txt.includes('BARRA')) unit = 'BARRA';
-        else if (txt.includes('COPACABANA')) unit = 'COPACABANA';
-      }
+      const raw = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      let unit = '';
 
-      if (txt.includes('SAMEC')) {
-        unit = 'SAMEC';
-      }
+      if (raw.includes('COPACABANA')) unit = 'COPACABANA';
+      else if (raw.includes('BARRA')) unit = 'BARRA';
+      else if (raw.includes('SAMEC')) unit = 'SAMEC';
+      else if (raw.includes('BANGU')) unit = 'BANGU';
+      else return;
 
-      if (!unit) return;
-
-      const consultorio = el.querySelector('.text-muted');
-
-      // mantém ícone
-      const icon = el.querySelector('i');
-
-      el.innerHTML = '';
-
-      if (icon) {
-        el.appendChild(icon.cloneNode(true));
-        el.appendChild(document.createTextNode(' ' + unit + ' '));
-      } else {
-        el.textContent = unit;
-      }
-
+      const consultorio = el.querySelector('small.text-muted');
       if (consultorio) {
         consultorio.style.display = 'none';
-        el.appendChild(consultorio);
       }
+
+      const icon = el.querySelector('i');
+      const shortTextClass = 'tm-unit-short-text';
+      let shortText = el.querySelector('.' + shortTextClass);
+
+      if (!shortText) {
+        shortText = document.createElement('span');
+        shortText.className = shortTextClass;
+
+        if (icon) {
+          if (icon.nextSibling) {
+            icon.parentNode.insertBefore(shortText, icon.nextSibling);
+          } else {
+            el.appendChild(shortText);
+          }
+        } else {
+          el.insertBefore(shortText, el.firstChild);
+        }
+      }
+
+      // remove apenas nós de texto soltos, sem destruir a estrutura do elemento
+      Array.from(el.childNodes).forEach((node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          node.textContent = '';
+        }
+      });
+
+      shortText.textContent = ' ' + unit + ' ';
+      el.dataset.tmUnitShortApplied = '1';
     });
   }
 
-function burstUpdateLite() {
+
+  function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
     const root = getSchedulingModalRoot();
     updateModalTitle();
