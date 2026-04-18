@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.61
+// @version      2.62
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -979,22 +979,22 @@
       }
 
 
-      /* DATA DE NASCIMENTO: esconder calendário e manter idade inline */
-      .tm-klingo-root [data-slot="nascimento"] .tm-birth-calendar-hidden {
+      /* DATA DE NASCIMENTO: idade dentro do campo e sem calendário */
+      .tm-klingo-root [data-slot="nascimento"] .tm-birth-calendar-append {
         display: none !important;
       }
 
-      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline {
+      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-append {
         display: flex !important;
         margin-left: 0 !important;
       }
 
-      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline .input-group-text {
-        min-width: 48px !important;
+      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-append .input-group-text {
+        min-width: 46px !important;
         justify-content: center !important;
+        padding: 0 8px !important;
         border-top-left-radius: 0 !important;
         border-bottom-left-radius: 0 !important;
-        padding: 0 8px !important;
       }
 
       .tm-klingo-root [data-slot="nascimento"] .input-group {
@@ -1003,8 +1003,8 @@
         align-items: stretch !important;
       }
 
-      .tm-klingo-root [data-slot="nascimento"] .input-group > input.form-control,
-      .tm-klingo-root [data-slot="nascimento"] .input-group > .form-control {
+      .tm-klingo-root [data-slot="nascimento"] .input-group > .form-control,
+      .tm-klingo-root [data-slot="nascimento"] .input-group > input.form-control {
         min-width: 0 !important;
         flex: 1 1 auto !important;
       }
@@ -1714,7 +1714,7 @@ function burstUpdateLite() {
     injectFontFix();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    adjustBirthDateInlineSafe();
+    fixBirthDateFieldInline();
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
@@ -1743,7 +1743,7 @@ function burstUpdateLite() {
     enableBirthDatePaste();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    adjustBirthDateInlineSafe();
+    fixBirthDateFieldInline();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
