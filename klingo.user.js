@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.66
+// @version      2.67
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -979,40 +979,31 @@
       }
 
 
-      /* OCULTAR BOTÃO/ÍCONE DE DATA NO CAMPO DATA DE NASCIMENTO */
-      .tm-klingo-root [data-slot="nascimento"] .input-group-append,
-      .tm-klingo-root [data-slot="nascimento"] .input-group button,
-      .tm-klingo-root [data-slot="nascimento"] .input-group .btn,
-      .tm-klingo-root [data-slot="nascimento"] .input-group .fa-calendar,
-      .tm-klingo-root [data-slot="nascimento"] .input-group .fa-calendar-alt,
-      .tm-klingo-root [data-slot="nascimento"] .input-group .far.fa-calendar-alt,
-      .tm-klingo-root [data-slot="nascimento"] .input-group .fas.fa-calendar-alt {
-        display: none !important;
-      }
-
-
-      /* OCULTAR DE FORMA FORTE O BOTÃO/ÍCONE DE DATA NO CAMPO DATA DE NASCIMENTO */
-      .tm-klingo-root [data-slot="nascimento"] .input-group-append,
-      .tm-klingo-root [data-slot="nascimento"] .input-group button,
-      .tm-klingo-root [data-slot="nascimento"] .input-group .btn,
-      .tm-klingo-root [data-slot="nascimento"] .input-group-text,
-      .tm-klingo-root [data-slot="nascimento"] .fa-calendar,
-      .tm-klingo-root [data-slot="nascimento"] .fa-calendar-alt,
-      .tm-klingo-root [data-slot="nascimento"] .far.fa-calendar-alt,
-      .tm-klingo-root [data-slot="nascimento"] .fas.fa-calendar-alt,
-      .tm-klingo-root [data-slot="nascimento"] svg,
-      .tm-klingo-root [data-slot="nascimento"] [aria-label*="calendar" i],
-      .tm-klingo-root [data-slot="nascimento"] [title*="calendar" i] {
-        display: none !important;
-        visibility: hidden !important;
+      /* OCULTAR ÍCONE NATIVO DO INPUT DATE NO CAMPO DATA DE NASCIMENTO */
+      .tm-klingo-root [data-slot="nascimento"] input[type="date"]::-webkit-calendar-picker-indicator {
         opacity: 0 !important;
-        pointer-events: none !important;
+        display: none !important;
+        -webkit-appearance: none !important;
       }
 
-      .tm-klingo-root [data-slot="nascimento"] .input-group > .form-control,
-      .tm-klingo-root [data-slot="nascimento"] .input-group > input.form-control,
-      .tm-klingo-root [data-slot="nascimento"] input.form-control {
+      .tm-klingo-root [data-slot="nascimento"] input[type="date"]::-webkit-inner-spin-button,
+      .tm-klingo-root [data-slot="nascimento"] input[type="date"]::-webkit-clear-button {
+        display: none !important;
+        -webkit-appearance: none !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] input[type="date"] {
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        background-image: none !important;
         padding-right: 8px !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .input-group-append,
+      .tm-klingo-root [data-slot="nascimento"] .input-group-text,
+      .tm-klingo-root [data-slot="nascimento"] .btn,
+      .tm-klingo-root [data-slot="nascimento"] button {
+        display: none !important;
       }
 
       @media (max-width: 1200px) {
