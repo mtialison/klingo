@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         klingo 4.2
+// @name         klingo 4.3
 // @namespace    http://tampermonkey.net/
-// @version      4.2
+// @version      4.3
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2275,12 +2275,9 @@
     return !!(rect.width || rect.height);
   }
 
-  
   function findDateCalculatorMenuContainer() {
-    return document.querySelector('#creek-dropdown.dropdown-menu');
-  }
-
-    return null;
+    const menu = document.querySelector('#creek-dropdown.dropdown-menu');
+    return menu || null;
   }
 
   function findExitActionInMenu(menu) {
@@ -2301,26 +2298,28 @@
     return null;
   }
 
-  
   function ensureDateCalculatorMenuItem() {
     const menu = findDateCalculatorMenuContainer();
     if (!menu) return;
-
     if (menu.querySelector('[data-tm-datecalc-item="1"]')) return;
 
-    const items = Array.from(menu.querySelectorAll('.dropdown-item'));
-    const exitItem = items.find(el => el.textContent.trim() === 'Sair');
+    const items = Array.from(menu.querySelectorAll('a.dropdown-item'));
+    const exitItem = items.find((el) => norm(el.textContent || '').includes('Sair'));
     if (!exitItem) return;
 
+    const dividerBeforeExit = exitItem.previousElementSibling;
     const item = document.createElement('a');
-    item.href = "#";
-    item.className = exitItem.className;
-    item.textContent = "Calculadora de datas";
+    item.href = '#';
+    item.className = exitItem.className || 'dropdown-item ddip-card';
+    item.textContent = 'Calculadora de datas';
     item.setAttribute('data-tm-datecalc-item', '1');
 
-    menu.insertBefore(item, exitItem);
+    if (dividerBeforeExit && dividerBeforeExit.classList.contains('dropdown-divider')) {
+      menu.insertBefore(item, dividerBeforeExit);
+    } else {
+      menu.insertBefore(item, exitItem);
+    }
   }
-
 
   function scheduleDateCalculatorMenuRefresh() {
     if (!isKlingoHost()) return;
@@ -2348,6 +2347,15 @@
         e.preventDefault();
         e.stopPropagation();
         setDateCalculatorOpen(false);
+        return;
+      }
+
+      const avatarToggle = e.target.closest('#navbarDropdown');
+      if (avatarToggle) {
+        scheduleDateCalculatorMenuRefresh();
+        setTimeout(scheduleDateCalculatorMenuRefresh, 80);
+        setTimeout(scheduleDateCalculatorMenuRefresh, 180);
+        setTimeout(scheduleDateCalculatorMenuRefresh, 320);
         return;
       }
 
