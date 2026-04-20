@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         klingo 3.2
+// @name         klingo 3.3
 // @namespace    http://tampermonkey.net/
-// @version      3.2
+// @version      3.3
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1036,6 +1036,10 @@
         pointer-events: none !important;
       }
 
+      .tm-klingo-root [data-slot="nascimento"] .input-group-append.tm-age-hidden {
+        display: none !important;
+      }
+
       .tm-klingo-root [data-slot="nascimento"] .input-group-append:has(.input-group-text[title*="Idade"]) .input-group-text,
       .tm-klingo-root [data-slot="nascimento"] .input-group-append:has(.input-group-text[title*="idade"]) .input-group-text {
         min-width: 42px !important;
@@ -1776,19 +1780,91 @@
 
 
 
-  function normalizeBirthAgeBadgeText() {
+
+
+  function calculatePatientAgeFromIso(isoValue) {
+    if (!isoValue || !/^\d{4}-\d{2}-\d{2}$/.test(isoValue)) return '';
+
+    const [yyyy, mm, dd] = isoValue.split('-').map(Number);
+    const birth = new Date(yyyy, mm - 1, dd);
+
+    if (
+      birth.getFullYear() !== yyyy ||
+      birth.getMonth() !== mm - 1 ||
+      birth.getDate() !== dd
+    ) return '';
+
+    const today = new Date();
+    let age = today.getFullYear() - yyyy;
+    const monthDiff = today.getMonth() - (mm - 1);
+    const dayDiff = today.getDate() - dd;
+
+    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+      age -= 1;
+    }
+
+    if (age < 0 || age > 130) return '';
+    return String(age);
+  }
+
+  function syncBirthAgeBadge() {
     if (!isCallCenterRoute()) return;
 
     const root = getSchedulingModalRoot();
     if (!root) return;
 
-    root.querySelectorAll('[data-slot="nascimento"] .input-group-text[title*="Idade"], [data-slot="nascimento"] .input-group-text[title*="idade"]').forEach((el) => {
-      const raw = (el.textContent || '').trim();
-      const onlyDigits = raw.replace(/\D+/g, '');
-      if (onlyDigits && raw !== onlyDigits) {
-        el.textContent = onlyDigits;
-      }
-    });
+    const birthSlot = root.querySelector('[data-slot="nascimento"]');
+    if (!birthSlot) return;
+
+    const input = birthSlot.querySelector('input[type="date"]');
+    if (!input) return;
+
+    const ageAppend = birthSlot.querySelector('.input-group-append:has(.input-group-text[title*="Idade"]), .input-group-append:has(.input-group-text[title*="idade"])');
+    const ageText = ageAppend ? ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]') : null;
+    if (!ageAppend || !ageText) return;
+
+    const age = calculatePatientAgeFromIso(input.value);
+
+    if (!age) {
+      ageText.textContent = '';
+      ageAppend.classList.add('tm-age-hidden');
+      return;
+    }
+
+    ageText.textContent = age;
+    ageAppend.classList.remove('tm-age-hidden');
+  }
+
+  function enableBirthAgeSync() {
+    if (!isCallCenterRoute()) return;
+
+    const root = getSchedulingModalRoot();
+    if (!root) return;
+
+    const birthSlot = root.querySelector('[data-slot="nascimento"]');
+    if (!birthSlot) return;
+
+    const input = birthSlot.querySelector('input[type="date"]');
+    if (!input) return;
+
+    if (input.dataset.tmBirthAgeSyncEnabled === '1') {
+      syncBirthAgeBadge();
+      return;
+    }
+
+    input.dataset.tmBirthAgeSyncEnabled = '1';
+
+    const handler = () => {
+      requestAnimationFrame(() => {
+        syncBirthAgeBadge();
+      });
+    };
+
+    input.addEventListener('input', handler, true);
+    input.addEventListener('change', handler, true);
+    input.addEventListener('blur', handler, true);
+
+    syncBirthAgeBadge();
   }
 
 
@@ -1801,7 +1877,7 @@
     injectFontFix();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    normalizeBirthAgeBadgeText();
+    enableBirthAgeSync();
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
@@ -1830,7 +1906,7 @@
     enableBirthDatePaste();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    normalizeBirthAgeBadgeText();
+    enableBirthAgeSync();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
