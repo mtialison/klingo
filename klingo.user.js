@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         klingo 4.4
+// @name         klingo 4.5
 // @namespace    http://tampermonkey.net/
-// @version      4.4
+// @version      4.5
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2184,26 +2184,9 @@
   }
 
   function parseIsoDateSafe(value) {
-    const raw = norm(value || '');
-    if (!raw) return null;
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value || '')) return null;
 
-    let yyyy = 0;
-    let mm = 0;
-    let dd = 0;
-    let match = raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
-
-    if (match) {
-      yyyy = Number(match[1]);
-      mm = Number(match[2]);
-      dd = Number(match[3]);
-    } else {
-      match = raw.match(/^(\\d{2})\/(\\d{2})\/(\\d{4})$/);
-      if (!match) return null;
-      dd = Number(match[1]);
-      mm = Number(match[2]);
-      yyyy = Number(match[3]);
-    }
-
+    const [yyyy, mm, dd] = value.split('-').map(Number);
     const date = new Date(yyyy, mm - 1, dd, 12, 0, 0, 0);
 
     if (
@@ -2215,6 +2198,29 @@
     }
 
     return date;
+
+
+  function parseDateFlexible(value) {
+    const raw = (value || '').toString().trim();
+    if (!raw) return null;
+
+    // try ISO first
+    let d = parseIsoDateSafe(raw);
+    if (d) return d;
+
+    // try dd/mm/yyyy
+    const m = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m) {
+      const dd = Number(m[1]);
+      const mm = Number(m[2]);
+      const yyyy = Number(m[3]);
+      const date = new Date(yyyy, mm - 1, dd, 12, 0, 0, 0);
+      if (date.getFullYear() === yyyy && date.getMonth() === mm - 1 && date.getDate() === dd) {
+        return date;
+      }
+    }
+    return null;
+  }
   }
 
   function addDaysSafe(date, days) {
@@ -2258,8 +2264,8 @@
 
     if (!startInput || !daysInput || !endInput || !resultDate || !resultDays) return;
 
-    const startDate = parseIsoDateSafe(startInput.value);
-    const endDate = parseIsoDateSafe(endInput.value);
+    const startDate = parseDateFlexible(startInput.value);
+    const endDate = parseDateFlexible(endInput.value);
     const daysValue = norm(daysInput.value);
 
     if (startDate && daysValue !== '' && !Number.isNaN(Number(daysValue))) {
