@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         klingo 3.9
+// @name         klingo 4.0
 // @namespace    http://tampermonkey.net/
-// @version      3.9
+// @version      4.0
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1963,8 +1963,410 @@
     }, 200);
   }, true);
 
+
+  function isKlingoHost() {
+    return location.hostname.endsWith('klingo.app');
+  }
+
+  function isElementVisible(el) {
+    if (!el || !el.isConnected) return false;
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    return !!(rect.width || rect.height) && style.display !== 'none' && style.visibility !== 'hidden';
+  }
+
+  function parseIsoDateSafe(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return null;
+
+    const [yyyy, mm, dd] = value.split('-').map(Number);
+    const date = new Date(yyyy, mm - 1, dd, 12, 0, 0, 0);
+
+    if (
+      date.getFullYear() !== yyyy ||
+      date.getMonth() !== mm - 1 ||
+      date.getDate() !== dd
+    ) {
+      return null;
+    }
+
+    return date;
+  }
+
+  function addDaysSafe(date, days) {
+    const amount = Number(days);
+    if (!(date instanceof Date) || Number.isNaN(amount)) return null;
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount, 12, 0, 0, 0);
+  }
+
+  function diffDaysSafe(startDate, endDate) {
+    if (!(startDate instanceof Date) || !(endDate instanceof Date)) return null;
+    const diffMs = endDate.getTime() - startDate.getTime();
+    return Math.round(diffMs / 86400000);
+  }
+
+  function formatDatePtBrFull(date) {
+    if (!(date instanceof Date)) return '';
+    const weekday = WEEKDAYS[date.getDay() === 0 ? 6 : date.getDay() - 1] || '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = monthNameFromNumber(String(date.getMonth() + 1).padStart(2, '0'));
+    const year = date.getFullYear();
+    return `${weekday}, ${day} de ${month} de ${year}`;
+  }
+
+  function formatDatePtBrShort(date) {
+    if (!(date instanceof Date)) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  function injectDateCalculatorCSS() {
+    if (document.getElementById('tm-datecalc-style')) return;
+
+    const style = document.createElement('style');
+    style.id = 'tm-datecalc-style';
+    style.textContent = `
+      .tm-datecalc-panel {
+        position: fixed;
+        top: 88px;
+        right: 20px;
+        width: 360px;
+        max-width: calc(100vw - 24px);
+        background: #ffffff;
+        border: 1px solid #d7dbe2;
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+        z-index: 999995;
+        overflow: hidden;
+      }
+
+      .tm-datecalc-hidden {
+        display: none !important;
+      }
+
+      .tm-datecalc-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        background: #1679e8;
+        color: #fff;
+      }
+
+      .tm-datecalc-title {
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      .tm-datecalc-close {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .tm-datecalc-body {
+        padding: 14px;
+      }
+
+      .tm-datecalc-section + .tm-datecalc-section {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid #e7ebf0;
+      }
+
+      .tm-datecalc-grid {
+        display: grid;
+        grid-template-columns: 1fr 112px;
+        gap: 10px 12px;
+        align-items: end;
+      }
+
+      .tm-datecalc-field {
+        min-width: 0;
+      }
+
+      .tm-datecalc-field label {
+        display: block;
+        margin-bottom: 6px;
+        color: #6c757d;
+        font-size: 13px;
+        line-height: 1.2;
+      }
+
+      .tm-datecalc-field input {
+        width: 100%;
+        height: 38px;
+        border: 1px solid #ced4da;
+        border-radius: .25rem;
+        padding: 6px 10px;
+        font-size: 15px;
+        line-height: 1.2;
+        color: #495057;
+        background: #fff;
+        box-sizing: border-box;
+      }
+
+      .tm-datecalc-field input:focus {
+        outline: none;
+        border-color: #80bdff;
+        box-shadow: 0 0 0 .2rem rgba(0,123,255,.15);
+      }
+
+      .tm-datecalc-result-box,
+      .tm-datecalc-days-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 46px;
+        margin-top: 12px;
+        padding: 10px 12px;
+        border: 1px solid #d9dee5;
+        border-radius: 8px;
+        background: #f7f9fb;
+        text-align: center;
+        box-sizing: border-box;
+      }
+
+      .tm-datecalc-result-box {
+        color: #d93025;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+
+      .tm-datecalc-result-box small {
+        display: block;
+        margin-top: 2px;
+        color: #6c757d;
+        font-weight: 500;
+      }
+
+      .tm-datecalc-days-box {
+        color: #d93025;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      [data-tm-datecalc-item="1"] {
+        cursor: pointer !important;
+      }
+
+      @media (max-width: 640px) {
+        .tm-datecalc-panel {
+          top: 76px;
+          right: 10px;
+          left: 10px;
+          width: auto;
+          max-width: none;
+        }
+
+        .tm-datecalc-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function getDateCalculatorPanel() {
+    return document.getElementById('tm-datecalc-panel');
+  }
+
+  function ensureDateCalculatorPanel() {
+    let panel = getDateCalculatorPanel();
+    if (panel) return panel;
+
+    panel = document.createElement('div');
+    panel.id = 'tm-datecalc-panel';
+    panel.className = 'tm-datecalc-panel tm-datecalc-hidden';
+    panel.innerHTML = `
+      <div class="tm-datecalc-header">
+        <div class="tm-datecalc-title">Calculadora de datas</div>
+        <button type="button" class="tm-datecalc-close" data-tm-datecalc-close="1" aria-label="Fechar">×</button>
+      </div>
+      <div class="tm-datecalc-body">
+        <div class="tm-datecalc-section">
+          <div class="tm-datecalc-grid">
+            <div class="tm-datecalc-field">
+              <label for="tm-datecalc-start">Data inicial</label>
+              <input id="tm-datecalc-start" type="date">
+            </div>
+            <div class="tm-datecalc-field">
+              <label for="tm-datecalc-days">Adicionar dias</label>
+              <input id="tm-datecalc-days" type="number" min="0" step="1" placeholder="0">
+            </div>
+          </div>
+          <div class="tm-datecalc-result-box" id="tm-datecalc-result-date">Informe a data inicial e a quantidade de dias.</div>
+        </div>
+
+        <div class="tm-datecalc-section">
+          <div class="tm-datecalc-grid">
+            <div class="tm-datecalc-field" style="grid-column: 1 / -1;">
+              <label for="tm-datecalc-end">Data final</label>
+              <input id="tm-datecalc-end" type="date">
+            </div>
+          </div>
+          <div class="tm-datecalc-days-box" id="tm-datecalc-result-days">Informe a data inicial e a data final.</div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(panel);
+    return panel;
+  }
+
+  function setDateCalculatorOpen(isOpen) {
+    const panel = ensureDateCalculatorPanel();
+    panel.classList.toggle('tm-datecalc-hidden', !isOpen);
+    if (isOpen) {
+      const startInput = panel.querySelector('#tm-datecalc-start');
+      if (startInput) startInput.focus();
+    }
+  }
+
+  function toggleDateCalculatorPanel() {
+    const panel = ensureDateCalculatorPanel();
+    setDateCalculatorOpen(panel.classList.contains('tm-datecalc-hidden'));
+  }
+
+  function refreshDateCalculatorResults() {
+    const panel = getDateCalculatorPanel();
+    if (!panel) return;
+
+    const startInput = panel.querySelector('#tm-datecalc-start');
+    const daysInput = panel.querySelector('#tm-datecalc-days');
+    const endInput = panel.querySelector('#tm-datecalc-end');
+    const resultDate = panel.querySelector('#tm-datecalc-result-date');
+    const resultDays = panel.querySelector('#tm-datecalc-result-days');
+
+    if (!startInput || !daysInput || !endInput || !resultDate || !resultDays) return;
+
+    const startDate = parseIsoDateSafe(startInput.value);
+    const endDate = parseIsoDateSafe(endInput.value);
+    const daysValue = norm(daysInput.value);
+
+    if (startDate && daysValue !== '' && !Number.isNaN(Number(daysValue))) {
+      const targetDate = addDaysSafe(startDate, Number(daysValue));
+      if (targetDate) {
+        resultDate.innerHTML = `${formatDatePtBrFull(targetDate)}<small>${formatDatePtBrShort(targetDate)}</small>`;
+      } else {
+        resultDate.textContent = 'Não foi possível calcular a data.';
+      }
+    } else {
+      resultDate.textContent = 'Informe a data inicial e a quantidade de dias.';
+    }
+
+    if (startDate && endDate) {
+      const totalDays = diffDaysSafe(startDate, endDate);
+      if (totalDays === null) {
+        resultDays.textContent = 'Não foi possível calcular a diferença.';
+      } else {
+        const label = Math.abs(totalDays) === 1 ? 'dia' : 'dias';
+        resultDays.textContent = `${totalDays} ${label}`;
+      }
+    } else {
+      resultDays.textContent = 'Informe a data inicial e a data final.';
+    }
+  }
+
+  function findProfileMenuAnchor() {
+    const nodes = Array.from(document.querySelectorAll('a, button, div, span, li'));
+    for (const node of nodes) {
+      if (node.dataset.tmDatecalcItem === '1') continue;
+      if (!isElementVisible(node)) continue;
+      if (norm(node.textContent) !== 'Sair') continue;
+
+      const actionNode =
+        node.closest('a, button, .dropdown-item, [role="menuitem"], li, div') ||
+        node.parentElement;
+
+      if (!actionNode || !isElementVisible(actionNode)) continue;
+
+      const menuParent = actionNode.parentElement;
+      if (!menuParent) continue;
+
+      const menuText = norm(menuParent.textContent || '');
+      if (!menuText.includes('Alterar minha senha') || !menuText.includes('Sair')) continue;
+
+      return actionNode;
+    }
+    return null;
+  }
+
+  function ensureDateCalculatorMenuItem() {
+    const exitAction = findProfileMenuAnchor();
+    if (!exitAction) return;
+
+    const menuParent = exitAction.parentElement;
+    if (!menuParent || menuParent.querySelector('[data-tm-datecalc-item="1"]')) return;
+
+    const tag = exitAction.tagName === 'A' ? 'a' : (exitAction.tagName === 'BUTTON' ? 'button' : 'div');
+    const item = document.createElement(tag);
+
+    item.dataset.tmDatecalcItem = '1';
+    item.setAttribute('data-tm-datecalc-item', '1');
+    item.className = exitAction.className || '';
+
+    if (tag === 'button') item.type = 'button';
+    if (tag === 'a') item.href = 'javascript:void(0)';
+
+    item.textContent = 'Calculadora de datas';
+    item.style.cursor = 'pointer';
+    item.style.width = '100%';
+    item.style.boxSizing = 'border-box';
+
+    menuParent.insertBefore(item, exitAction);
+  }
+
+  function bindDateCalculatorEvents() {
+    if (document.body.dataset.tmDatecalcBound === '1') return;
+    document.body.dataset.tmDatecalcBound = '1';
+
+    document.addEventListener('click', (e) => {
+      const menuItem = e.target.closest('[data-tm-datecalc-item="1"]');
+      if (menuItem) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleDateCalculatorPanel();
+        return;
+      }
+
+      const closeBtn = e.target.closest('[data-tm-datecalc-close="1"]');
+      if (closeBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        setDateCalculatorOpen(false);
+      }
+    }, true);
+
+    const refreshIfNeeded = (e) => {
+      if (!e.target.closest('#tm-datecalc-panel')) return;
+      refreshDateCalculatorResults();
+    };
+
+    document.addEventListener('input', refreshIfNeeded, true);
+    document.addEventListener('change', refreshIfNeeded, true);
+  }
+
+  function initDateCalculatorFeature() {
+    if (!isKlingoHost()) return;
+    injectDateCalculatorCSS();
+    ensureDateCalculatorPanel();
+    bindDateCalculatorEvents();
+    ensureDateCalculatorMenuItem();
+    refreshDateCalculatorResults();
+  }
+
+
   const observer = new MutationObserver(() => {
     applyLoginIndicator();
+    initDateCalculatorFeature();
     enableBirthDatePaste();
     burstUpdateLite();
   });
@@ -1977,6 +2379,7 @@
 
   function initScript() {
     applyLoginIndicator();
+    initDateCalculatorFeature();
     if (!isCallCenterRoute()) return;
     enableBirthDatePaste();
     injectLayoutCSS();
