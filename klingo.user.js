@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         klingo 3.6
+// @name         klingo 3.7
 // @namespace    http://tampermonkey.net/
-// @version      3.6
+// @version      3.7
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1018,39 +1018,44 @@
 
       .tm-klingo-root [data-slot="nascimento"] input[type="date"],
       .tm-klingo-root [data-slot="nascimento"] input.form-control {
-        padding-right: 60px !important;
+        padding-right: 102px !important;
       }
 
       .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline {
         position: absolute !important;
-        top: 2px !important;
-        bottom: 2px !important;
-        right: 4px !important;
+        top: 1px !important;
+        bottom: 1px !important;
+        right: 1px !important;
+        width: 98px !important;
         transform: none !important;
         z-index: 3 !important;
         display: flex !important;
-        align-items: center !important;
+        align-items: stretch !important;
         margin: 0 !important;
         pointer-events: none !important;
       }
 
       .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline .input-group-text {
-        min-width: 42px !important;
-        height: 100% !important;
-        max-height: 26px !important;
-        padding: 0 10px !important;
-        border-radius: 6px !important;
-        display: inline-flex !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         background: #d9d9d9 !important;
         color: #666 !important;
-        font-size: 14px !important;
         line-height: 1 !important;
-        border: 0 !important;
+        border-top: 0 !important;
+        border-right: 0 !important;
+        border-bottom: 0 !important;
+        border-left: 1px solid #cfd4da !important;
         box-shadow: none !important;
         box-sizing: border-box !important;
         white-space: nowrap !important;
+        text-align: center !important;
       }
 
       .tm-klingo-root [data-slot="nascimento"] .tm-age-hidden {
