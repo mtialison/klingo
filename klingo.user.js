@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         klingo 4.1
+// @name         klingo 4.2
 // @namespace    http://tampermonkey.net/
-// @version      4.1
+// @version      4.2
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2275,17 +2275,11 @@
     return !!(rect.width || rect.height);
   }
 
+  
   function findDateCalculatorMenuContainer() {
-    const candidates = Array.from(document.querySelectorAll('.dropdown-menu, [role="menu"], .menu, .show, .dropdown-content, .popover'));
-    for (const candidate of candidates) {
-      if (!isElementVisible(candidate)) continue;
+    return document.querySelector('#creek-dropdown.dropdown-menu');
+  }
 
-      const text = norm(candidate.textContent || '');
-      if (!text.includes('Sair')) continue;
-      if (!text.includes('Alterar minha senha')) continue;
-
-      return candidate;
-    }
     return null;
   }
 
@@ -2307,29 +2301,26 @@
     return null;
   }
 
+  
   function ensureDateCalculatorMenuItem() {
     const menu = findDateCalculatorMenuContainer();
-    if (!menu || menu.querySelector('[data-tm-datecalc-item="1"]')) return;
+    if (!menu) return;
 
-    const exitAction = findExitActionInMenu(menu);
-    if (!exitAction) return;
+    if (menu.querySelector('[data-tm-datecalc-item="1"]')) return;
 
-    const tag = exitAction.tagName === 'A' ? 'a' : (exitAction.tagName === 'BUTTON' ? 'button' : 'div');
-    const item = document.createElement(tag);
+    const items = Array.from(menu.querySelectorAll('.dropdown-item'));
+    const exitItem = items.find(el => el.textContent.trim() === 'Sair');
+    if (!exitItem) return;
 
-    item.dataset.tmDatecalcItem = '1';
+    const item = document.createElement('a');
+    item.href = "#";
+    item.className = exitItem.className;
+    item.textContent = "Calculadora de datas";
     item.setAttribute('data-tm-datecalc-item', '1');
-    item.className = exitAction.className || '';
-    if (tag === 'button') item.type = 'button';
-    if (tag === 'a') item.href = 'javascript:void(0)';
 
-    item.textContent = 'Calculadora de datas';
-    item.style.cursor = 'pointer';
-    item.style.width = '100%';
-    item.style.boxSizing = 'border-box';
-
-    menu.insertBefore(item, exitAction);
+    menu.insertBefore(item, exitItem);
   }
+
 
   function scheduleDateCalculatorMenuRefresh() {
     if (!isKlingoHost()) return;
