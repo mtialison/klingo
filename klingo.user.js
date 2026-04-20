@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         klingo 3.1
+// @name         klingo 3.2
 // @namespace    http://tampermonkey.net/
-// @version      3.1
+// @version      3.2
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1008,7 +1008,7 @@
       }
 
 
-      /* DATA DE NASCIMENTO: badge de idade inline usando o append nativo do sistema */
+      /* DATA DE NASCIMENTO: badge de idade inline sem JS de escuta */
       .tm-klingo-root [data-slot="nascimento"] .input-group {
         position: relative !important;
         display: flex !important;
@@ -1021,18 +1021,23 @@
         padding-right: 56px !important;
       }
 
-      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline {
+      .tm-klingo-root [data-slot="nascimento"] .input-group-append {
+        margin-left: 0 !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .input-group-append:has(.input-group-text[title*="Idade"]),
+      .tm-klingo-root [data-slot="nascimento"] .input-group-append:has(.input-group-text[title*="idade"]) {
         position: absolute !important;
         top: 50% !important;
         right: 6px !important;
         transform: translateY(-50%) !important;
-        display: flex !important;
-        margin: 0 !important;
         z-index: 3 !important;
+        display: flex !important;
         pointer-events: none !important;
       }
 
-      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline .input-group-text {
+      .tm-klingo-root [data-slot="nascimento"] .input-group-append:has(.input-group-text[title*="Idade"]) .input-group-text,
+      .tm-klingo-root [data-slot="nascimento"] .input-group-append:has(.input-group-text[title*="idade"]) .input-group-text {
         min-width: 42px !important;
         height: 30px !important;
         padding: 0 10px !important;
@@ -1046,6 +1051,10 @@
         line-height: 1 !important;
         border: 0 !important;
         box-shadow: none !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .input-group-append:not(:has(.input-group-text[title*="Idade"])):not(:has(.input-group-text[title*="idade"])) {
+        display: none !important;
       }
 
       @media (max-width: 1200px) {
@@ -1767,59 +1776,19 @@
 
 
 
-  function placeBirthAgeBadgeSafe() {
+  function normalizeBirthAgeBadgeText() {
     if (!isCallCenterRoute()) return;
 
     const root = getSchedulingModalRoot();
     if (!root) return;
 
-    const birthSlot = root.querySelector('[data-slot="nascimento"]');
-    if (!birthSlot) return;
-
-    const inputGroup = birthSlot.querySelector('.input-group');
-    if (!inputGroup) return;
-
-    const appends = Array.from(birthSlot.querySelectorAll('.input-group-append'));
-    if (!appends.length) return;
-
-    let ageAppend = null;
-    let calendarAppend = null;
-
-    appends.forEach((append) => {
-      const ageText = append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
-      if (ageText) {
-        ageAppend = append;
-        return;
-      }
-
-      if (
-        append.querySelector('button, .btn, .fa-calendar, .far.fa-calendar-alt, .fas.fa-calendar-alt') ||
-        append.textContent.trim() === ''
-      ) {
-        calendarAppend = append;
+    root.querySelectorAll('[data-slot="nascimento"] .input-group-text[title*="Idade"], [data-slot="nascimento"] .input-group-text[title*="idade"]').forEach((el) => {
+      const raw = (el.textContent || '').trim();
+      const onlyDigits = raw.replace(/\D+/g, '');
+      if (onlyDigits && raw !== onlyDigits) {
+        el.textContent = onlyDigits;
       }
     });
-
-    if (calendarAppend) {
-      calendarAppend.style.setProperty('display', 'none', 'important');
-    }
-
-    if (!ageAppend) return;
-
-    const ageText = ageAppend.querySelector('.input-group-text');
-    if (!ageText) return;
-
-    // remove sufixo "a" para ficar como no layout esperado
-    ageText.textContent = (ageText.textContent || '').replace(/\D+/g, '');
-
-    if (ageAppend.parentElement !== inputGroup) {
-      inputGroup.appendChild(ageAppend);
-    }
-
-    ageAppend.classList.add('tm-birth-age-inline');
-    ageAppend.style.setProperty('display', 'flex', 'important');
-    ageAppend.style.setProperty('margin', '0', 'important');
-    ageAppend.style.setProperty('pointer-events', 'none', 'important');
   }
 
 
@@ -1832,7 +1801,7 @@
     injectFontFix();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    placeBirthAgeBadgeSafe();
+    normalizeBirthAgeBadgeText();
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
@@ -1861,7 +1830,7 @@
     enableBirthDatePaste();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    placeBirthAgeBadgeSafe();
+    normalizeBirthAgeBadgeText();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
