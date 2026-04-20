@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         klingo 4.5
+// @name         klingo
 // @namespace    http://tampermonkey.net/
 // @version      4.5
 // @description  envenenado
