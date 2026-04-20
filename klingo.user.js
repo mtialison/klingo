@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         klingo 3.5
+// @name         klingo 3.6
 // @namespace    http://tampermonkey.net/
-// @version      3.5
+// @version      3.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -454,7 +454,7 @@
 .tm-klingo-root .list-group-item.list-group-item-warning .tm-header-line,
 .tm-klingo-root .list-group-item.list-group-item-secondary .tm-header-line,
 .tm-klingo-root .list-group-item.list-group-item-danger .tm-header-line {
-  font-size: 14px !important;
+  font-size: inherit !important;
   line-height: 1.3 !important;
 }
 
@@ -1818,6 +1818,20 @@
     return { birthSlot, input, inputGroup, ageAppend };
   }
 
+
+  function syncBirthAgeBadgeFontSafe(input, ageText) {
+    if (!input || !ageText) return;
+
+    const style = window.getComputedStyle(input);
+    if (!style) return;
+
+    ageText.style.setProperty('font-size', style.fontSize, 'important');
+    ageText.style.setProperty('font-family', style.fontFamily, 'important');
+    ageText.style.setProperty('font-weight', style.fontWeight, 'important');
+    ageText.style.setProperty('line-height', style.lineHeight, 'important');
+    ageText.style.setProperty('letter-spacing', style.letterSpacing, 'important');
+  }
+
   function applyBirthAgeBadgeSafe() {
     if (!isCallCenterRoute()) return;
 
@@ -1835,6 +1849,8 @@
 
     const ageText = ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
     if (!ageText) return;
+
+    syncBirthAgeBadgeFontSafe(input, ageText);
 
     const age = calculateBirthAgeSafe(input.value);
     if (!age) {
