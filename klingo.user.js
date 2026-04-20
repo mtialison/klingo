@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         klingo 4.3
+// @name         klingo 4.4
 // @namespace    http://tampermonkey.net/
-// @version      4.3
+// @version      4.4
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2184,9 +2184,26 @@
   }
 
   function parseIsoDateSafe(value) {
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value || '')) return null;
+    const raw = norm(value || '');
+    if (!raw) return null;
 
-    const [yyyy, mm, dd] = value.split('-').map(Number);
+    let yyyy = 0;
+    let mm = 0;
+    let dd = 0;
+    let match = raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+
+    if (match) {
+      yyyy = Number(match[1]);
+      mm = Number(match[2]);
+      dd = Number(match[3]);
+    } else {
+      match = raw.match(/^(\\d{2})\/(\\d{2})\/(\\d{4})$/);
+      if (!match) return null;
+      dd = Number(match[1]);
+      mm = Number(match[2]);
+      yyyy = Number(match[3]);
+    }
+
     const date = new Date(yyyy, mm - 1, dd, 12, 0, 0, 0);
 
     if (
@@ -2247,8 +2264,8 @@
 
     if (startDate && daysValue !== '' && !Number.isNaN(Number(daysValue))) {
       const targetDate = addDaysSafe(startDate, Number(daysValue));
-      resultDate.innerHTML = targetDate
-        ? `${formatDatePtBrFull(targetDate)}<small>${formatDatePtBrShort(targetDate)}</small>`
+      resultDate.textContent = targetDate
+        ? formatDatePtBrShort(targetDate)
         : 'Não foi possível calcular a data.';
     } else {
       resultDate.textContent = 'Informe a data inicial e a quantidade de dias.';
@@ -2275,9 +2292,12 @@
     return !!(rect.width || rect.height);
   }
 
+  
   function findDateCalculatorMenuContainer() {
-    const menu = document.querySelector('#creek-dropdown.dropdown-menu');
-    return menu || null;
+    return document.querySelector('#creek-dropdown.dropdown-menu');
+  }
+
+    return null;
   }
 
   function findExitActionInMenu(menu) {
@@ -2298,28 +2318,26 @@
     return null;
   }
 
+  
   function ensureDateCalculatorMenuItem() {
     const menu = findDateCalculatorMenuContainer();
     if (!menu) return;
+
     if (menu.querySelector('[data-tm-datecalc-item="1"]')) return;
 
-    const items = Array.from(menu.querySelectorAll('a.dropdown-item'));
-    const exitItem = items.find((el) => norm(el.textContent || '').includes('Sair'));
+    const items = Array.from(menu.querySelectorAll('.dropdown-item'));
+    const exitItem = items.find(el => el.textContent.trim() === 'Sair');
     if (!exitItem) return;
 
-    const dividerBeforeExit = exitItem.previousElementSibling;
     const item = document.createElement('a');
-    item.href = '#';
-    item.className = exitItem.className || 'dropdown-item ddip-card';
-    item.textContent = 'Calculadora de datas';
+    item.href = "#";
+    item.className = exitItem.className;
+    item.textContent = "Calculadora de datas";
     item.setAttribute('data-tm-datecalc-item', '1');
 
-    if (dividerBeforeExit && dividerBeforeExit.classList.contains('dropdown-divider')) {
-      menu.insertBefore(item, dividerBeforeExit);
-    } else {
-      menu.insertBefore(item, exitItem);
-    }
+    menu.insertBefore(item, exitItem);
   }
+
 
   function scheduleDateCalculatorMenuRefresh() {
     if (!isKlingoHost()) return;
@@ -2347,15 +2365,6 @@
         e.preventDefault();
         e.stopPropagation();
         setDateCalculatorOpen(false);
-        return;
-      }
-
-      const avatarToggle = e.target.closest('#navbarDropdown');
-      if (avatarToggle) {
-        scheduleDateCalculatorMenuRefresh();
-        setTimeout(scheduleDateCalculatorMenuRefresh, 80);
-        setTimeout(scheduleDateCalculatorMenuRefresh, 180);
-        setTimeout(scheduleDateCalculatorMenuRefresh, 320);
         return;
       }
 
