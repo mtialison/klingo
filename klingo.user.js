@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.64
+// @version      2.65
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -976,6 +976,18 @@
         margin-left: auto !important;
         margin-right: auto !important;
         box-sizing: border-box !important;
+      }
+
+
+      /* OCULTAR BOTÃO/ÍCONE DE DATA NO CAMPO DATA DE NASCIMENTO */
+      .tm-klingo-root [data-slot="nascimento"] .input-group-append,
+      .tm-klingo-root [data-slot="nascimento"] .input-group button,
+      .tm-klingo-root [data-slot="nascimento"] .input-group .btn,
+      .tm-klingo-root [data-slot="nascimento"] .input-group .fa-calendar,
+      .tm-klingo-root [data-slot="nascimento"] .input-group .fa-calendar-alt,
+      .tm-klingo-root [data-slot="nascimento"] .input-group .far.fa-calendar-alt,
+      .tm-klingo-root [data-slot="nascimento"] .input-group .fas.fa-calendar-alt {
+        display: none !important;
       }
 
       @media (max-width: 1200px) {
