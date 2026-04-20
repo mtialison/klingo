@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      4.6
+// @version      4.7
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2190,14 +2190,14 @@
     let yyyy = 0;
     let mm = 0;
     let dd = 0;
-    let match = raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+    let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
     if (match) {
       yyyy = Number(match[1]);
       mm = Number(match[2]);
       dd = Number(match[3]);
     } else {
-      match = raw.match(/^(\\d{2})\/(\\d{2})\/(\\d{4})$/);
+      match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
       if (!match) return null;
       dd = Number(match[1]);
       mm = Number(match[2]);
