@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      4.5
+// @version      4.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2184,9 +2184,26 @@
   }
 
   function parseIsoDateSafe(value) {
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value || '')) return null;
+    const raw = norm(value || '');
+    if (!raw) return null;
 
-    const [yyyy, mm, dd] = value.split('-').map(Number);
+    let yyyy = 0;
+    let mm = 0;
+    let dd = 0;
+    let match = raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+
+    if (match) {
+      yyyy = Number(match[1]);
+      mm = Number(match[2]);
+      dd = Number(match[3]);
+    } else {
+      match = raw.match(/^(\\d{2})\/(\\d{2})\/(\\d{4})$/);
+      if (!match) return null;
+      dd = Number(match[1]);
+      mm = Number(match[2]);
+      yyyy = Number(match[3]);
+    }
+
     const date = new Date(yyyy, mm - 1, dd, 12, 0, 0, 0);
 
     if (
@@ -2198,29 +2215,6 @@
     }
 
     return date;
-
-
-  function parseDateFlexible(value) {
-    const raw = (value || '').toString().trim();
-    if (!raw) return null;
-
-    // try ISO first
-    let d = parseIsoDateSafe(raw);
-    if (d) return d;
-
-    // try dd/mm/yyyy
-    const m = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (m) {
-      const dd = Number(m[1]);
-      const mm = Number(m[2]);
-      const yyyy = Number(m[3]);
-      const date = new Date(yyyy, mm - 1, dd, 12, 0, 0, 0);
-      if (date.getFullYear() === yyyy && date.getMonth() === mm - 1 && date.getDate() === dd) {
-        return date;
-      }
-    }
-    return null;
-  }
   }
 
   function addDaysSafe(date, days) {
@@ -2264,8 +2258,8 @@
 
     if (!startInput || !daysInput || !endInput || !resultDate || !resultDays) return;
 
-    const startDate = parseDateFlexible(startInput.value);
-    const endDate = parseDateFlexible(endInput.value);
+    const startDate = parseIsoDateSafe(startInput.value);
+    const endDate = parseIsoDateSafe(endInput.value);
     const daysValue = norm(daysInput.value);
 
     if (startDate && daysValue !== '' && !Number.isNaN(Number(daysValue))) {
@@ -2298,12 +2292,15 @@
     return !!(rect.width || rect.height);
   }
 
-  
   function findDateCalculatorMenuContainer() {
-    return document.querySelector('#creek-dropdown.dropdown-menu');
-  }
+    const menu = document.querySelector('#creek-dropdown.dropdown-menu');
+    if (!menu) return null;
 
-    return null;
+    const text = norm(menu.textContent || '');
+    if (!text.includes('Sair')) return null;
+    if (!text.includes('Alterar minha senha')) return null;
+
+    return menu;
   }
 
   function findExitActionInMenu(menu) {
@@ -2324,26 +2321,30 @@
     return null;
   }
 
-  
   function ensureDateCalculatorMenuItem() {
     const menu = findDateCalculatorMenuContainer();
-    if (!menu) return;
+    if (!menu || menu.querySelector('[data-tm-datecalc-item="1"]')) return;
 
-    if (menu.querySelector('[data-tm-datecalc-item="1"]')) return;
-
-    const items = Array.from(menu.querySelectorAll('.dropdown-item'));
-    const exitItem = items.find(el => el.textContent.trim() === 'Sair');
-    if (!exitItem) return;
+    const exitAction = findExitActionInMenu(menu);
+    if (!exitAction) return;
 
     const item = document.createElement('a');
-    item.href = "#";
-    item.className = exitItem.className;
-    item.textContent = "Calculadora de datas";
+    item.dataset.tmDatecalcItem = '1';
     item.setAttribute('data-tm-datecalc-item', '1');
+    item.className = exitAction.className || 'dropdown-item ddip-card';
+    item.href = '#';
+    item.textContent = 'Calculadora de datas';
+    item.style.cursor = 'pointer';
+    item.style.width = '100%';
+    item.style.boxSizing = 'border-box';
 
-    menu.insertBefore(item, exitItem);
+    const dividerBeforeExit = exitAction.previousElementSibling;
+    if (dividerBeforeExit && dividerBeforeExit.classList && dividerBeforeExit.classList.contains('dropdown-divider')) {
+      menu.insertBefore(item, dividerBeforeExit);
+    } else {
+      menu.insertBefore(item, exitAction);
+    }
   }
-
 
   function scheduleDateCalculatorMenuRefresh() {
     if (!isKlingoHost()) return;
@@ -2371,6 +2372,15 @@
         e.preventDefault();
         e.stopPropagation();
         setDateCalculatorOpen(false);
+        return;
+      }
+
+      const avatarToggle = e.target.closest('#navbarDropdown');
+      if (avatarToggle) {
+        scheduleDateCalculatorMenuRefresh();
+        setTimeout(scheduleDateCalculatorMenuRefresh, 80);
+        setTimeout(scheduleDateCalculatorMenuRefresh, 180);
+        setTimeout(scheduleDateCalculatorMenuRefresh, 320);
         return;
       }
 
