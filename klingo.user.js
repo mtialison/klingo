@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      2.63
+// @version      2.64
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1016,9 +1016,17 @@
       const text = norm(modal.innerText || modal.textContent || '');
       if (!text) continue;
 
+      const modalTitle = norm(modal.querySelector('.modal-title')?.textContent || '');
+      const successTexts = Array.from(modal.querySelectorAll('.btn-success'))
+        .map(btn => norm(btn.textContent || ''));
+
       const hasDadosPessoais = text.includes('Dados Pessoais');
       const hasOrigemPacientes = text.includes('ORIGEM DE PACIENTES') || text.includes('Origem de Pacientes');
-      const hasConfirmar = text.includes('Confirmar');
+      const hasConfirmar = successTexts.some(txt => txt.includes('Confirmar'));
+      const hasAtualizar = successTexts.some(txt => txt.includes('Atualizar'));
+
+      if (modalTitle.includes('Editar Marcação')) continue;
+      if (hasAtualizar && !hasConfirmar) continue;
 
       if (hasDadosPessoais && hasOrigemPacientes && hasConfirmar) {
         modal.classList.add('tm-klingo-root');
