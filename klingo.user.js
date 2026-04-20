@@ -1,12 +1,13 @@
 // ==UserScript==
-// @name         klingo
+// @name         klingo 3.0
 // @namespace    http://tampermonkey.net/
-// @version      2.67
+// @version      3.0
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
 // @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
+// @author       alison
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -1006,6 +1007,41 @@
         display: none !important;
       }
 
+
+      /* DATA DE NASCIMENTO: badge de idade inline */
+      .tm-klingo-root [data-slot="nascimento"] .input-group {
+        position: relative !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-badge {
+        position: absolute !important;
+        top: 50% !important;
+        right: 6px !important;
+        transform: translateY(-50%) !important;
+        min-width: 42px !important;
+        height: 30px !important;
+        padding: 0 10px !important;
+        border-radius: 6px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #d9d9d9 !important;
+        color: #666 !important;
+        font-size: 14px !important;
+        line-height: 1 !important;
+        z-index: 2 !important;
+        pointer-events: none !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] input[type="date"],
+      .tm-klingo-root [data-slot="nascimento"] input.form-control {
+        padding-right: 58px !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-badge.tm-hidden {
+        display: none !important;
+      }
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -1724,6 +1760,82 @@
   }
 
 
+
+  function calculateAgeFromIsoDate(value) {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
+
+    const [yyyy, mm, dd] = value.split('-').map(Number);
+    const birth = new Date(yyyy, mm - 1, dd);
+    if (
+      birth.getFullYear() !== yyyy ||
+      birth.getMonth() !== mm - 1 ||
+      birth.getDate() !== dd
+    ) return '';
+
+    const today = new Date();
+    let age = today.getFullYear() - yyyy;
+    const monthDiff = today.getMonth() - (mm - 1);
+    const dayDiff = today.getDate() - dd;
+
+    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+      age -= 1;
+    }
+
+    if (age < 0 || age > 130) return '';
+    return String(age);
+  }
+
+  function ensureBirthAgeBadge(inputGroup) {
+    let badge = inputGroup.querySelector('.tm-birth-age-badge');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'tm-birth-age-badge tm-hidden';
+      inputGroup.appendChild(badge);
+    }
+    return badge;
+  }
+
+  function updateBirthAgeBadgeForInput(input) {
+    if (!(input instanceof HTMLInputElement)) return;
+    const inputGroup = input.closest('.input-group');
+    if (!inputGroup) return;
+
+    const badge = ensureBirthAgeBadge(inputGroup);
+    const age = calculateAgeFromIsoDate(input.value);
+
+    if (!age) {
+      badge.textContent = '';
+      badge.classList.add('tm-hidden');
+      return;
+    }
+
+    badge.textContent = age;
+    badge.classList.remove('tm-hidden');
+  }
+
+  function enableBirthAgeBadge() {
+    if (!isCallCenterRoute()) return;
+
+    const root = getSchedulingModalRoot();
+    if (!root) return;
+
+    const birthSlot = root.querySelector('[data-slot="nascimento"]');
+    if (!birthSlot) return;
+
+    const input = birthSlot.querySelector('input[type="date"]');
+    if (!input) return;
+
+    if (input.dataset.tmBirthAgeBound !== '1') {
+      input.dataset.tmBirthAgeBound = '1';
+      ['input', 'change', 'blur'].forEach((evtName) => {
+        input.addEventListener(evtName, () => updateBirthAgeBadgeForInput(input), true);
+      });
+    }
+
+    updateBirthAgeBadgeForInput(input);
+  }
+
+
   function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
     const root = getSchedulingModalRoot();
@@ -1733,6 +1845,7 @@
     injectFontFix();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
+    enableBirthAgeBadge();
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
@@ -1761,6 +1874,7 @@
     enableBirthDatePaste();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
+    enableBirthAgeBadge();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
