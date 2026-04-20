@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         klingo 3.7
+// @name         klingo 3.8
 // @namespace    http://tampermonkey.net/
-// @version      3.7
+// @version      3.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1018,7 +1018,7 @@
 
       .tm-klingo-root [data-slot="nascimento"] input[type="date"],
       .tm-klingo-root [data-slot="nascimento"] input.form-control {
-        padding-right: 102px !important;
+        padding-right: 58px !important;
       }
 
       .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline {
@@ -1026,19 +1026,22 @@
         top: 1px !important;
         bottom: 1px !important;
         right: 1px !important;
-        width: 98px !important;
+        width: 56px !important;
         transform: none !important;
         z-index: 3 !important;
         display: flex !important;
         align-items: stretch !important;
         margin: 0 !important;
         pointer-events: none !important;
+        overflow: hidden !important;
+        border-top-right-radius: .25rem !important;
+        border-bottom-right-radius: .25rem !important;
       }
 
       .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline .input-group-text {
         width: 100% !important;
         min-width: 0 !important;
-        height: auto !important;
+        height: 100% !important;
         max-height: none !important;
         padding: 0 !important;
         border-radius: 0 !important;
