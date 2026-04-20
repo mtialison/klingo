@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         klingo 3.3
+// @name         klingo 3.4
 // @namespace    http://tampermonkey.net/
-// @version      3.3
+// @version      3.4
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1008,7 +1008,7 @@
       }
 
 
-      /* DATA DE NASCIMENTO: badge de idade inline sem JS de escuta */
+      /* DATA DE NASCIMENTO: badge de idade inline */
       .tm-klingo-root [data-slot="nascimento"] .input-group {
         position: relative !important;
         display: flex !important;
@@ -1018,30 +1018,21 @@
 
       .tm-klingo-root [data-slot="nascimento"] input[type="date"],
       .tm-klingo-root [data-slot="nascimento"] input.form-control {
-        padding-right: 56px !important;
+        padding-right: 58px !important;
       }
 
-      .tm-klingo-root [data-slot="nascimento"] .input-group-append {
-        margin-left: 0 !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .input-group-append:has(.input-group-text[title*="Idade"]),
-      .tm-klingo-root [data-slot="nascimento"] .input-group-append:has(.input-group-text[title*="idade"]) {
+      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline {
         position: absolute !important;
         top: 50% !important;
         right: 6px !important;
         transform: translateY(-50%) !important;
         z-index: 3 !important;
         display: flex !important;
+        margin: 0 !important;
         pointer-events: none !important;
       }
 
-      .tm-klingo-root [data-slot="nascimento"] .input-group-append.tm-age-hidden {
-        display: none !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .input-group-append:has(.input-group-text[title*="Idade"]) .input-group-text,
-      .tm-klingo-root [data-slot="nascimento"] .input-group-append:has(.input-group-text[title*="idade"]) .input-group-text {
+      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline .input-group-text {
         min-width: 42px !important;
         height: 30px !important;
         padding: 0 10px !important;
@@ -1057,7 +1048,7 @@
         box-shadow: none !important;
       }
 
-      .tm-klingo-root [data-slot="nascimento"] .input-group-append:not(:has(.input-group-text[title*="Idade"])):not(:has(.input-group-text[title*="idade"])) {
+      .tm-klingo-root [data-slot="nascimento"] .tm-age-hidden {
         display: none !important;
       }
 
@@ -1780,9 +1771,7 @@
 
 
 
-
-
-  function calculatePatientAgeFromIso(isoValue) {
+  function calculateBirthAgeSafe(isoValue) {
     if (!isoValue || !/^\d{4}-\d{2}-\d{2}$/.test(isoValue)) return '';
 
     const [yyyy, mm, dd] = isoValue.split('-').map(Number);
@@ -1799,72 +1788,89 @@
     const monthDiff = today.getMonth() - (mm - 1);
     const dayDiff = today.getDate() - dd;
 
-    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-      age -= 1;
-    }
-
+    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) age -= 1;
     if (age < 0 || age > 130) return '';
+
     return String(age);
   }
 
-  function syncBirthAgeBadge() {
+  function findBirthAgeElements(root) {
+    const birthSlot = root.querySelector('[data-slot="nascimento"]');
+    if (!birthSlot) return {};
+
+    const input = birthSlot.querySelector('input[type="date"]');
+    const inputGroup = birthSlot.querySelector('.input-group');
+    if (!input || !inputGroup) return { birthSlot, input, inputGroup };
+
+    const appends = Array.from(birthSlot.querySelectorAll('.input-group-append'));
+    let ageAppend = null;
+
+    appends.forEach((append) => {
+      const ageText = append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
+      if (ageText) ageAppend = append;
+    });
+
+    return { birthSlot, input, inputGroup, ageAppend };
+  }
+
+  function applyBirthAgeBadgeSafe() {
     if (!isCallCenterRoute()) return;
 
     const root = getSchedulingModalRoot();
     if (!root) return;
 
-    const birthSlot = root.querySelector('[data-slot="nascimento"]');
-    if (!birthSlot) return;
+    const { input, inputGroup, ageAppend } = findBirthAgeElements(root);
+    if (!input || !inputGroup || !ageAppend) return;
 
-    const input = birthSlot.querySelector('input[type="date"]');
-    if (!input) return;
+    if (ageAppend.parentElement !== inputGroup) {
+      inputGroup.appendChild(ageAppend);
+    }
 
-    const ageAppend = birthSlot.querySelector('.input-group-append:has(.input-group-text[title*="Idade"]), .input-group-append:has(.input-group-text[title*="idade"])');
-    const ageText = ageAppend ? ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]') : null;
-    if (!ageAppend || !ageText) return;
+    ageAppend.classList.add('tm-birth-age-inline');
 
-    const age = calculatePatientAgeFromIso(input.value);
+    const ageText = ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
+    if (!ageText) return;
 
+    const age = calculateBirthAgeSafe(input.value);
     if (!age) {
-      ageText.textContent = '';
       ageAppend.classList.add('tm-age-hidden');
       return;
     }
 
-    ageText.textContent = age;
+    const currentDigits = (ageText.textContent || '').replace(/\D+/g, '');
+    if (currentDigits !== age) {
+      ageText.textContent = age;
+    }
+
     ageAppend.classList.remove('tm-age-hidden');
   }
 
-  function enableBirthAgeSync() {
+  function enableBirthAgeBadgeSafe() {
     if (!isCallCenterRoute()) return;
 
     const root = getSchedulingModalRoot();
     if (!root) return;
 
-    const birthSlot = root.querySelector('[data-slot="nascimento"]');
-    if (!birthSlot) return;
-
-    const input = birthSlot.querySelector('input[type="date"]');
+    const { input } = findBirthAgeElements(root);
     if (!input) return;
 
-    if (input.dataset.tmBirthAgeSyncEnabled === '1') {
-      syncBirthAgeBadge();
-      return;
+    if (input.dataset.tmBirthAgeBadgeBound !== '1') {
+      input.dataset.tmBirthAgeBadgeBound = '1';
+
+      let debounceId = null;
+      const handler = () => {
+        clearTimeout(debounceId);
+        debounceId = setTimeout(() => {
+          applyBirthAgeBadgeSafe();
+        }, 80);
+      };
+
+      input.addEventListener('input', handler, true);
+      input.addEventListener('change', handler, true);
+      input.addEventListener('blur', handler, true);
     }
 
-    input.dataset.tmBirthAgeSyncEnabled = '1';
-
-    const handler = () => {
-      requestAnimationFrame(() => {
-        syncBirthAgeBadge();
-      });
-    };
-
-    input.addEventListener('input', handler, true);
-    input.addEventListener('change', handler, true);
-    input.addEventListener('blur', handler, true);
-
-    syncBirthAgeBadge();
+    applyBirthAgeBadgeSafe();
   }
 
 
@@ -1877,7 +1883,7 @@
     injectFontFix();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    enableBirthAgeSync();
+    enableBirthAgeBadgeSafe();
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
@@ -1906,7 +1912,7 @@
     enableBirthDatePaste();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    enableBirthAgeSync();
+    enableBirthAgeBadgeSafe();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
