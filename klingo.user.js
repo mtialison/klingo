@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         klingo 3.0
+// @name         klingo 3.1
 // @namespace    http://tampermonkey.net/
-// @version      3.0
+// @version      3.1
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1008,16 +1008,31 @@
       }
 
 
-      /* DATA DE NASCIMENTO: badge de idade inline */
+      /* DATA DE NASCIMENTO: badge de idade inline usando o append nativo do sistema */
       .tm-klingo-root [data-slot="nascimento"] .input-group {
         position: relative !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
       }
 
-      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-badge {
+      .tm-klingo-root [data-slot="nascimento"] input[type="date"],
+      .tm-klingo-root [data-slot="nascimento"] input.form-control {
+        padding-right: 56px !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline {
         position: absolute !important;
         top: 50% !important;
         right: 6px !important;
         transform: translateY(-50%) !important;
+        display: flex !important;
+        margin: 0 !important;
+        z-index: 3 !important;
+        pointer-events: none !important;
+      }
+
+      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline .input-group-text {
         min-width: 42px !important;
         height: 30px !important;
         padding: 0 10px !important;
@@ -1029,17 +1044,8 @@
         color: #666 !important;
         font-size: 14px !important;
         line-height: 1 !important;
-        z-index: 2 !important;
-        pointer-events: none !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] input[type="date"],
-      .tm-klingo-root [data-slot="nascimento"] input.form-control {
-        padding-right: 58px !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-badge.tm-hidden {
-        display: none !important;
+        border: 0 !important;
+        box-shadow: none !important;
       }
 
       @media (max-width: 1200px) {
@@ -1761,59 +1767,7 @@
 
 
 
-  function calculateAgeFromIsoDate(value) {
-    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
-
-    const [yyyy, mm, dd] = value.split('-').map(Number);
-    const birth = new Date(yyyy, mm - 1, dd);
-    if (
-      birth.getFullYear() !== yyyy ||
-      birth.getMonth() !== mm - 1 ||
-      birth.getDate() !== dd
-    ) return '';
-
-    const today = new Date();
-    let age = today.getFullYear() - yyyy;
-    const monthDiff = today.getMonth() - (mm - 1);
-    const dayDiff = today.getDate() - dd;
-
-    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-      age -= 1;
-    }
-
-    if (age < 0 || age > 130) return '';
-    return String(age);
-  }
-
-  function ensureBirthAgeBadge(inputGroup) {
-    let badge = inputGroup.querySelector('.tm-birth-age-badge');
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.className = 'tm-birth-age-badge tm-hidden';
-      inputGroup.appendChild(badge);
-    }
-    return badge;
-  }
-
-  function updateBirthAgeBadgeForInput(input) {
-    if (!(input instanceof HTMLInputElement)) return;
-    const inputGroup = input.closest('.input-group');
-    if (!inputGroup) return;
-
-    const badge = ensureBirthAgeBadge(inputGroup);
-    const age = calculateAgeFromIsoDate(input.value);
-
-    if (!age) {
-      badge.textContent = '';
-      badge.classList.add('tm-hidden');
-      return;
-    }
-
-    badge.textContent = age;
-    badge.classList.remove('tm-hidden');
-  }
-
-  function enableBirthAgeBadge() {
+  function placeBirthAgeBadgeSafe() {
     if (!isCallCenterRoute()) return;
 
     const root = getSchedulingModalRoot();
@@ -1822,17 +1776,50 @@
     const birthSlot = root.querySelector('[data-slot="nascimento"]');
     if (!birthSlot) return;
 
-    const input = birthSlot.querySelector('input[type="date"]');
-    if (!input) return;
+    const inputGroup = birthSlot.querySelector('.input-group');
+    if (!inputGroup) return;
 
-    if (input.dataset.tmBirthAgeBound !== '1') {
-      input.dataset.tmBirthAgeBound = '1';
-      ['input', 'change', 'blur'].forEach((evtName) => {
-        input.addEventListener(evtName, () => updateBirthAgeBadgeForInput(input), true);
-      });
+    const appends = Array.from(birthSlot.querySelectorAll('.input-group-append'));
+    if (!appends.length) return;
+
+    let ageAppend = null;
+    let calendarAppend = null;
+
+    appends.forEach((append) => {
+      const ageText = append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
+      if (ageText) {
+        ageAppend = append;
+        return;
+      }
+
+      if (
+        append.querySelector('button, .btn, .fa-calendar, .far.fa-calendar-alt, .fas.fa-calendar-alt') ||
+        append.textContent.trim() === ''
+      ) {
+        calendarAppend = append;
+      }
+    });
+
+    if (calendarAppend) {
+      calendarAppend.style.setProperty('display', 'none', 'important');
     }
 
-    updateBirthAgeBadgeForInput(input);
+    if (!ageAppend) return;
+
+    const ageText = ageAppend.querySelector('.input-group-text');
+    if (!ageText) return;
+
+    // remove sufixo "a" para ficar como no layout esperado
+    ageText.textContent = (ageText.textContent || '').replace(/\D+/g, '');
+
+    if (ageAppend.parentElement !== inputGroup) {
+      inputGroup.appendChild(ageAppend);
+    }
+
+    ageAppend.classList.add('tm-birth-age-inline');
+    ageAppend.style.setProperty('display', 'flex', 'important');
+    ageAppend.style.setProperty('margin', '0', 'important');
+    ageAppend.style.setProperty('pointer-events', 'none', 'important');
   }
 
 
@@ -1845,7 +1832,7 @@
     injectFontFix();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    enableBirthAgeBadge();
+    placeBirthAgeBadgeSafe();
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
@@ -1874,7 +1861,7 @@
     enableBirthDatePaste();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    enableBirthAgeBadge();
+    placeBirthAgeBadgeSafe();
   }, true);
 
   document.addEventListener('contextmenu', async (e) => {
