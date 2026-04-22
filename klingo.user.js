@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      4.7
+// @version      4.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2149,7 +2149,7 @@
               <input id="tm-datecalc-days" type="number" step="1" placeholder="0">
             </div>
           </div>
-          <div class="tm-datecalc-result-box" id="tm-datecalc-result-date">Informe a data inicial e a quantidade de dias.</div>
+          <div class="tm-datecalc-result-box" id="tm-datecalc-result-date"></div>
         </div>
 
         <div class="tm-datecalc-section">
@@ -2159,7 +2159,7 @@
               <input id="tm-datecalc-end" type="date">
             </div>
           </div>
-          <div class="tm-datecalc-days-box" id="tm-datecalc-result-days">Informe a data inicial e a data final.</div>
+          <div class="tm-datecalc-days-box" id="tm-datecalc-result-days"></div>
         </div>
       </div>
     `;
@@ -2268,7 +2268,7 @@
         ? formatDatePtBrShort(targetDate)
         : 'Não foi possível calcular a data.';
     } else {
-      resultDate.textContent = 'Informe a data inicial e a quantidade de dias.';
+      resultDate.textContent = '';
     }
 
     if (startDate && endDate) {
@@ -2280,7 +2280,7 @@
         resultDays.textContent = `${totalDays} ${label}`;
       }
     } else {
-      resultDays.textContent = 'Informe a data inicial e a data final.';
+      resultDays.textContent = '';
     }
   }
 
