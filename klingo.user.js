@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      5.0
+// @version      5.1
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2099,7 +2099,7 @@
       }
 
       .tm-datecalc-result-box {
-        color: #d93025;
+        color: #212529;
         font-weight: 600;
         line-height: 1.35;
       }
@@ -2112,7 +2112,7 @@
       }
 
       .tm-datecalc-days-box {
-        color: #d93025;
+        color: #212529;
         font-size: 16px;
         font-weight: 700;
       }
@@ -2166,7 +2166,7 @@
             </div>
             <div class="tm-datecalc-field">
               <label for="tm-datecalc-days">Adicionar dias</label>
-              <input id="tm-datecalc-days" type="number" step="1" placeholder="0">
+              <input id="tm-datecalc-days" type="number" step="1" placeholder="">
             </div>
           </div>
           <div class="tm-datecalc-result-box" id="tm-datecalc-result-date"></div>
