@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      5.3
+// @version      5.4
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2121,13 +2121,20 @@
         cursor: pointer !important;
       }
 
+      .tm-datecalc-header-trigger-item {
+        display: flex !important;
+        align-items: center !important;
+      }
+
       .tm-datecalc-header-trigger {
-        display: inline-flex !important;
+        display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        width: 34px !important;
-        height: 34px !important;
-        margin-right: 14px !important;
+        align-self: stretch !important;
+        height: 100% !important;
+        min-height: 48px !important;
+        padding: 0 12px !important;
+        margin: 0 14px 0 0 !important;
         color: #ffffff !important;
         font-size: 28px !important;
         line-height: 1 !important;
@@ -2135,6 +2142,12 @@
         cursor: pointer !important;
         user-select: none !important;
         flex: 0 0 auto !important;
+      }
+
+      .tm-datecalc-header-trigger img {
+        display: block !important;
+        width: 22px !important;
+        height: 22px !important;
       }
 
       .tm-datecalc-header-trigger:hover,
@@ -2342,7 +2355,7 @@
 
     const patientItem = host.querySelector('li');
     const triggerLi = document.createElement('li');
-    triggerLi.className = 'nav-item';
+    triggerLi.className = 'nav-item tm-datecalc-header-trigger-item';
 
     const trigger = document.createElement('a');
     trigger.href = '#';
