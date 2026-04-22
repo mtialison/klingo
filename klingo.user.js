@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      5.2
+// @version      5.3
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2350,7 +2350,7 @@
     trigger.setAttribute('data-tm-datecalc-header-trigger', '1');
     trigger.setAttribute('title', 'Calculadora de datas');
     trigger.setAttribute('aria-label', 'Calculadora de datas');
-    trigger.textContent = '🧮';
+    trigger.innerHTML = '<img src="https://i.imgur.com/GU5gE57.png" style="width:22px;height:22px;">';
 
     triggerLi.appendChild(trigger);
 
