@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      5.7
+// @version      5.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -194,6 +194,36 @@
   function getSelectedDoctorName() {
     return state.selectedDoctor || getDoctorNameFromModal();
   }
+  function getModalDateContext() {
+    const modal = document.querySelector('#minutoModal');
+    if (!modal) return { dateText: '', weekdayText: '' };
+
+    const text = norm(modal.innerText || modal.textContent || '');
+    const dateMatch = text.match(/\b\d{2}\/\d{2}\b/);
+    const weekday = WEEKDAYS.find((day) => text.includes(day)) || '';
+
+    return {
+      dateText: dateMatch ? formatDatePtBr(dateMatch[0]) : '',
+      weekdayText: weekday
+    };
+  }
+
+  function buildCopyTextFromTarget(target) {
+    const btn = target ? target.closest('button, a, div, span') : null;
+    if (!btn || !isTimeButton(btn)) return '';
+
+    const time = normalizeHour(btn.textContent);
+    const doctorContainer = findDoctorContainerFromTimeButton(btn);
+    const doctorName = extractDoctorNameFromContainer(doctorContainer);
+    const modalContext = getModalDateContext();
+
+    if (!doctorName || !modalContext.dateText || !modalContext.weekdayText || !time) {
+      return '';
+    }
+
+    return `👨‍⚕️ ${doctorName}\n${modalContext.dateText} | ${modalContext.weekdayText} | ${time}`;
+  }
+
 
   function captureSelectionFromClick(target, allowModalTime = false) {
     const insideModal = !!target.closest('#minutoModal');
@@ -2029,14 +2059,19 @@
     e.preventDefault();
     e.stopPropagation();
 
+    const directCopyText = buildCopyTextFromTarget(targetEl);
     const changed = captureSelectionFromClick(e.target, true);
-    if (!changed) return;
+    if (!changed && !directCopyText) return;
+
+    const modalContext = getModalDateContext();
+    if (modalContext.dateText) state.selectedDate = modalContext.dateText;
+    if (modalContext.weekdayText) state.selectedWeekday = modalContext.weekdayText;
 
     burstUpdate();
 
     setTimeout(async () => {
-      await copyText(getCopyText(), targetEl);
-    }, 200);
+      await copyText(directCopyText || getCopyText(), targetEl);
+    }, 80);
   }, true);
 
 
