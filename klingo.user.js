@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      5.4
+// @version      5.5
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1976,8 +1976,8 @@
     style.textContent = `
       .tm-datecalc-panel {
         position: fixed;
-        top: 88px;
-        right: 20px;
+        top: 0;
+        left: 0;
         width: 360px;
         max-width: calc(100vw - 24px);
         background: #ffffff;
@@ -2185,12 +2185,7 @@
     panel = document.createElement('div');
     panel.id = 'tm-datecalc-panel';
     panel.className = 'tm-datecalc-panel tm-datecalc-hidden';
-    panel.innerHTML = `
-      <div class="tm-datecalc-header">
-        <div class="tm-datecalc-title">Calculadora de datas</div>
-        <button type="button" class="tm-datecalc-close" data-tm-datecalc-close="1" aria-label="Fechar">×</button>
-      </div>
-      <div class="tm-datecalc-body">
+    panel.innerHTML = `      <div class="tm-datecalc-body">
         <div class="tm-datecalc-section">
           <div class="tm-datecalc-grid">
             <div class="tm-datecalc-field">
@@ -2227,9 +2222,22 @@
     return panel;
   }
 
-  function setDateCalculatorOpen(isOpen) {
+  
+  function positionDateCalculatorPanel() {
+    const panel = document.getElementById('tm-datecalc-panel');
+    const trigger = document.querySelector('[data-tm-datecalc-header-trigger="1"]');
+    if (!panel || !trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+
+    panel.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+    panel.style.left = (rect.left + window.scrollX - 280) + 'px';
+  }
+
+function setDateCalculatorOpen(isOpen) {
     const panel = ensureDateCalculatorPanel();
     panel.classList.toggle('tm-datecalc-hidden', !isOpen);
+    if (isOpen) positionDateCalculatorPanel();
 
     if (isOpen) {
       const startInput = panel.querySelector('#tm-datecalc-start');
@@ -2498,6 +2506,9 @@
     document.addEventListener('input', (e) => {
       if (!e.target.closest('#tm-datecalc-panel')) return;
       refreshDateCalculatorResults();
+  window.addEventListener('resize', positionDateCalculatorPanel);
+  window.addEventListener('scroll', positionDateCalculatorPanel, true);
+
     }, true);
 
     document.addEventListener('change', (e) => {
