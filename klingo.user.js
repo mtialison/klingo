@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      5.6
+// @version      5.7
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -142,6 +142,28 @@
   function extractDoctorNameFromContainer(container) {
     if (!container) return '';
 
+    const crmNode = Array.from(container.querySelectorAll('div, span, label, strong, b, p, h1, h2, h3, h4, h5, h6, small'))
+      .find((node) => /\bCRM\b/i.test(norm(node.textContent || '')));
+
+    if (crmNode) {
+      let current = crmNode.previousElementSibling;
+      while (current) {
+        const text = norm(current.textContent || '');
+        if (
+          text &&
+          text.length >= 8 &&
+          text.length <= 90 &&
+          !/\bCRM\b/i.test(text) &&
+          !isTimeButton(current) &&
+          /[A-Za-zÀ-ÿ]{2}/.test(text) &&
+          !/^[A-Z]{2,6}$/.test(text)
+        ) {
+          return toTitleCase(text);
+        }
+        current = current.previousElementSibling;
+      }
+    }
+
     const candidates = Array.from(
       container.querySelectorAll('div, span, label, strong, b, p, h1, h2, h3, h4, h5, h6, small')
     );
@@ -153,6 +175,7 @@
       if (/\bCRM\b/i.test(text)) continue;
       if (isTimeButton(node)) continue;
       if (!/[A-Za-zÀ-ÿ]{2}/.test(text)) continue;
+      if (/^[A-Z]{2,6}$/.test(text)) continue;
 
       const parentText = norm(node.parentElement?.textContent || '');
       if (/\bCRM\b/i.test(parentText)) {
@@ -162,7 +185,10 @@
 
     const raw = norm(container.innerText || container.textContent || '');
     const match = raw.match(/([A-ZÀ-Ý][A-ZÀ-Ýa-zà-ÿ'´`^~\- ]{8,}?)\s+CRM\b/i);
-    return match ? toTitleCase(match[1]) : '';
+    if (!match) return '';
+
+    const cleaned = norm(match[1]).replace(/^[A-Z]{2,6}\s+/, '');
+    return toTitleCase(cleaned);
   }
 
   function getSelectedDoctorName() {
