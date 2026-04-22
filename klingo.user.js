@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      4.8
+// @version      5.0
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2047,6 +2047,23 @@
         line-height: 1.2;
       }
 
+      
+      .tm-datecalc-field input[type="date"]::-webkit-calendar-picker-indicator {
+        display: none !important;
+        opacity: 0 !important;
+      }
+
+      .tm-datecalc-hoje-btn {
+        height: 38px;
+        padding: 0 10px;
+        margin-left: 6px;
+        border: 1px solid #ced4da;
+        border-radius: .25rem;
+        background: #f1f3f5;
+        cursor: pointer;
+        font-size: 13px;
+      }
+
       .tm-datecalc-field input {
         width: 100%;
         height: 38px;
@@ -2142,7 +2159,10 @@
           <div class="tm-datecalc-grid">
             <div class="tm-datecalc-field">
               <label for="tm-datecalc-start">Data inicial</label>
-              <input id="tm-datecalc-start" type="date">
+              <div style="display:flex;align-items:center;">
+              <input id="tm-datecalc-start" type="date" style="flex:1;">
+              <button type="button" class="tm-datecalc-hoje-btn" data-tm-hoje="1">Hoje</button>
+            </div>
             </div>
             <div class="tm-datecalc-field">
               <label for="tm-datecalc-days">Adicionar dias</label>
@@ -2156,7 +2176,10 @@
           <div class="tm-datecalc-grid">
             <div class="tm-datecalc-field" style="grid-column: 1 / -1;">
               <label for="tm-datecalc-end">Data final</label>
-              <input id="tm-datecalc-end" type="date">
+              <div style="display:flex;align-items:center;">
+              <input id="tm-datecalc-end" type="date" style="flex:1;">
+              <button type="button" class="tm-datecalc-hoje-btn" data-tm-hoje-end="1">Hoje</button>
+            </div>
             </div>
           </div>
           <div class="tm-datecalc-days-box" id="tm-datecalc-result-days"></div>
@@ -2367,7 +2390,37 @@
         return;
       }
 
-      const closeBtn = e.target.closest('[data-tm-datecalc-close="1"]');
+      const hojeEndBtn = e.target.closest('[data-tm-hoje-end="1"]');
+      if (hojeEndBtn) {
+        e.preventDefault();
+        const input = document.getElementById('tm-datecalc-end');
+        if (input) {
+          const today = new Date();
+          const yyyy = today.getFullYear();
+          const mm = String(today.getMonth()+1).padStart(2,'0');
+          const dd = String(today.getDate()).padStart(2,'0');
+          input.value = `${yyyy}-${mm}-${dd}`;
+          input.dispatchEvent(new Event('input', {bubbles:true}));
+        }
+        return;
+      }
+
+      const hojeBtn = e.target.closest('[data-tm-hoje="1"]');
+      if (hojeBtn) {
+        e.preventDefault();
+        const input = document.getElementById('tm-datecalc-start');
+        if (input) {
+          const today = new Date();
+          const yyyy = today.getFullYear();
+          const mm = String(today.getMonth()+1).padStart(2,'0');
+          const dd = String(today.getDate()).padStart(2,'0');
+          input.value = `${yyyy}-${mm}-${dd}`;
+          input.dispatchEvent(new Event('input', {bubbles:true}));
+        }
+        return;
+      }
+
+            const closeBtn = e.target.closest('[data-tm-datecalc-close="1"]');
       if (closeBtn) {
         e.preventDefault();
         e.stopPropagation();
