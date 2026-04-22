@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      5.1
+// @version      5.2
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2121,6 +2121,29 @@
         cursor: pointer !important;
       }
 
+      .tm-datecalc-header-trigger {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 34px !important;
+        height: 34px !important;
+        margin-right: 14px !important;
+        color: #ffffff !important;
+        font-size: 28px !important;
+        line-height: 1 !important;
+        text-decoration: none !important;
+        cursor: pointer !important;
+        user-select: none !important;
+        flex: 0 0 auto !important;
+      }
+
+      .tm-datecalc-header-trigger:hover,
+      .tm-datecalc-header-trigger:focus {
+        color: #ffffff !important;
+        text-decoration: none !important;
+        opacity: 0.92 !important;
+      }
+
       @media (max-width: 640px) {
         .tm-datecalc-panel {
           top: 76px;
@@ -2307,6 +2330,37 @@
     }
   }
 
+  function getDateCalculatorHeaderHost() {
+    return document.querySelector('nav.navbar ul.navbar-nav.ml-auto');
+  }
+
+  function ensureDateCalculatorHeaderTrigger() {
+    const host = getDateCalculatorHeaderHost();
+    if (!host) return;
+
+    if (host.querySelector('[data-tm-datecalc-header-trigger="1"]')) return;
+
+    const patientItem = host.querySelector('li');
+    const triggerLi = document.createElement('li');
+    triggerLi.className = 'nav-item';
+
+    const trigger = document.createElement('a');
+    trigger.href = '#';
+    trigger.className = 'nav-link tm-datecalc-header-trigger';
+    trigger.setAttribute('data-tm-datecalc-header-trigger', '1');
+    trigger.setAttribute('title', 'Calculadora de datas');
+    trigger.setAttribute('aria-label', 'Calculadora de datas');
+    trigger.textContent = '🧮';
+
+    triggerLi.appendChild(trigger);
+
+    if (patientItem) {
+      host.insertBefore(triggerLi, patientItem);
+    } else {
+      host.appendChild(triggerLi);
+    }
+  }
+
   function isElementVisible(el) {
     if (!el || !el.isConnected) return false;
     const style = window.getComputedStyle(el);
@@ -2345,34 +2399,14 @@
   }
 
   function ensureDateCalculatorMenuItem() {
-    const menu = findDateCalculatorMenuContainer();
-    if (!menu || menu.querySelector('[data-tm-datecalc-item="1"]')) return;
-
-    const exitAction = findExitActionInMenu(menu);
-    if (!exitAction) return;
-
-    const item = document.createElement('a');
-    item.dataset.tmDatecalcItem = '1';
-    item.setAttribute('data-tm-datecalc-item', '1');
-    item.className = exitAction.className || 'dropdown-item ddip-card';
-    item.href = '#';
-    item.textContent = 'Calculadora de datas';
-    item.style.cursor = 'pointer';
-    item.style.width = '100%';
-    item.style.boxSizing = 'border-box';
-
-    const dividerBeforeExit = exitAction.previousElementSibling;
-    if (dividerBeforeExit && dividerBeforeExit.classList && dividerBeforeExit.classList.contains('dropdown-divider')) {
-      menu.insertBefore(item, dividerBeforeExit);
-    } else {
-      menu.insertBefore(item, exitAction);
-    }
+    return;
   }
 
   function scheduleDateCalculatorMenuRefresh() {
     if (!isKlingoHost()) return;
     clearTimeout(scheduleDateCalculatorMenuRefresh._timer);
     scheduleDateCalculatorMenuRefresh._timer = setTimeout(() => {
+      ensureDateCalculatorHeaderTrigger();
       ensureDateCalculatorMenuItem();
     }, 120);
   }
@@ -2382,6 +2416,14 @@
     document.body.dataset.tmDatecalcBound = '1';
 
     document.addEventListener('click', (e) => {
+      const headerTrigger = e.target.closest('[data-tm-datecalc-header-trigger="1"]');
+      if (headerTrigger) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleDateCalculatorPanel();
+        return;
+      }
+
       const menuItem = e.target.closest('[data-tm-datecalc-item="1"]');
       if (menuItem) {
         e.preventDefault();
@@ -2458,9 +2500,13 @@
     if (!isKlingoHost()) return;
     injectDateCalculatorCSS();
     ensureDateCalculatorPanel();
+    ensureDateCalculatorHeaderTrigger();
     bindDateCalculatorEvents();
     refreshDateCalculatorResults();
     scheduleDateCalculatorMenuRefresh();
+    setTimeout(ensureDateCalculatorHeaderTrigger, 120);
+    setTimeout(ensureDateCalculatorHeaderTrigger, 300);
+    setTimeout(ensureDateCalculatorHeaderTrigger, 700);
   }
 
   const observer = new MutationObserver(() => {
