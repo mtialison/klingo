@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      5.5
+// @version      5.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -43,6 +43,7 @@
     selectedDate: '',
     selectedWeekday: '',
     selectedTime: '',
+    selectedDoctor: '',
   };
 
   const WEEKDAYS = [
@@ -126,6 +127,48 @@
     return null;
   }
 
+  function findDoctorContainerFromTimeButton(el) {
+    let current = el;
+    while (current && current !== document.body) {
+      const text = norm(current.innerText || current.textContent || '');
+      const hasCRM = /\bCRM\b/i.test(text);
+      const hasTime = Array.from(current.querySelectorAll('button, a, div, span')).some(isTimeButton);
+      if (hasCRM && hasTime) return current;
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  function extractDoctorNameFromContainer(container) {
+    if (!container) return '';
+
+    const candidates = Array.from(
+      container.querySelectorAll('div, span, label, strong, b, p, h1, h2, h3, h4, h5, h6, small')
+    );
+
+    for (const node of candidates) {
+      const text = norm(node.textContent || '');
+      if (!text) continue;
+      if (text.length < 8 || text.length > 90) continue;
+      if (/\bCRM\b/i.test(text)) continue;
+      if (isTimeButton(node)) continue;
+      if (!/[A-Za-zÀ-ÿ]{2}/.test(text)) continue;
+
+      const parentText = norm(node.parentElement?.textContent || '');
+      if (/\bCRM\b/i.test(parentText)) {
+        return toTitleCase(text);
+      }
+    }
+
+    const raw = norm(container.innerText || container.textContent || '');
+    const match = raw.match(/([A-ZÀ-Ý][A-ZÀ-Ýa-zà-ÿ'´`^~\- ]{8,}?)\s+CRM\b/i);
+    return match ? toTitleCase(match[1]) : '';
+  }
+
+  function getSelectedDoctorName() {
+    return state.selectedDoctor || getDoctorNameFromModal();
+  }
+
   function captureSelectionFromClick(target, allowModalTime = false) {
     const insideModal = !!target.closest('#minutoModal');
 
@@ -138,6 +181,13 @@
 
     if (insideModal && allowModalTime) {
       state.selectedTime = time;
+
+      const doctorContainer = findDoctorContainerFromTimeButton(btn);
+      const doctorName = extractDoctorNameFromContainer(doctorContainer);
+      if (doctorName) {
+        state.selectedDoctor = doctorName;
+      }
+
       return true;
     }
 
@@ -188,7 +238,7 @@
   }
 
   function getCopyText() {
-    const doctorName = getDoctorNameFromModal();
+    const doctorName = getSelectedDoctorName();
     if (!doctorName || !state.selectedDate || !state.selectedWeekday || !state.selectedTime) {
       return '';
     }
@@ -277,7 +327,7 @@
 
     if (!modal || !titleEl) return;
 
-    const doctorName = getDoctorNameFromModal();
+    const doctorName = getSelectedDoctorName();
     const titleHtml = buildTitleHtml(doctorName);
 
     if (!titleHtml) return;
