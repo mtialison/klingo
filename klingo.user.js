@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      6.0
+// @version      6.1
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -701,6 +701,10 @@
         grid-template-columns: 155px 342px;
       }
 
+      .tm-row-tel-cel-email {
+        grid-template-columns: 155px 155px 187px;
+      }
+
       .tm-row-carteira-validade {
         grid-template-columns: 342px 155px;
       }
@@ -1250,6 +1254,19 @@
     );
   }
 
+  function findColByAnyLabel(root, labelTexts) {
+    for (const labelText of labelTexts) {
+      const block = findColByLabel(root, labelText);
+      if (block) return block;
+    }
+    return null;
+  }
+
+  function isRegisteredPatientSchedulingModal(root) {
+    if (!root) return false;
+    return !!findTextSmall(root, 'Nome do Paciente');
+  }
+
   function getCadTemp(root) {
     return root.querySelector('#cadTemp');
   }
@@ -1613,14 +1630,17 @@
 
     if (!cadTemp || !cadTempTitleRow || !observationTitleRow || !observationFieldsRow) return;
 
-    const sexoBlock = findColByLabel(cadTemp, 'Sexo');
-    const birthBlock = findColByLabel(cadTemp, 'Data de Nascimento');
-    const celularBlock = findColByLabel(cadTemp, 'Celular');
-    const emailBlock = findColByLabel(cadTemp, 'e-mail');
-    const nomeBlock = findColByLabel(cadTemp, 'Nome');
-    const cpfBlock = findColByLabel(cadTemp, 'CPF');
-    const carteiraBlock = findColByLabel(cadTemp, 'No. da Carteira do Plano');
-    const validadeBlock = findColByLabel(cadTemp, 'Validade da Carteira');
+    const isRegisteredPatient = isRegisteredPatientSchedulingModal(root);
+
+    const sexoBlock = findColByAnyLabel(cadTemp, ['Sexo']);
+    const birthBlock = findColByAnyLabel(cadTemp, ['Data de Nascimento']);
+    const telefoneBlock = findColByAnyLabel(cadTemp, ['Telefone']);
+    const celularBlock = findColByAnyLabel(cadTemp, ['Celular']);
+    const emailBlock = findColByAnyLabel(cadTemp, ['e-mail', 'E-mail', 'Email']);
+    const nomeBlock = findColByAnyLabel(cadTemp, ['Nome', 'Nome do Paciente']);
+    const cpfBlock = findColByAnyLabel(cadTemp, ['CPF']);
+    const carteiraBlock = findColByAnyLabel(cadTemp, ['No. da Carteira do Plano']);
+    const validadeBlock = findColByAnyLabel(cadTemp, ['Validade da Carteira']);
     const origemBlock = findOriginFieldBlock(root);
 
     const observationInputBlock = observationFieldsRow.children[0] || null;
@@ -1632,7 +1652,6 @@
       !celularBlock ||
       !emailBlock ||
       !nomeBlock ||
-      !cpfBlock ||
       !carteiraBlock ||
       !validadeBlock ||
       !origemBlock ||
@@ -1645,35 +1664,63 @@
     const topLayoutHost = ensureHost(cadTemp, 'tm-top-layout-host', 'tm-layout-host');
     cadTemp.insertBefore(topLayoutHost, cadTempTitleRow.nextSibling);
 
-    topLayoutHost.innerHTML = `
-      <div class="tm-top-layout">
-        <div class="tm-left-panel">
-          <div class="tm-grid-row tm-row-name-birth">
-            <div class="tm-field-slot" data-slot="nome"></div>
-            <div class="tm-field-slot" data-slot="nascimento"></div>
-          </div>
-          <div class="tm-grid-row tm-row-cpf-sexo-origem">
-            <div class="tm-field-slot" data-slot="cpf"></div>
-            <div class="tm-field-slot" data-slot="sexo"></div>
-            <div class="tm-field-slot" data-slot="origem"></div>
-          </div>
-          <div class="tm-grid-row tm-row-cel-email">
-            <div class="tm-field-slot" data-slot="celular"></div>
-            <div class="tm-field-slot" data-slot="email"></div>
-          </div>
-          <div class="tm-grid-row tm-row-carteira-validade">
-            <div class="tm-field-slot" data-slot="carteira"></div>
-            <div class="tm-field-slot" data-slot="validade"></div>
+    if (isRegisteredPatient) {
+      topLayoutHost.innerHTML = `
+        <div class="tm-top-layout">
+          <div class="tm-left-panel">
+            <div class="tm-grid-row tm-row-name-birth">
+              <div class="tm-field-slot" data-slot="nome"></div>
+              <div class="tm-field-slot" data-slot="nascimento"></div>
+            </div>
+            <div class="tm-grid-row tm-row-cpf-sexo-origem">
+              <div class="tm-field-slot" data-slot="sexo"></div>
+              <div class="tm-field-slot" data-slot="origem"></div>
+              <div class="tm-field-slot" data-slot="validade"></div>
+            </div>
+            <div class="tm-grid-row tm-row-tel-cel-email">
+              <div class="tm-field-slot" data-slot="telefone"></div>
+              <div class="tm-field-slot" data-slot="celular"></div>
+              <div class="tm-field-slot" data-slot="email"></div>
+            </div>
+            <div class="tm-grid-row tm-row-carteira-validade">
+              <div class="tm-field-slot" data-slot="carteira"></div>
+              <div class="tm-field-slot" data-slot="cpf"></div>
+            </div>
           </div>
         </div>
-      </div>
-    `;
+      `;
+    } else {
+      topLayoutHost.innerHTML = `
+        <div class="tm-top-layout">
+          <div class="tm-left-panel">
+            <div class="tm-grid-row tm-row-name-birth">
+              <div class="tm-field-slot" data-slot="nome"></div>
+              <div class="tm-field-slot" data-slot="nascimento"></div>
+            </div>
+            <div class="tm-grid-row tm-row-cpf-sexo-origem">
+              <div class="tm-field-slot" data-slot="cpf"></div>
+              <div class="tm-field-slot" data-slot="sexo"></div>
+              <div class="tm-field-slot" data-slot="origem"></div>
+            </div>
+            <div class="tm-grid-row tm-row-cel-email">
+              <div class="tm-field-slot" data-slot="celular"></div>
+              <div class="tm-field-slot" data-slot="email"></div>
+            </div>
+            <div class="tm-grid-row tm-row-carteira-validade">
+              <div class="tm-field-slot" data-slot="carteira"></div>
+              <div class="tm-field-slot" data-slot="validade"></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
     moveToSlot(topLayoutHost.querySelector('[data-slot="nome"]'), nomeBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="nascimento"]'), birthBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="cpf"]'), cpfBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="sexo"]'), sexoBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="origem"]'), origemBlock);
+    moveToSlot(topLayoutHost.querySelector('[data-slot="telefone"]'), telefoneBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="celular"]'), celularBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="email"]'), emailBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="carteira"]'), carteiraBlock);
@@ -1705,6 +1752,7 @@
     [
       sexoBlock,
       birthBlock,
+      telefoneBlock,
       celularBlock,
       emailBlock,
       nomeBlock,
@@ -1715,6 +1763,7 @@
       observationInputBlock,
       observationSelectBlock
     ].forEach((block) => {
+      if (!block) return;
       block.style.setProperty('width', '100%', 'important');
       block.style.setProperty('max-width', 'none', 'important');
       block.style.setProperty('padding-left', '0', 'important');
@@ -1735,7 +1784,10 @@
     const nomeSocialBlock = findColByLabel(root, 'Nome Social');
     const materialBlock = findMaterialBlock(root);
 
-    hideElement(telefoneBlock);
+    if (!isRegisteredPatientSchedulingModal(root)) {
+      hideElement(telefoneBlock);
+    }
+
     hideElement(nomeSocialBlock);
     hideElement(materialBlock);
   }
@@ -2481,9 +2533,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '6.0';
+      : '6.1';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '6.0';
+    return match ? match[0] : '6.1';
   }
 
   function ensureScriptVersionIndicator() {
