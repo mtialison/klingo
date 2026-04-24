@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      5.8
+// @version      5.9
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
 // @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
 // @author       alison
-// @grant        none
+// @grant        GM_info
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -2268,6 +2268,22 @@
         opacity: 0.92 !important;
       }
 
+      .tm-script-version-indicator {
+        position: absolute !important;
+        left: 50% !important;
+        top: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        color: #ffffff !important;
+        font-size: inherit !important;
+        line-height: inherit !important;
+        font-weight: inherit !important;
+        font-family: inherit !important;
+        white-space: nowrap !important;
+        pointer-events: none !important;
+        user-select: none !important;
+        z-index: 2 !important;
+      }
+
       @media (max-width: 640px) {
         .tm-datecalc-panel {
           top: 76px;
@@ -2462,6 +2478,43 @@ function setDateCalculatorOpen(isOpen) {
     }
   }
 
+  function getCurrentScriptVersion() {
+    const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
+      ? String(GM_info.script.version)
+      : '5.9';
+    const match = version.match(/\d+(?:\.\d+)?/);
+    return match ? match[0] : '5.9';
+  }
+
+  function ensureScriptVersionIndicator() {
+    const navbar = document.querySelector('nav.navbar');
+    if (!navbar) return;
+
+    navbar.style.setProperty('position', 'relative', 'important');
+
+    let indicator = navbar.querySelector('#tm-script-version-indicator');
+    if (!indicator) {
+      indicator = document.createElement('div');
+      indicator.id = 'tm-script-version-indicator';
+      indicator.className = 'tm-script-version-indicator';
+      navbar.appendChild(indicator);
+    }
+
+    const expected = `🧪 V${getCurrentScriptVersion()}`;
+    if (indicator.textContent !== expected) {
+      indicator.textContent = expected;
+    }
+
+    const companyText = navbar.querySelector('.text-white');
+    if (companyText) {
+      const cs = window.getComputedStyle(companyText);
+      indicator.style.setProperty('font-size', cs.fontSize, 'important');
+      indicator.style.setProperty('line-height', cs.lineHeight, 'important');
+      indicator.style.setProperty('font-weight', cs.fontWeight, 'important');
+      indicator.style.setProperty('font-family', cs.fontFamily, 'important');
+    }
+  }
+
   function getDateCalculatorHeaderHost() {
     return document.querySelector('nav.navbar ul.navbar-nav.ml-auto');
   }
@@ -2539,6 +2592,7 @@ function setDateCalculatorOpen(isOpen) {
     clearTimeout(scheduleDateCalculatorMenuRefresh._timer);
     scheduleDateCalculatorMenuRefresh._timer = setTimeout(() => {
       ensureDateCalculatorHeaderTrigger();
+      ensureScriptVersionIndicator();
       ensureDateCalculatorMenuItem();
     }, 120);
   }
@@ -2636,12 +2690,22 @@ function setDateCalculatorOpen(isOpen) {
     injectDateCalculatorCSS();
     ensureDateCalculatorPanel();
     ensureDateCalculatorHeaderTrigger();
+    ensureScriptVersionIndicator();
     bindDateCalculatorEvents();
     refreshDateCalculatorResults();
     scheduleDateCalculatorMenuRefresh();
-    setTimeout(ensureDateCalculatorHeaderTrigger, 120);
-    setTimeout(ensureDateCalculatorHeaderTrigger, 300);
-    setTimeout(ensureDateCalculatorHeaderTrigger, 700);
+    setTimeout(() => {
+      ensureDateCalculatorHeaderTrigger();
+      ensureScriptVersionIndicator();
+    }, 120);
+    setTimeout(() => {
+      ensureDateCalculatorHeaderTrigger();
+      ensureScriptVersionIndicator();
+    }, 300);
+    setTimeout(() => {
+      ensureDateCalculatorHeaderTrigger();
+      ensureScriptVersionIndicator();
+    }, 700);
   }
 
   const observer = new MutationObserver(() => {
