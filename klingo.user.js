@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      8.7
+// @version      8.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1423,6 +1423,189 @@
       }
 
 
+
+      /* =========================
+         FASE 5 - GRID PACIENTE
+         Layout solicitado, com movimentação única e controlada
+      ========================= */
+      .tm-paciente-grid-root {
+        width: 580px !important;
+        max-width: 580px !important;
+        min-width: 580px !important;
+        overflow: hidden !important;
+      }
+
+      .tm-paciente-grid-root .modal-body {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-host,
+      .tm-paciente-grid-root .tm-paciente-grid-section,
+      .tm-paciente-grid-root .tm-paciente-observation-host,
+      .tm-paciente-grid-root .modal-footer,
+      .tm-paciente-grid-root #myTab,
+      .tm-paciente-grid-root #myTabContent,
+      .tm-paciente-grid-root .tab-content,
+      .tm-paciente-grid-root .tab-pane,
+      .tm-paciente-grid-root .tab-pane > .mt-3 {
+        width: 509px !important;
+        max-width: 509px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-grid-host {
+        display: grid !important;
+        grid-template-columns: repeat(12, 1fr) !important;
+        gap: 10px 12px !important;
+        align-items: end !important;
+      }
+
+      .tm-paciente-grid-host .tm-paciente-grid-field {
+        min-width: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-grid-host .tm-paciente-grid-field .form-group {
+        margin-bottom: 0 !important;
+      }
+
+      .tm-paciente-grid-host .tm-paciente-grid-field .input-group,
+      .tm-paciente-grid-host .tm-paciente-grid-field .form-control,
+      .tm-paciente-grid-host .tm-paciente-grid-field input,
+      .tm-paciente-grid-host .tm-paciente-grid-field select {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+
+      .tm-paciente-grid-nome { grid-column: span 9 !important; }
+      .tm-paciente-grid-nascimento { grid-column: span 3 !important; }
+      .tm-paciente-grid-cpf { grid-column: span 3 !important; }
+      .tm-paciente-grid-sexo { grid-column: span 3 !important; }
+      .tm-paciente-grid-origem { grid-column: span 6 !important; }
+      .tm-paciente-grid-celular { grid-column: span 3 !important; }
+      .tm-paciente-grid-telefone { grid-column: span 3 !important; }
+      .tm-paciente-grid-email { grid-column: span 6 !important; }
+      .tm-paciente-grid-carteira { grid-column: span 9 !important; }
+      .tm-paciente-grid-validade { grid-column: span 3 !important; }
+
+      .tm-paciente-grid-root .tm-paciente-grid-social {
+        display: none !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-nascimento .input-group {
+        position: relative !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-nascimento input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 0 !important;
+        display: none !important;
+        -webkit-appearance: none !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-nascimento input[type="date"] {
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        background-image: none !important;
+        padding-right: 46px !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-nascimento .tm-birth-age-inline {
+        position: absolute !important;
+        top: 1px !important;
+        bottom: 1px !important;
+        right: 1px !important;
+        width: 44px !important;
+        transform: none !important;
+        z-index: 3 !important;
+        display: flex !important;
+        align-items: stretch !important;
+        margin: 0 !important;
+        pointer-events: none !important;
+        overflow: hidden !important;
+        border-top-right-radius: .25rem !important;
+        border-bottom-right-radius: .25rem !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-nascimento .tm-birth-age-inline .input-group-text {
+        width: 100% !important;
+        min-width: 0 !important;
+        height: 100% !important;
+        max-height: none !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #d9d9d9 !important;
+        color: #666 !important;
+        line-height: 1 !important;
+        border-top: 0 !important;
+        border-right: 0 !important;
+        border-bottom: 0 !important;
+        border-left: 1px solid #cfd4da !important;
+        box-shadow: none !important;
+        box-sizing: border-box !important;
+        white-space: nowrap !important;
+        text-align: center !important;
+      }
+
+      .tm-paciente-observation-host {
+        margin-top: 10px !important;
+      }
+
+      .tm-paciente-observation-host .tm-paciente-observation-title {
+        width: 509px !important;
+        max-width: 509px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .tm-paciente-observation-host .tm-paciente-observation-row {
+        display: grid !important;
+        grid-template-columns: 9fr 3fr !important;
+        gap: 10px 12px !important;
+        width: 509px !important;
+        max-width: 509px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        align-items: start !important;
+      }
+
+      .tm-paciente-observation-host textarea.tm-paciente-observation-textarea,
+      .tm-paciente-observation-host .tm-paciente-observation-textarea {
+        min-height: 68px !important;
+        height: 68px !important;
+        resize: none !important;
+        overflow-y: auto !important;
+        padding: 8px 10px !important;
+        line-height: 1.35 !important;
+        white-space: pre-wrap !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-hidden-original-row {
+        display: none !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -1739,6 +1922,180 @@
       footer.style.setProperty('padding-left', '0', 'important');
       footer.style.setProperty('padding-right', '8px', 'important');
     }
+  }
+
+  function ensurePacienteGridHost(root) {
+    const personal = root.querySelector(':scope > .modal-body > .mt-3');
+    if (!personal) return null;
+
+    let title = personal.querySelector('#tm-paciente-grid-title');
+    if (!title) {
+      title = document.createElement('div');
+      title.id = 'tm-paciente-grid-title';
+      title.className = 'border-bottom mb-1 d-flex justify-content-between hover-title-bg text-primary tm-paciente-grid-section';
+      title.innerHTML = '<div><small>Dados Pessoais</small></div><div></div>';
+      personal.insertBefore(title, personal.firstChild);
+    }
+
+    let host = personal.querySelector('#tm-paciente-grid-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'tm-paciente-grid-host';
+      host.className = 'tm-paciente-grid-host tm-paciente-grid-section';
+      host.innerHTML = `
+        <div class="tm-paciente-grid-slot tm-paciente-grid-nome-slot"></div>
+        <div class="tm-paciente-grid-slot tm-paciente-grid-nascimento-slot"></div>
+        <div class="tm-paciente-grid-slot tm-paciente-grid-cpf-slot"></div>
+        <div class="tm-paciente-grid-slot tm-paciente-grid-sexo-slot"></div>
+        <div class="tm-paciente-grid-slot tm-paciente-grid-origem-slot"></div>
+        <div class="tm-paciente-grid-slot tm-paciente-grid-celular-slot"></div>
+        <div class="tm-paciente-grid-slot tm-paciente-grid-telefone-slot"></div>
+        <div class="tm-paciente-grid-slot tm-paciente-grid-email-slot"></div>
+        <div class="tm-paciente-grid-slot tm-paciente-grid-carteira-slot"></div>
+        <div class="tm-paciente-grid-slot tm-paciente-grid-validade-slot"></div>
+      `;
+    }
+
+    if (title.nextSibling !== host) {
+      personal.insertBefore(host, title.nextSibling);
+    }
+
+    return host;
+  }
+
+  function movePacienteGridField(slot, block, className) {
+    if (!slot || !block) return;
+    block.classList.add('tm-paciente-grid-field', className);
+    if (block.parentElement !== slot) {
+      slot.appendChild(block);
+    }
+  }
+
+  function hidePacienteOriginalRows(root) {
+    const personal = root.querySelector(':scope > .modal-body > .mt-3');
+    if (!personal) return;
+
+    personal.querySelectorAll(':scope > .form-row').forEach((row) => {
+      row.classList.add('tm-paciente-hidden-original-row');
+      row.style.setProperty('display', 'none', 'important');
+    });
+  }
+
+  function applyPacienteObservationGrid(root) {
+    const obsTitleSmall = Array.from(root.querySelectorAll('small'))
+      .find((small) => norm(small.textContent || '') === 'Observação');
+    const obsTitle = obsTitleSmall ? obsTitleSmall.closest('.border-bottom') : null;
+    if (!obsTitle) return;
+
+    let obsRow = obsTitle.nextElementSibling;
+    while (obsRow && !(obsRow.classList && obsRow.classList.contains('form-row'))) {
+      obsRow = obsRow.nextElementSibling;
+    }
+    if (!obsRow) return;
+
+    const inputBlock = obsRow.children[0] || null;
+    const selectBlock = obsRow.children[1] || null;
+    if (!inputBlock || !selectBlock) return;
+
+    let host = root.querySelector('#tm-paciente-observation-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'tm-paciente-observation-host';
+      host.className = 'tm-paciente-observation-host';
+      host.innerHTML = `
+        <div class="tm-paciente-observation-title"></div>
+        <div class="tm-paciente-observation-row">
+          <div class="tm-paciente-observation-input"></div>
+          <div class="tm-paciente-observation-select"></div>
+        </div>
+      `;
+    }
+
+    if (obsTitle.parentElement && obsTitle.nextSibling !== host) {
+      obsTitle.parentElement.insertBefore(host, obsTitle.nextSibling);
+    }
+
+    host.querySelector('.tm-paciente-observation-title').appendChild(obsTitle);
+    host.querySelector('.tm-paciente-observation-input').appendChild(inputBlock);
+    host.querySelector('.tm-paciente-observation-select').appendChild(selectBlock);
+
+    obsRow.classList.add('tm-paciente-hidden-original-row');
+    obsRow.style.setProperty('display', 'none', 'important');
+
+    ensureObservationTextarea(inputBlock);
+  }
+
+  function applyPacienteGridLayoutPhase5() {
+    const root = getActivePacienteSchedulingModalRoot();
+    if (!root) return;
+
+    if (root.dataset.tmPacienteGridApplied === '1') {
+      pacienteApplyBirth(root);
+      return;
+    }
+
+    const host = ensurePacienteGridHost(root);
+    if (!host) return;
+
+    const nome = findPacienteFieldBlockByLabel(root, 'Nome do Paciente');
+    const social = findPacienteFieldBlockByLabel(root, 'Nome Social');
+    const nascimento = findPacienteFieldBlockByLabel(root, 'Data de Nascimento');
+    const cpf = findPacienteFieldBlockByLabel(root, 'CPF');
+    const sexo = findPacienteFieldBlockByLabel(root, 'Sexo');
+    const origem = findPacienteFieldBlockByLabel(root, 'Origem de Pacientes');
+    const celular = findPacienteFieldBlockByLabel(root, 'Celular');
+    const telefone = findPacienteFieldBlockByLabel(root, 'Telefone');
+    const email = findPacienteFieldBlockByLabel(root, 'e-mail');
+    const carteira = findPacienteFieldBlockByLabel(root, 'No. da Carteira do Plano');
+    const validade = findPacienteFieldBlockByLabel(root, 'Validade da Carteira');
+
+    if (!nome || !nascimento || !sexo || !origem || !celular || !telefone || !email || !carteira || !validade) return;
+
+    root.classList.add('tm-paciente-grid-root');
+
+    movePacienteGridField(host.querySelector('.tm-paciente-grid-nome-slot'), nome, 'tm-paciente-grid-nome');
+    movePacienteGridField(host.querySelector('.tm-paciente-grid-nascimento-slot'), nascimento, 'tm-paciente-grid-nascimento');
+
+    if (cpf) {
+      movePacienteGridField(host.querySelector('.tm-paciente-grid-cpf-slot'), cpf, 'tm-paciente-grid-cpf');
+    } else {
+      const cpfSlot = host.querySelector('.tm-paciente-grid-cpf-slot');
+      if (cpfSlot) cpfSlot.remove();
+      sexo.classList.add('tm-paciente-grid-sexo');
+      origem.classList.add('tm-paciente-grid-origem');
+    }
+
+    movePacienteGridField(host.querySelector('.tm-paciente-grid-sexo-slot'), sexo, 'tm-paciente-grid-sexo');
+    movePacienteGridField(host.querySelector('.tm-paciente-grid-origem-slot'), origem, 'tm-paciente-grid-origem');
+    movePacienteGridField(host.querySelector('.tm-paciente-grid-celular-slot'), celular, 'tm-paciente-grid-celular');
+    movePacienteGridField(host.querySelector('.tm-paciente-grid-telefone-slot'), telefone, 'tm-paciente-grid-telefone');
+    movePacienteGridField(host.querySelector('.tm-paciente-grid-email-slot'), email, 'tm-paciente-grid-email');
+    movePacienteGridField(host.querySelector('.tm-paciente-grid-carteira-slot'), carteira, 'tm-paciente-grid-carteira');
+    movePacienteGridField(host.querySelector('.tm-paciente-grid-validade-slot'), validade, 'tm-paciente-grid-validade');
+
+    if (social) {
+      social.classList.add('tm-paciente-grid-social');
+      social.style.setProperty('display', 'none', 'important');
+    }
+
+    const origemTitle = Array.from(root.querySelectorAll('small'))
+      .find((small) => norm(small.textContent || '') === 'ORIGEM DE PACIENTES');
+    const origemTitleRow = origemTitle ? origemTitle.closest('.border-bottom') : null;
+    const origemMainRow = origemTitleRow ? origemTitleRow.closest('.row') : null;
+    if (origemTitleRow) {
+      origemTitleRow.classList.add('tm-paciente-hidden-original-row');
+      origemTitleRow.style.setProperty('display', 'none', 'important');
+    }
+    if (origemMainRow) {
+      origemMainRow.classList.add('tm-paciente-hidden-original-row');
+      origemMainRow.style.setProperty('display', 'none', 'important');
+    }
+
+    hidePacienteOriginalRows(root);
+    applyPacienteObservationGrid(root);
+    pacienteApplyBirth(root);
+
+    root.dataset.tmPacienteGridApplied = '1';
   }
 
   function findTextSmall(root, labelText) {
@@ -2527,6 +2884,7 @@
     applyPacienteHeaderVisual();
     applyPacienteFieldsPhase3();
     applyPacienteSpacingPhase4();
+    applyPacienteGridLayoutPhase5();
 
     const root = getSchedulingModalRoot();
 
@@ -2569,18 +2927,21 @@
         applyPacienteHeaderVisual();
         applyPacienteFieldsPhase3();
         applyPacienteSpacingPhase4();
+        applyPacienteGridLayoutPhase5();
       }, 60);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         applyPacienteHeaderVisual();
         applyPacienteFieldsPhase3();
         applyPacienteSpacingPhase4();
+        applyPacienteGridLayoutPhase5();
       }, 160);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         applyPacienteHeaderVisual();
         applyPacienteFieldsPhase3();
         applyPacienteSpacingPhase4();
+        applyPacienteGridLayoutPhase5();
       }, 320);
     }
 
@@ -3030,9 +3391,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '8.7';
+      : '8.8';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '8.7';
+    return match ? match[0] : '8.8';
   }
 
   function ensureScriptVersionIndicator() {
