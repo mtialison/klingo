@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      6.7
+// @version      6.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2239,11 +2239,28 @@
   function tmPacienteFindRootPrecise() {
     if (!isCallCenterRoute()) return null;
 
-    const roots = Array.from(document.querySelectorAll('.modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content'));
+    const activeModals = Array.from(document.querySelectorAll('.modal.show, .modal.fade.show'))
+      .filter((modal) => {
+        if (modal.id === 'cadastroModal') return false;
+        if (modal.id === 'minutoModal') return false;
 
-    for (const root of roots) {
-      if (root.closest('#cadastroModal')) continue;
-      if (root.closest('#minutoModal')) continue;
+        const style = window.getComputedStyle(modal);
+        const rect = modal.getBoundingClientRect();
+
+        return (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      });
+
+    for (const modal of activeModals) {
+      const root =
+        modal.querySelector(':scope > .modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content') ||
+        modal.querySelector('.modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content');
+
+      if (!root) continue;
       if (root.querySelector('#cadTemp')) continue;
 
       const body = root.querySelector(':scope > .modal-body');
@@ -2542,6 +2559,9 @@
       captureSelectionFromClick(e.target, false);
     }
     burstUpdate();
+    setTimeout(tmPacienteApplyPrecise, 80);
+    setTimeout(tmPacienteApplyPrecise, 220);
+    setTimeout(tmPacienteApplyPrecise, 500);
   }, true);
 
   document.addEventListener('focusin', () => {
@@ -2984,9 +3004,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '6.7';
+      : '6.8';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '6.7';
+    return match ? match[0] : '6.8';
   }
 
   function ensureScriptVersionIndicator() {
