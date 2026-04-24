@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      8.8
+// @version      8.9
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1606,6 +1606,157 @@
       }
 
 
+
+      /* =========================
+         FASE 5.1 - AJUSTES GRID PACIENTE
+         Referência Primeira Vez
+      ========================= */
+      .tm-paciente-grid-root .tm-paciente-grid-host {
+        width: 509px !important;
+        max-width: 509px !important;
+        display: grid !important;
+        grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+        gap: 10px 12px !important;
+        align-items: end !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-nome {
+        grid-column: span 9 !important;
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-nascimento {
+        grid-column: span 3 !important;
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-cpf {
+        grid-column: span 3 !important;
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-sexo {
+        grid-column: span 4 !important;
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-origem {
+        grid-column: span 5 !important;
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-celular {
+        grid-column: span 4 !important;
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-telefone {
+        grid-column: span 4 !important;
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-email {
+        grid-column: span 8 !important;
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-carteira {
+        grid-column: span 9 !important;
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-validade {
+        grid-column: span 3 !important;
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-grid-field,
+      .tm-paciente-grid-root .tm-paciente-grid-field .form-group,
+      .tm-paciente-grid-root .tm-paciente-grid-field .input-group,
+      .tm-paciente-grid-root .tm-paciente-grid-field input,
+      .tm-paciente-grid-root .tm-paciente-grid-field select,
+      .tm-paciente-grid-root .tm-paciente-grid-field .form-control {
+        min-width: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-observation-host {
+        width: 509px !important;
+        max-width: 509px !important;
+        margin: 12px auto 0 auto !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-observation-title {
+        width: 509px !important;
+        max-width: 509px !important;
+        margin: 0 auto 6px auto !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-observation-row {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+        width: 509px !important;
+        max-width: 509px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-observation-input,
+      .tm-paciente-grid-root .tm-paciente-observation-input > *,
+      .tm-paciente-grid-root .tm-paciente-observation-input textarea,
+      .tm-paciente-grid-root .tm-paciente-observation-input .form-control {
+        width: 509px !important;
+        max-width: 509px !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-observation-input textarea,
+      .tm-paciente-grid-root .tm-paciente-observation-input .tm-paciente-observation-textarea,
+      .tm-paciente-grid-root .tm-paciente-observation-input .tm-observation-textarea {
+        height: 84px !important;
+        min-height: 84px !important;
+        resize: none !important;
+        overflow-y: auto !important;
+        padding: 8px 10px !important;
+        line-height: 1.35 !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-observation-select {
+        width: 240px !important;
+        max-width: 240px !important;
+      }
+
+      .tm-paciente-grid-root .tm-paciente-observation-select .input-group,
+      .tm-paciente-grid-root .tm-paciente-observation-select select,
+      .tm-paciente-grid-root .tm-paciente-observation-select .form-control {
+        width: 240px !important;
+        max-width: 240px !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -1943,16 +2094,16 @@
       host.id = 'tm-paciente-grid-host';
       host.className = 'tm-paciente-grid-host tm-paciente-grid-section';
       host.innerHTML = `
-        <div class="tm-paciente-grid-slot tm-paciente-grid-nome-slot"></div>
-        <div class="tm-paciente-grid-slot tm-paciente-grid-nascimento-slot"></div>
-        <div class="tm-paciente-grid-slot tm-paciente-grid-cpf-slot"></div>
-        <div class="tm-paciente-grid-slot tm-paciente-grid-sexo-slot"></div>
-        <div class="tm-paciente-grid-slot tm-paciente-grid-origem-slot"></div>
-        <div class="tm-paciente-grid-slot tm-paciente-grid-celular-slot"></div>
-        <div class="tm-paciente-grid-slot tm-paciente-grid-telefone-slot"></div>
-        <div class="tm-paciente-grid-slot tm-paciente-grid-email-slot"></div>
-        <div class="tm-paciente-grid-slot tm-paciente-grid-carteira-slot"></div>
-        <div class="tm-paciente-grid-slot tm-paciente-grid-validade-slot"></div>
+        <div class="tm-paciente-grid-slot" data-paciente-slot="nome"></div>
+        <div class="tm-paciente-grid-slot" data-paciente-slot="nascimento"></div>
+        <div class="tm-paciente-grid-slot" data-paciente-slot="cpf"></div>
+        <div class="tm-paciente-grid-slot" data-paciente-slot="sexo"></div>
+        <div class="tm-paciente-grid-slot" data-paciente-slot="origem"></div>
+        <div class="tm-paciente-grid-slot" data-paciente-slot="celular"></div>
+        <div class="tm-paciente-grid-slot" data-paciente-slot="telefone"></div>
+        <div class="tm-paciente-grid-slot" data-paciente-slot="email"></div>
+        <div class="tm-paciente-grid-slot" data-paciente-slot="carteira"></div>
+        <div class="tm-paciente-grid-slot" data-paciente-slot="validade"></div>
       `;
     }
 
@@ -1966,6 +2117,9 @@
   function movePacienteGridField(slot, block, className) {
     if (!slot || !block) return;
     block.classList.add('tm-paciente-grid-field', className);
+    block.style.removeProperty('width');
+    block.style.removeProperty('max-width');
+    block.style.removeProperty('flex');
     if (block.parentElement !== slot) {
       slot.appendChild(block);
     }
@@ -2023,6 +2177,40 @@
     obsRow.style.setProperty('display', 'none', 'important');
 
     ensureObservationTextarea(inputBlock);
+
+    const textarea = inputBlock.querySelector('textarea, .tm-observation-textarea, .tm-paciente-observation-textarea');
+    if (textarea) {
+      textarea.classList.add('tm-paciente-observation-textarea');
+      textarea.style.setProperty('height', '84px', 'important');
+      textarea.style.setProperty('min-height', '84px', 'important');
+      textarea.style.setProperty('resize', 'none', 'important');
+      textarea.style.setProperty('overflow-y', 'auto', 'important');
+    }
+  }
+
+  function applyPacienteGridBirth(root) {
+    const birthBlock = root.querySelector('.tm-paciente-grid-nascimento');
+    if (!birthBlock) return;
+
+    const input = birthBlock.querySelector('input[type="date"]');
+    const inputGroup = birthBlock.querySelector('.input-group');
+    if (!input || !inputGroup) return;
+
+    const ageAppend = Array.from(birthBlock.querySelectorAll('.input-group-append')).find((append) =>
+      append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]')
+    );
+
+    if (!ageAppend) return;
+
+    if (ageAppend.parentElement !== inputGroup) inputGroup.appendChild(ageAppend);
+    ageAppend.classList.add('tm-birth-age-inline');
+
+    const ageText = ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
+    if (ageText) {
+      syncBirthAgeBadgeFontSafe(input, ageText);
+      const age = calculateBirthAgeSafe(input.value);
+      if (age) ageText.textContent = age;
+    }
   }
 
   function applyPacienteGridLayoutPhase5() {
@@ -2030,7 +2218,7 @@
     if (!root) return;
 
     if (root.dataset.tmPacienteGridApplied === '1') {
-      pacienteApplyBirth(root);
+      applyPacienteGridBirth(root);
       return;
     }
 
@@ -2053,25 +2241,27 @@
 
     root.classList.add('tm-paciente-grid-root');
 
-    movePacienteGridField(host.querySelector('.tm-paciente-grid-nome-slot'), nome, 'tm-paciente-grid-nome');
-    movePacienteGridField(host.querySelector('.tm-paciente-grid-nascimento-slot'), nascimento, 'tm-paciente-grid-nascimento');
+    movePacienteGridField(host.querySelector('[data-paciente-slot="nome"]'), nome, 'tm-paciente-grid-nome');
+    movePacienteGridField(host.querySelector('[data-paciente-slot="nascimento"]'), nascimento, 'tm-paciente-grid-nascimento');
 
     if (cpf) {
-      movePacienteGridField(host.querySelector('.tm-paciente-grid-cpf-slot'), cpf, 'tm-paciente-grid-cpf');
+      movePacienteGridField(host.querySelector('[data-paciente-slot="cpf"]'), cpf, 'tm-paciente-grid-cpf');
     } else {
-      const cpfSlot = host.querySelector('.tm-paciente-grid-cpf-slot');
+      const cpfSlot = host.querySelector('[data-paciente-slot="cpf"]');
       if (cpfSlot) cpfSlot.remove();
-      sexo.classList.add('tm-paciente-grid-sexo');
-      origem.classList.add('tm-paciente-grid-origem');
+      sexo.classList.add('tm-paciente-grid-cpf');
     }
 
-    movePacienteGridField(host.querySelector('.tm-paciente-grid-sexo-slot'), sexo, 'tm-paciente-grid-sexo');
-    movePacienteGridField(host.querySelector('.tm-paciente-grid-origem-slot'), origem, 'tm-paciente-grid-origem');
-    movePacienteGridField(host.querySelector('.tm-paciente-grid-celular-slot'), celular, 'tm-paciente-grid-celular');
-    movePacienteGridField(host.querySelector('.tm-paciente-grid-telefone-slot'), telefone, 'tm-paciente-grid-telefone');
-    movePacienteGridField(host.querySelector('.tm-paciente-grid-email-slot'), email, 'tm-paciente-grid-email');
-    movePacienteGridField(host.querySelector('.tm-paciente-grid-carteira-slot'), carteira, 'tm-paciente-grid-carteira');
-    movePacienteGridField(host.querySelector('.tm-paciente-grid-validade-slot'), validade, 'tm-paciente-grid-validade');
+    movePacienteGridField(host.querySelector('[data-paciente-slot="sexo"]'), sexo, 'tm-paciente-grid-sexo');
+    movePacienteGridField(host.querySelector('[data-paciente-slot="origem"]'), origem, 'tm-paciente-grid-origem');
+
+    // Ordem solicitada: Celular, Telefone. E-mail fica na linha de baixo.
+    movePacienteGridField(host.querySelector('[data-paciente-slot="celular"]'), celular, 'tm-paciente-grid-celular');
+    movePacienteGridField(host.querySelector('[data-paciente-slot="telefone"]'), telefone, 'tm-paciente-grid-telefone');
+    movePacienteGridField(host.querySelector('[data-paciente-slot="email"]'), email, 'tm-paciente-grid-email');
+
+    movePacienteGridField(host.querySelector('[data-paciente-slot="carteira"]'), carteira, 'tm-paciente-grid-carteira');
+    movePacienteGridField(host.querySelector('[data-paciente-slot="validade"]'), validade, 'tm-paciente-grid-validade');
 
     if (social) {
       social.classList.add('tm-paciente-grid-social');
@@ -2082,10 +2272,12 @@
       .find((small) => norm(small.textContent || '') === 'ORIGEM DE PACIENTES');
     const origemTitleRow = origemTitle ? origemTitle.closest('.border-bottom') : null;
     const origemMainRow = origemTitleRow ? origemTitleRow.closest('.row') : null;
+
     if (origemTitleRow) {
       origemTitleRow.classList.add('tm-paciente-hidden-original-row');
       origemTitleRow.style.setProperty('display', 'none', 'important');
     }
+
     if (origemMainRow) {
       origemMainRow.classList.add('tm-paciente-hidden-original-row');
       origemMainRow.style.setProperty('display', 'none', 'important');
@@ -2093,789 +2285,10 @@
 
     hidePacienteOriginalRows(root);
     applyPacienteObservationGrid(root);
-    pacienteApplyBirth(root);
+    applyPacienteGridBirth(root);
 
     root.dataset.tmPacienteGridApplied = '1';
   }
-
-  function findTextSmall(root, labelText) {
-    const smalls = root.querySelectorAll('small');
-    for (const small of smalls) {
-      if (norm(small.textContent) === labelText) return small;
-    }
-    return null;
-  }
-
-  function findColByLabel(root, labelText) {
-    const label = findTextSmall(root, labelText);
-    if (!label) return null;
-
-    return (
-      label.closest('.col') ||
-      label.closest('[class*="col-"]') ||
-      label.closest('.form-group') ||
-      label.parentElement
-    );
-  }
-
-  function getCadTemp(root) {
-    return root.querySelector('#cadTemp');
-  }
-
-  function getCadTempTitleRow(root) {
-    const cadTemp = getCadTemp(root);
-    if (!cadTemp) return null;
-
-    const title = findTextSmall(cadTemp, 'Dados Pessoais');
-    return title ? title.closest('.border-bottom') : null;
-  }
-
-  function getObservationTitleRow(root) {
-    const title = findTextSmall(root, 'Observação');
-    return title ? title.closest('.border-bottom') : null;
-  }
-
-  function getObservationFieldsRow(root) {
-    const titleRow = getObservationTitleRow(root);
-    if (!titleRow) return null;
-
-    let current = titleRow.nextElementSibling;
-    while (current) {
-      if (current.classList && current.classList.contains('form-row')) return current;
-      current = current.nextElementSibling;
-    }
-    return null;
-  }
-
-  function getOriginTitleRow(root) {
-    const title = findTextSmall(root, 'ORIGEM DE PACIENTES');
-    return title ? title.closest('.border-bottom') : null;
-  }
-
-  function findOriginFieldBlock(root) {
-    return findColByLabel(root, 'Origem de Pacientes');
-  }
-
-  function findMaterialBlock(root) {
-    const input = root.querySelector('input[placeholder="Incluir material, medicamento ou taxa..."]');
-    if (!input) return null;
-
-    return (
-      input.closest('.form-group.mb-3.mb-1') ||
-      input.closest('.form-group') ||
-      input.closest('.autocomplete') ||
-      input.closest('.input-group') ||
-      input.parentElement
-    );
-  }
-
-  function ensureHost(parent, id, className) {
-    let host = parent.querySelector('#' + id);
-    if (!host) {
-      host = document.createElement('div');
-      host.id = id;
-      host.className = className;
-      parent.appendChild(host);
-    }
-    return host;
-  }
-
-  function moveToSlot(slot, block) {
-    if (!slot || !block) return;
-    slot.innerHTML = '';
-    slot.appendChild(block);
-  }
-
-  function ensureObservationTextarea(block) {
-    if (!block) return;
-
-    const input = block.querySelector('input.form-control[type="text"]');
-    if (!input) return;
-
-    let textarea = block.querySelector('textarea.tm-observation-textarea');
-    if (!textarea) {
-      textarea = document.createElement('textarea');
-      textarea.className = `${input.className} tm-observation-textarea`;
-      textarea.placeholder = input.placeholder || '';
-      textarea.autocomplete = input.autocomplete || 'off';
-      textarea.value = input.value || '';
-      textarea.rows = 4;
-      input.insertAdjacentElement('afterend', textarea);
-      input.classList.add('tm-hidden-by-script');
-      input.style.setProperty('display', 'none', 'important');
-
-      const syncToInput = () => {
-        setNativeInputValue(input, textarea.value);
-        dispatchEvents(input, ['input', 'change']);
-      };
-
-      textarea.addEventListener('input', syncToInput, true);
-      textarea.addEventListener('change', syncToInput, true);
-      textarea.addEventListener('blur', () => {
-        syncToInput();
-        dispatchEvents(input, ['blur']);
-      }, true);
-    }
-
-    if (textarea.value !== (input.value || '')) {
-      textarea.value = input.value || '';
-    }
-  }
-
-  function hideCellCountryButton(celularBlock) {
-    if (!celularBlock) return;
-    const inputGroup = celularBlock.querySelector('.input-group');
-    if (!inputGroup) return;
-    inputGroup.classList.add('tm-cell-input-group');
-
-    const prepend = inputGroup.querySelector('.input-group-prepend');
-    if (prepend) {
-      prepend.classList.add('tm-hidden-by-script');
-      prepend.style.setProperty('display', 'none', 'important');
-    }
-  }
-
-
-  function ensureHeaderLine(label, className, beforeNode = null) {
-    let line = label.querySelector(`.${className}`);
-    if (!line) {
-      line = document.createElement('div');
-      line.className = className;
-    } else {
-      line.innerHTML = '';
-    }
-
-    if (beforeNode) {
-      label.insertBefore(line, beforeNode);
-    } else if (!line.parentElement) {
-      label.appendChild(line);
-    }
-
-    if (!line.parentElement) {
-      label.appendChild(line);
-    }
-
-    return line;
-  }
-
-  function reorganizeHeaderStructure(root) {
-    if (!isCallCenterRoute()) return;
-
-    const listGroup = root.querySelector('.list-group');
-    if (!listGroup) return;
-
-    const headerItems = listGroup.querySelectorAll(':scope > .list-group-item.list-group-item-success, :scope > .list-group-item.list-group-item-info, :scope > .list-group-item.list-group-item-warning, :scope > .list-group-item.list-group-item-secondary, :scope > .list-group-item.list-group-item-danger');
-    if (!headerItems.length) return;
-
-    const paymentSourceItem = listGroup.querySelector(':scope > .list-group-item:not(.list-group-item-success):not(.list-group-item-info)');
-    const paymentSourceSmall = paymentSourceItem ? paymentSourceItem.querySelector('small.lead') : null;
-
-    headerItems.forEach((headerItem) => {
-      const label = headerItem.querySelector('label.mb-0.w-100');
-      if (!label) return;
-
-      const titleDiv = label.querySelector('.h4.mb-1');
-      const metaRow = label.querySelector('.d-flex.justify-content-between');
-      const infosWrap = label.querySelector('blockquote') ? label.querySelector('blockquote').closest('div') : null;
-
-      if (!titleDiv || !metaRow) return;
-
-      titleDiv.classList.add('tm-procedure-title');
-
-      const leftMeta = metaRow.children[0] || null;
-      const rightMeta = metaRow.children[1] || null;
-      if (!leftMeta || !rightMeta) return;
-
-      const spans = Array.from(leftMeta.querySelectorAll(':scope > span'));
-      const paymentOwn = spans.find((span) => span.querySelector('.fa-credit-card'));
-      const doctorNode = spans.find((span) => span.querySelector('.fa-user-md')) || null;
-      const unitNode = spans.find((span) => span.querySelector('.fa-building')) || null;
-
-      let paymentNode = null;
-      if (paymentOwn) {
-        paymentNode = paymentOwn;
-      } else if (paymentSourceSmall) {
-        const wrapper = document.createElement('span');
-        wrapper.className = 'mr-3';
-        wrapper.appendChild(paymentSourceSmall.cloneNode(true));
-        paymentNode = wrapper;
-      }
-
-      const dateNode = rightMeta.querySelector('small:not(.mx-2)') || rightMeta.children[0] || null;
-      const timeNode = rightMeta.querySelector('small.mx-2') || rightMeta.children[1] || null;
-
-      const line2 = ensureHeaderLine(label, 'tm-header-line-2 tm-header-line', infosWrap || null);
-      const line3 = ensureHeaderLine(label, 'tm-header-line-3 tm-header-line', infosWrap || null);
-
-      if (paymentNode) line2.appendChild(paymentNode);
-      if (doctorNode) line2.appendChild(doctorNode);
-
-      if (unitNode) line3.appendChild(unitNode);
-      if (dateNode) line3.appendChild(dateNode);
-      if (timeNode) line3.appendChild(timeNode);
-
-      metaRow.remove();
-
-      if (infosWrap) {
-        infosWrap.classList.add('tm-header-infos');
-        label.appendChild(infosWrap);
-      }
-    });
-
-    if (paymentSourceItem && headerItems.length > 1) {
-      paymentSourceItem.style.display = 'none';
-    }
-  }
-
-  function resizeSchedulingModal() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const dialog = root.closest('.modal-dialog');
-    if (!dialog) return;
-
-    const MODAL_W = '580px';
-    const CONTENT_W = '540px';
-
-    dialog.style.setProperty('width', MODAL_W, 'important');
-    dialog.style.setProperty('max-width', MODAL_W, 'important');
-    dialog.style.setProperty('min-width', MODAL_W, 'important');
-    dialog.style.setProperty('margin-left', 'auto', 'important');
-    dialog.style.setProperty('margin-right', 'auto', 'important');
-
-    root.style.setProperty('width', MODAL_W, 'important');
-    root.style.setProperty('max-width', MODAL_W, 'important');
-    root.style.setProperty('min-width', MODAL_W, 'important');
-    root.style.setProperty('overflow', 'hidden', 'important');
-
-    const body = root.querySelector('.modal-body');
-    if (body) {
-      body.style.setProperty('padding-left', '0', 'important');
-      body.style.setProperty('padding-right', '0', 'important');
-      body.style.setProperty('overflow-x', 'hidden', 'important');
-      body.style.setProperty('overflow-y', 'auto', 'important');
-      body.style.setProperty('display', 'flex', 'important');
-      body.style.setProperty('flex-direction', 'column', 'important');
-      body.style.setProperty('align-items', 'center', 'important');
-    }
-
-    const selectors = [
-      '.modal-body > div',
-      '.modal-body .mt-3',
-      '.modal-body #cadTemp',
-      '.modal-body #tm-top-layout-host',
-      '.modal-body #tm-observation-layout-host',
-      '.modal-body #myTab',
-      '.modal-body .tab-content',
-      '.modal-body .tab-pane',
-      '.modal-body hr',
-      '.modal-footer'
-    ];
-
-    selectors.forEach((selector) => {
-      root.querySelectorAll(selector).forEach((el) => {
-        el.style.setProperty('width', CONTENT_W, 'important');
-        el.style.setProperty('max-width', CONTENT_W, 'important');
-        el.style.setProperty('margin-left', 'auto', 'important');
-        el.style.setProperty('margin-right', 'auto', 'important');
-        el.style.setProperty('box-sizing', 'border-box', 'important');
-      });
-    });
-
-    const topLayout = root.querySelector('.tm-top-layout');
-    if (topLayout) {
-      topLayout.style.setProperty('width', '509px', 'important');
-      topLayout.style.setProperty('max-width', '509px', 'important');
-      topLayout.style.setProperty('margin-left', 'auto', 'important');
-      topLayout.style.setProperty('margin-right', 'auto', 'important');
-    }
-
-    const observationHost = root.querySelector('#tm-observation-layout-host');
-    if (observationHost) {
-      observationHost.style.setProperty('width', '509px', 'important');
-      observationHost.style.setProperty('max-width', '509px', 'important');
-      observationHost.style.setProperty('margin-left', 'auto', 'important');
-      observationHost.style.setProperty('margin-right', 'auto', 'important');
-    }
-
-    const tabNav = root.querySelector('#myTab');
-    if (tabNav) {
-      tabNav.style.setProperty('width', '509px', 'important');
-      tabNav.style.setProperty('max-width', '509px', 'important');
-      tabNav.style.setProperty('margin-left', 'auto', 'important');
-      tabNav.style.setProperty('margin-right', 'auto', 'important');
-    }
-
-    const tabContent = root.querySelector('.tab-content');
-    if (tabContent) {
-      tabContent.style.setProperty('width', '509px', 'important');
-      tabContent.style.setProperty('max-width', '509px', 'important');
-      tabContent.style.setProperty('margin-left', 'auto', 'important');
-      tabContent.style.setProperty('margin-right', 'auto', 'important');
-    }
-
-    root.querySelectorAll('.tab-pane, .tab-pane .mt-3, .tab-pane .form-group.mb-1').forEach((el) => {
-      el.style.setProperty('width', '509px', 'important');
-      el.style.setProperty('max-width', '509px', 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    root.querySelectorAll('.tab-pane .autocomplete, .tab-pane .autocomplete .input-group, .tab-pane input.az-autocomplete, .tab-pane hr').forEach((el) => {
-      el.style.setProperty('width', '509px', 'important');
-      el.style.setProperty('max-width', '509px', 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-    });
-
-    const leftPanel = root.querySelector('.tm-left-panel');
-    if (leftPanel) {
-      leftPanel.style.setProperty('width', '509px', 'important');
-      leftPanel.style.setProperty('max-width', '509px', 'important');
-    }
-
-    root.querySelectorAll('.border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.text-primary, .border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.mt-1.text-primary').forEach((el) => {
-      el.style.setProperty('width', '509px', 'important');
-      el.style.setProperty('max-width', '509px', 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    const footer = root.querySelector('.modal-footer');
-    if (footer) {
-      footer.style.setProperty('width', '509px', 'important');
-      footer.style.setProperty('max-width', '509px', 'important');
-      footer.style.setProperty('padding-right', '8px', 'important');
-      footer.style.setProperty('box-sizing', 'border-box', 'important');
-      footer.style.setProperty('margin-left', 'auto', 'important');
-      footer.style.setProperty('margin-right', 'auto', 'important');
-      footer.style.setProperty('justify-content', 'flex-start', 'important');
-      footer.style.setProperty('padding-left', '0', 'important');
-    }
-
-    const headerList = root.querySelector('.list-group');
-    const headerItem = root.querySelector('.list-group-item.list-group-item-success');
-    if (headerList) {
-      headerList.style.setProperty('margin-left', 'auto', 'important');
-      headerList.style.setProperty('margin-right', 'auto', 'important');
-    }
-    if (headerItem) {
-      headerItem.style.setProperty('margin-left', 'auto', 'important');
-      headerItem.style.setProperty('margin-right', 'auto', 'important');
-    }
-  }
-
-  function reorganizeSchedulingModalLayout() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const cadTemp = getCadTemp(root);
-    const cadTempTitleRow = getCadTempTitleRow(root);
-    const observationTitleRow = getObservationTitleRow(root);
-    const observationFieldsRow = getObservationFieldsRow(root);
-    const originTitleRow = getOriginTitleRow(root);
-
-    if (!cadTemp || !cadTempTitleRow || !observationTitleRow || !observationFieldsRow) return;
-
-    const sexoBlock = findColByLabel(cadTemp, 'Sexo');
-    const birthBlock = findColByLabel(cadTemp, 'Data de Nascimento');
-    const celularBlock = findColByLabel(cadTemp, 'Celular');
-    const emailBlock = findColByLabel(cadTemp, 'e-mail');
-    const nomeBlock = findColByLabel(cadTemp, 'Nome');
-    const cpfBlock = findColByLabel(cadTemp, 'CPF');
-    const carteiraBlock = findColByLabel(cadTemp, 'No. da Carteira do Plano');
-    const validadeBlock = findColByLabel(cadTemp, 'Validade da Carteira');
-    const origemBlock = findOriginFieldBlock(root);
-
-    const observationInputBlock = observationFieldsRow.children[0] || null;
-    const observationSelectBlock = observationFieldsRow.children[1] || null;
-
-    if (
-      !sexoBlock ||
-      !birthBlock ||
-      !celularBlock ||
-      !emailBlock ||
-      !nomeBlock ||
-      !cpfBlock ||
-      !carteiraBlock ||
-      !validadeBlock ||
-      !origemBlock ||
-      !observationInputBlock ||
-      !observationSelectBlock
-    ) {
-      return;
-    }
-
-    const topLayoutHost = ensureHost(cadTemp, 'tm-top-layout-host', 'tm-layout-host');
-    cadTemp.insertBefore(topLayoutHost, cadTempTitleRow.nextSibling);
-
-    topLayoutHost.innerHTML = `
-      <div class="tm-top-layout">
-        <div class="tm-left-panel">
-          <div class="tm-grid-row tm-row-name-birth">
-            <div class="tm-field-slot" data-slot="nome"></div>
-            <div class="tm-field-slot" data-slot="nascimento"></div>
-          </div>
-          <div class="tm-grid-row tm-row-cpf-sexo-origem">
-            <div class="tm-field-slot" data-slot="cpf"></div>
-            <div class="tm-field-slot" data-slot="sexo"></div>
-            <div class="tm-field-slot" data-slot="origem"></div>
-          </div>
-          <div class="tm-grid-row tm-row-cel-email">
-            <div class="tm-field-slot" data-slot="celular"></div>
-            <div class="tm-field-slot" data-slot="email"></div>
-          </div>
-          <div class="tm-grid-row tm-row-carteira-validade">
-            <div class="tm-field-slot" data-slot="carteira"></div>
-            <div class="tm-field-slot" data-slot="validade"></div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    moveToSlot(topLayoutHost.querySelector('[data-slot="nome"]'), nomeBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="nascimento"]'), birthBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="cpf"]'), cpfBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="sexo"]'), sexoBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="origem"]'), origemBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="celular"]'), celularBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="email"]'), emailBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="carteira"]'), carteiraBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="validade"]'), validadeBlock);
-
-    const observationHostParent = observationTitleRow.parentElement;
-    const observationHost = ensureHost(observationHostParent, 'tm-observation-layout-host', 'tm-observation-layout');
-    if (observationTitleRow.nextSibling !== observationHost) {
-      observationHostParent.insertBefore(observationHost, observationTitleRow.nextSibling);
-    }
-
-    observationHost.innerHTML = `
-      <div class="tm-field-slot" data-slot="observacao-input"></div>
-      <div class="tm-field-slot" data-slot="observacao-select"></div>
-    `;
-
-    moveToSlot(observationHost.querySelector('[data-slot="observacao-input"]'), observationInputBlock);
-    moveToSlot(observationHost.querySelector('[data-slot="observacao-select"]'), observationSelectBlock);
-
-    cadTemp.querySelectorAll('.form-row').forEach((row) => hideOriginalRow(row));
-    hideOriginalRow(observationFieldsRow);
-
-    if (originTitleRow) {
-      const originMainRow = originTitleRow.closest('.row');
-      hideOriginalRow(originTitleRow);
-      hideOriginalRow(originMainRow);
-    }
-
-    [
-      sexoBlock,
-      birthBlock,
-      celularBlock,
-      emailBlock,
-      nomeBlock,
-      cpfBlock,
-      carteiraBlock,
-      validadeBlock,
-      origemBlock,
-      observationInputBlock,
-      observationSelectBlock
-    ].forEach((block) => {
-      block.style.setProperty('width', '100%', 'important');
-      block.style.setProperty('max-width', 'none', 'important');
-      block.style.setProperty('padding-left', '0', 'important');
-      block.style.setProperty('padding-right', '0', 'important');
-      block.style.setProperty('flex', 'unset', 'important');
-    });
-
-    hideCellCountryButton(celularBlock);
-    ensureObservationTextarea(observationInputBlock);
-  }
-
-  function hideAppointmentModalFields() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const telefoneBlock = findColByLabel(root, 'Telefone');
-    const nomeSocialBlock = findColByLabel(root, 'Nome Social');
-    const materialBlock = findMaterialBlock(root);
-
-    hideElement(telefoneBlock);
-    hideElement(nomeSocialBlock);
-    hideElement(materialBlock);
-  }
-
-
-
-  function forceObservationSelectHeight() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const slot = root.querySelector('.tm-field-slot[data-slot="observacao-select"]');
-    if (!slot) return;
-
-    const els = [
-      slot,
-      slot.querySelector(':scope > .col'),
-      slot.querySelector('.form-group'),
-      slot.querySelector('.input-group'),
-      slot.querySelector('.input-group-prepend'),
-      slot.querySelector('.input-group-text'),
-      slot.querySelector('select')
-    ];
-
-    els.forEach((el) => {
-      if (!el) return;
-      el.style.setProperty('height', '34px', 'important');
-      el.style.setProperty('min-height', '34px', 'important');
-      el.style.setProperty('max-height', '34px', 'important');
-      el.style.setProperty('margin', '0', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    const select = slot.querySelector('select');
-    if (select) {
-      select.style.setProperty('line-height', '34px', 'important');
-      select.style.setProperty('padding-top', '0', 'important');
-      select.style.setProperty('padding-bottom', '0', 'important');
-    }
-
-    const inputText = slot.querySelector('.input-group-text');
-    if (inputText) {
-      inputText.style.setProperty('display', 'flex', 'important');
-      inputText.style.setProperty('align-items', 'center', 'important');
-      inputText.style.setProperty('padding-left', '8px', 'important');
-      inputText.style.setProperty('padding-right', '8px', 'important');
-    }
-  }
-
-
-  function forceObservationSelectHeightExact() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const slot = root.querySelector('.tm-field-slot[data-slot="observacao-select"]');
-    if (!slot) return;
-
-    const col = slot.querySelector(':scope > .col.col-12.col-md-3');
-    const formGroup = slot.querySelector(':scope > .col.col-12.col-md-3 > .form-group.mb-1');
-    const inputGroup = slot.querySelector('.input-group.input-group-sm');
-    const prepend = slot.querySelector('.input-group-prepend');
-    const inputText = slot.querySelector('.input-group-text');
-    const select = slot.querySelector('select.form.form-control, select.form-control, select');
-
-    [slot, col, formGroup, inputGroup, prepend, inputText, select].forEach((el) => {
-      if (!el) return;
-      el.style.setProperty('height', '30px', 'important');
-      el.style.setProperty('min-height', '30px', 'important');
-      el.style.setProperty('max-height', '30px', 'important');
-      el.style.setProperty('margin', '0', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    if (col) {
-      col.style.setProperty('padding-top', '0', 'important');
-      col.style.setProperty('padding-bottom', '0', 'important');
-    }
-
-    if (formGroup) {
-      formGroup.style.setProperty('margin-bottom', '0', 'important');
-    }
-
-    if (select) {
-      select.style.setProperty('line-height', '30px', 'important');
-      select.style.setProperty('padding-top', '0', 'important');
-      select.style.setProperty('padding-bottom', '0', 'important');
-    }
-
-    if (inputText) {
-      inputText.style.setProperty('display', 'flex', 'important');
-      inputText.style.setProperty('align-items', 'center', 'important');
-      inputText.style.setProperty('padding-left', '8px', 'important');
-      inputText.style.setProperty('padding-right', '8px', 'important');
-    }
-  }
-
-
-  function simplifyUnitsSafe() {
-    if (!isCallCenterRoute()) return;
-
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    root.querySelectorAll('.tm-header-line-3 span.mr-2 small.lead').forEach((el) => {
-      if (el.dataset.tmUnitShortApplied === '1') return;
-
-      const raw = (el.textContent || '').replace(/\s+/g, ' ').trim();
-      let unit = '';
-
-      if (raw.includes('COPACABANA')) unit = 'COPACABANA';
-      else if (raw.includes('BARRA')) unit = 'BARRA';
-      else if (raw.includes('SAMEC')) unit = 'SAMEC';
-      else if (raw.includes('BANGU')) unit = 'BANGU';
-      else return;
-
-      const consultorio = el.querySelector('small.text-muted');
-      if (consultorio) {
-        consultorio.style.display = 'none';
-      }
-
-      const icon = el.querySelector('i');
-      const shortTextClass = 'tm-unit-short-text';
-      let shortText = el.querySelector('.' + shortTextClass);
-
-      if (!shortText) {
-        shortText = document.createElement('span');
-        shortText.className = shortTextClass;
-
-        if (icon) {
-          if (icon.nextSibling) {
-            icon.parentNode.insertBefore(shortText, icon.nextSibling);
-          } else {
-            el.appendChild(shortText);
-          }
-        } else {
-          el.insertBefore(shortText, el.firstChild);
-        }
-      }
-
-      // remove apenas nós de texto soltos, sem destruir a estrutura do elemento
-      Array.from(el.childNodes).forEach((node) => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          node.textContent = '';
-        }
-      });
-
-      shortText.textContent = ' ' + unit + ' ';
-      el.dataset.tmUnitShortApplied = '1';
-    });
-  }
-
-
-
-  function calculateBirthAgeSafe(isoValue) {
-    if (!isoValue || !/^\d{4}-\d{2}-\d{2}$/.test(isoValue)) return '';
-
-    const [yyyy, mm, dd] = isoValue.split('-').map(Number);
-    const birth = new Date(yyyy, mm - 1, dd);
-
-    if (
-      birth.getFullYear() !== yyyy ||
-      birth.getMonth() !== mm - 1 ||
-      birth.getDate() !== dd
-    ) return '';
-
-    const today = new Date();
-    let age = today.getFullYear() - yyyy;
-    const monthDiff = today.getMonth() - (mm - 1);
-    const dayDiff = today.getDate() - dd;
-
-    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) age -= 1;
-    if (age < 0 || age > 130) return '';
-
-    return String(age);
-  }
-
-  function findBirthAgeElements(root) {
-    const birthSlot = root.querySelector('[data-slot="nascimento"]');
-    if (!birthSlot) return {};
-
-    const input = birthSlot.querySelector('input[type="date"]');
-    const inputGroup = birthSlot.querySelector('.input-group');
-    if (!input || !inputGroup) return { birthSlot, input, inputGroup };
-
-    const appends = Array.from(birthSlot.querySelectorAll('.input-group-append'));
-    let ageAppend = null;
-
-    appends.forEach((append) => {
-      const ageText = append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
-      if (ageText) ageAppend = append;
-    });
-
-    return { birthSlot, input, inputGroup, ageAppend };
-  }
-
-
-  function syncBirthAgeBadgeFontSafe(input, ageText) {
-    if (!input || !ageText) return;
-
-    const style = window.getComputedStyle(input);
-    if (!style) return;
-
-    ageText.style.setProperty('font-size', style.fontSize, 'important');
-    ageText.style.setProperty('font-family', style.fontFamily, 'important');
-    ageText.style.setProperty('font-weight', style.fontWeight, 'important');
-    ageText.style.setProperty('line-height', style.lineHeight, 'important');
-    ageText.style.setProperty('letter-spacing', style.letterSpacing, 'important');
-  }
-
-  function applyBirthAgeBadgeSafe() {
-    if (!isCallCenterRoute()) return;
-
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const { input, inputGroup, ageAppend } = findBirthAgeElements(root);
-    if (!input || !inputGroup || !ageAppend) return;
-
-    if (ageAppend.parentElement !== inputGroup) {
-      inputGroup.appendChild(ageAppend);
-    }
-
-    ageAppend.classList.add('tm-birth-age-inline');
-
-    const ageText = ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
-    if (!ageText) return;
-
-    syncBirthAgeBadgeFontSafe(input, ageText);
-
-    const age = calculateBirthAgeSafe(input.value);
-    if (!age) {
-      ageAppend.classList.add('tm-age-hidden');
-      return;
-    }
-
-    const currentDigits = (ageText.textContent || '').replace(/\D+/g, '');
-    if (currentDigits !== age) {
-      ageText.textContent = age;
-    }
-
-    ageAppend.classList.remove('tm-age-hidden');
-  }
-
-  function enableBirthAgeBadgeSafe() {
-    if (!isCallCenterRoute()) return;
-
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const { input } = findBirthAgeElements(root);
-    if (!input) return;
-
-    if (input.dataset.tmBirthAgeBadgeBound !== '1') {
-      input.dataset.tmBirthAgeBadgeBound = '1';
-
-      let debounceId = null;
-      const handler = () => {
-        clearTimeout(debounceId);
-        debounceId = setTimeout(() => {
-          applyBirthAgeBadgeSafe();
-        }, 80);
-      };
-
-      input.addEventListener('input', handler, true);
-      input.addEventListener('change', handler, true);
-      input.addEventListener('blur', handler, true);
-    }
-
-    applyBirthAgeBadgeSafe();
-  }
-
 
   function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
@@ -3391,9 +2804,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '8.8';
+      : '8.9';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '8.8';
+    return match ? match[0] : '8.9';
   }
 
   function ensureScriptVersionIndicator() {
