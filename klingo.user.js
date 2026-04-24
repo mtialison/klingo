@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      7.8
+// @version      7.9
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2309,6 +2309,9 @@
     if (!root) return;
 
     root.classList.remove('tm-klingo-root');
+    root.querySelectorAll('.tm-procedure-title, .tm-header-line').forEach((el) => {
+      el.classList.remove('tm-procedure-title', 'tm-header-line');
+    });
 
     root.querySelectorAll(
       '#tm-top-layout-host, #tm-observation-layout-host, .tm-layout-host, .tm-observation-layout'
@@ -2417,7 +2420,6 @@
     if (carteira && validade) carteira.parentElement?.classList.add('tm-paciente-row-carteira');
 
     tmPacienteCssApplyBirth(root);
-    reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
 
     root.dataset.tmPacienteCssApplied = '1';
@@ -2921,9 +2923,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '7.8';
+      : '7.9';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '7.8';
+    return match ? match[0] : '7.9';
   }
 
   function ensureScriptVersionIndicator() {
