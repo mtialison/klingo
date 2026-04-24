@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      7.1
+// @version      7.2
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2222,16 +2222,45 @@
   }
 
   function getPacienteActiveModalRoot() {
-    const modal = document.querySelector('#cadastroModal.modal.show, #cadastroModal.show');
-    if (!modal) return null;
+    const activeModals = Array.from(document.querySelectorAll('#cadastroModal, .modal.show, .modal.fade.show'))
+      .filter((modal) => {
+        if (modal.id === 'minutoModal') return false;
 
-    const root =
-      modal.querySelector(':scope > .modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content') ||
-      modal.querySelector('.modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content');
+        const style = window.getComputedStyle(modal);
+        const rect = modal.getBoundingClientRect();
+
+        return (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      });
+
+    let root = null;
+
+    for (const modal of activeModals) {
+      const candidate =
+        modal.querySelector(':scope > .modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content') ||
+        modal.querySelector('.modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content');
+
+      if (!candidate) continue;
+
+      const candidateBody = candidate.querySelector(':scope > .modal-body');
+      const candidatePersonal = candidateBody ? candidateBody.querySelector(':scope > .mt-3') : null;
+
+      if (
+        candidatePersonal &&
+        pacienteLabelBlock(candidatePersonal, 'Nome do Paciente') &&
+        pacienteLabelBlock(candidatePersonal, 'Nome Social') &&
+        pacienteLabelBlock(candidatePersonal, 'Telefone')
+      ) {
+        root = candidate;
+        break;
+      }
+    }
 
     if (!root) return null;
-    if (root.querySelector('#cadTemp')) return null;
-
     const body = root.querySelector(':scope > .modal-body');
     const personal = body ? body.querySelector(':scope > .mt-3') : null;
     if (!body || !personal) return null;
@@ -2926,9 +2955,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '7.1';
+      : '7.2';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '7.1';
+    return match ? match[0] : '7.2';
   }
 
   function ensureScriptVersionIndicator() {
