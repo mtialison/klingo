@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      8.6
+// @version      8.7
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1331,6 +1331,98 @@
       }
 
 
+
+      /* =========================
+         FASE 4.1 - INPUTS PACIENTE COM LARGURA DO PRIMEIRA VEZ
+         Sem mover DOM
+      ========================= */
+      .tm-paciente-spacing-root .modal-body > div,
+      .tm-paciente-spacing-root .modal-body > .mt-3,
+      .tm-paciente-spacing-root .modal-footer,
+      .tm-paciente-spacing-root #myTab,
+      .tm-paciente-spacing-root #myTabContent,
+      .tm-paciente-spacing-root .tab-content,
+      .tm-paciente-spacing-root .tab-pane,
+      .tm-paciente-spacing-root .tab-pane > .mt-3 {
+        width: 509px !important;
+        max-width: 509px !important;
+      }
+
+      .tm-paciente-spacing-root .form-row {
+        width: 509px !important;
+        max-width: 509px !important;
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: flex-end !important;
+      }
+
+      .tm-paciente-spacing-root .form-row > .col,
+      .tm-paciente-spacing-root .form-row > [class*="col-"] {
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+        flex-grow: 0 !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-spacing-root .tm-paciente-nome-paciente-field {
+        flex: 0 0 509px !important;
+        width: 509px !important;
+        max-width: 509px !important;
+      }
+
+      .tm-paciente-spacing-root .tm-paciente-social-field,
+      .tm-paciente-spacing-root .tm-paciente-nome-social-field {
+        display: none !important;
+      }
+
+      .tm-paciente-spacing-root .tm-paciente-sexo-field {
+        flex: 0 0 155px !important;
+        width: 155px !important;
+        max-width: 155px !important;
+      }
+
+      .tm-paciente-spacing-root .tm-paciente-nascimento-field {
+        flex: 0 0 155px !important;
+        width: 155px !important;
+        max-width: 155px !important;
+      }
+
+      .tm-paciente-spacing-root .tm-paciente-email-field {
+        flex: 0 0 199px !important;
+        width: 199px !important;
+        max-width: 199px !important;
+      }
+
+      .tm-paciente-spacing-root .tm-paciente-telefone-field,
+      .tm-paciente-spacing-root .tm-paciente-celular-field {
+        flex: 0 0 254px !important;
+        width: 254px !important;
+        max-width: 254px !important;
+      }
+
+      .tm-paciente-spacing-root .tm-paciente-carteira-field {
+        flex: 0 0 354px !important;
+        width: 354px !important;
+        max-width: 354px !important;
+      }
+
+      .tm-paciente-spacing-root .tm-paciente-validade-field {
+        flex: 0 0 155px !important;
+        width: 155px !important;
+        max-width: 155px !important;
+      }
+
+      .tm-paciente-spacing-root .tm-paciente-field,
+      .tm-paciente-spacing-root .tm-paciente-field .form-group,
+      .tm-paciente-spacing-root .tm-paciente-field .input-group,
+      .tm-paciente-spacing-root .tm-paciente-field input,
+      .tm-paciente-spacing-root .tm-paciente-field select,
+      .tm-paciente-spacing-root .tm-paciente-field .form-control {
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -1568,18 +1660,41 @@
 
     const nomeBlock = findPacienteFieldBlockByLabel(root, 'Nome do Paciente');
     const nomeSocialBlock = findPacienteFieldBlockByLabel(root, 'Nome Social');
+    const sexoBlock = findPacienteFieldBlockByLabel(root, 'Sexo');
+    const nascimentoBlock = findPacienteFieldBlockByLabel(root, 'Data de Nascimento');
+    const emailBlock = findPacienteFieldBlockByLabel(root, 'e-mail');
+    const telefoneBlock = findPacienteFieldBlockByLabel(root, 'Telefone');
+    const celularBlock = findPacienteFieldBlockByLabel(root, 'Celular');
+    const carteiraBlock = findPacienteFieldBlockByLabel(root, 'No. da Carteira do Plano');
+    const validadeBlock = findPacienteFieldBlockByLabel(root, 'Validade da Carteira');
 
     if (nomeBlock) {
-      nomeBlock.classList.add('tm-paciente-nome-paciente-field');
-      nomeBlock.style.setProperty('width', '100%', 'important');
-      nomeBlock.style.setProperty('max-width', 'none', 'important');
-      nomeBlock.style.setProperty('flex', '0 0 100%', 'important');
+      nomeBlock.classList.add('tm-paciente-field', 'tm-paciente-nome-paciente-field');
+      nomeBlock.style.setProperty('width', '509px', 'important');
+      nomeBlock.style.setProperty('max-width', '509px', 'important');
+      nomeBlock.style.setProperty('flex', '0 0 509px', 'important');
     }
 
     if (nomeSocialBlock) {
-      nomeSocialBlock.classList.add('tm-paciente-nome-social-field');
+      nomeSocialBlock.classList.add('tm-paciente-field', 'tm-paciente-nome-social-field');
       nomeSocialBlock.style.setProperty('display', 'none', 'important');
     }
+
+    [
+      [sexoBlock, 'tm-paciente-sexo-field', '155px'],
+      [nascimentoBlock, 'tm-paciente-nascimento-field', '155px'],
+      [emailBlock, 'tm-paciente-email-field', '199px'],
+      [telefoneBlock, 'tm-paciente-telefone-field', '254px'],
+      [celularBlock, 'tm-paciente-celular-field', '254px'],
+      [carteiraBlock, 'tm-paciente-carteira-field', '354px'],
+      [validadeBlock, 'tm-paciente-validade-field', '155px']
+    ].forEach(([block, className, width]) => {
+      if (!block) return;
+      block.classList.add('tm-paciente-field', className);
+      block.style.setProperty('width', width, 'important');
+      block.style.setProperty('max-width', width, 'important');
+      block.style.setProperty('flex', `0 0 ${width}`, 'important');
+    });
   }
 
   function applyPacienteSpacingPhase4() {
@@ -2915,9 +3030,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '8.6';
+      : '8.7';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '8.6';
+    return match ? match[0] : '8.7';
   }
 
   function ensureScriptVersionIndicator() {
