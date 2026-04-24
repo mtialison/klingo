@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      6.9
+// @version      7.0
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2221,20 +2221,26 @@
   function setSchedulingFlowFromClick(target) {
     if (!isCallCenterRoute()) return;
 
-    const clickable = target.closest('button, a, div, span');
-    if (!clickable) return;
+    let current = target instanceof Element ? target : null;
+    let steps = 0;
 
-    const text = norm(clickable.innerText || clickable.textContent || '');
+    while (current && current !== document.body && steps < 8) {
+      const text = norm(current.innerText || current.textContent || '');
 
-    if (text === 'Paciente') {
-      window.__tmKlingoSchedulingFlow = 'paciente';
-      window.__tmKlingoSchedulingFlowAt = Date.now();
-      return;
-    }
+      if (text === 'Paciente' || /(^|\\s)Paciente($|\\s)/.test(text)) {
+        window.__tmKlingoSchedulingFlow = 'paciente';
+        window.__tmKlingoSchedulingFlowAt = Date.now();
+        return;
+      }
 
-    if (text === 'Primeira Vez') {
-      window.__tmKlingoSchedulingFlow = 'primeira_vez';
-      window.__tmKlingoSchedulingFlowAt = Date.now();
+      if (text === 'Primeira Vez' || text === 'Primeira vez' || /Primeira\\s+Vez/i.test(text)) {
+        window.__tmKlingoSchedulingFlow = 'primeira_vez';
+        window.__tmKlingoSchedulingFlowAt = Date.now();
+        return;
+      }
+
+      current = current.parentElement;
+      steps += 1;
     }
   }
 
@@ -2278,7 +2284,6 @@
 
     const activeModals = Array.from(document.querySelectorAll('.modal.show, .modal.fade.show'))
       .filter((modal) => {
-        if (modal.id === 'cadastroModal') return false;
         if (modal.id === 'minutoModal') return false;
 
         const style = window.getComputedStyle(modal);
@@ -2588,10 +2593,12 @@
     burstUpdate();
 
     if (window.__tmKlingoSchedulingFlow === 'paciente') {
-      setTimeout(tmPacienteApplyFromFlow, 120);
-      setTimeout(tmPacienteApplyFromFlow, 300);
+      setTimeout(tmPacienteApplyFromFlow, 80);
+      setTimeout(tmPacienteApplyFromFlow, 180);
+      setTimeout(tmPacienteApplyFromFlow, 350);
       setTimeout(tmPacienteApplyFromFlow, 700);
       setTimeout(tmPacienteApplyFromFlow, 1200);
+      setTimeout(tmPacienteApplyFromFlow, 2000);
     }
   }, true);
 
@@ -3035,9 +3042,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '6.9';
+      : '7.0';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '6.9';
+    return match ? match[0] : '7.0';
   }
 
   function ensureScriptVersionIndicator() {
