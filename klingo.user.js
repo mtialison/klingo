@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      6.3
+// @version      6.4
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -701,26 +701,6 @@
         grid-template-columns: 155px 342px;
       }
 
-      .tm-row-tel-cel-email {
-        grid-template-columns: 155px 155px 187px;
-      }
-
-      .tm-klingo-root.tm-registered-patient-modal .tm-row-name-birth {
-        grid-template-columns: 342px 155px;
-      }
-
-      .tm-klingo-root.tm-registered-patient-modal .tm-row-cpf-sexo-origem {
-        grid-template-columns: 155px 175px 155px;
-      }
-
-      .tm-klingo-root .tm-generated-dados-pessoais-title {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        box-sizing: border-box !important;
-      }
-
       .tm-row-carteira-validade {
         grid-template-columns: 342px 155px;
       }
@@ -1221,85 +1201,28 @@
     el.style.setProperty('display', 'none', 'important');
   }
 
-  function hasExactSmallText(root, labelText) {
-    return Array.from(root.querySelectorAll('small'))
-      .some((small) => norm(small.textContent || '') === labelText);
-  }
-
-  function hasFooterButtonsExact(modal, labels) {
-    const footer = modal.querySelector(':scope > .modal-footer, .modal-footer');
-    if (!footer) return false;
-
-    const buttonTexts = Array.from(footer.querySelectorAll('button'))
-      .map((btn) => norm(btn.textContent || ''))
-      .filter(Boolean);
-
-    return labels.every((label) => buttonTexts.includes(label));
-  }
-
-  function isFirstVisitSchedulingModalHtml(modal) {
-    if (!modal || modal.closest('#minutoModal')) return false;
-
-    const wrapper = modal.closest('#cadastroModal');
-    const dialog = modal.closest('.modal-dialog.modal-xl.modal-dialog-scrollable');
-
-    return !!(
-      wrapper &&
-      dialog &&
-      modal.querySelector(':scope > .modal-body') &&
-      modal.querySelector('#cadTemp') &&
-      hasExactSmallText(modal, 'Dados Pessoais') &&
-      hasExactSmallText(modal, 'Nome') &&
-      hasExactSmallText(modal, 'CPF') &&
-      hasExactSmallText(modal, 'Data de Nascimento') &&
-      hasExactSmallText(modal, 'ORIGEM DE PACIENTES') &&
-      hasExactSmallText(modal, 'Origem de Pacientes') &&
-      hasFooterButtonsExact(modal, ['Recorrência...', 'Reservar', 'Voltar', 'Confirmar'])
-    );
-  }
-
-  function isRegisteredPatientSchedulingModalHtml(modal) {
-    if (!modal || modal.closest('#cadastroModal') || modal.closest('#minutoModal')) return false;
-
-    const dialog = modal.closest('.modal-dialog.modal-xl.modal-dialog-scrollable');
-    const body = modal.querySelector(':scope > .modal-body');
-    const personalBlock = body ? body.querySelector(':scope > .mt-3') : null;
-
-    return !!(
-      dialog &&
-      body &&
-      personalBlock &&
-      !modal.querySelector('#cadTemp') &&
-      body.querySelector(':scope > div[data-v-06af4983]') &&
-      hasExactSmallText(personalBlock, 'Nome do Paciente') &&
-      hasExactSmallText(personalBlock, 'Nome Social') &&
-      hasExactSmallText(personalBlock, 'Sexo') &&
-      hasExactSmallText(personalBlock, 'Data de Nascimento') &&
-      hasExactSmallText(personalBlock, 'Telefone') &&
-      hasExactSmallText(personalBlock, 'Celular') &&
-      hasExactSmallText(personalBlock, 'No. da Carteira do Plano') &&
-      hasExactSmallText(personalBlock, 'Validade da Carteira') &&
-      hasExactSmallText(modal, 'ORIGEM DE PACIENTES') &&
-      hasExactSmallText(modal, 'Origem de Pacientes') &&
-      hasFooterButtonsExact(modal, ['Recorrência...', 'Reservar', 'Voltar', 'Confirmar'])
-    );
-  }
-
   function getSchedulingModalRoot() {
     if (!isCallCenterRoute()) return null;
     const modalContents = document.querySelectorAll('.modal-content');
 
     for (const modal of modalContents) {
+      const text = norm(modal.innerText || modal.textContent || '');
+      if (!text) continue;
+
       const modalTitle = norm(modal.querySelector('.modal-title')?.textContent || '');
+      const successTexts = Array.from(modal.querySelectorAll('.btn-success'))
+        .map(btn => norm(btn.textContent || ''));
+
+      const hasDadosPessoais = text.includes('Dados Pessoais');
+      const hasOrigemPacientes = text.includes('ORIGEM DE PACIENTES') || text.includes('Origem de Pacientes');
+      const hasConfirmar = successTexts.some(txt => txt.includes('Confirmar'));
+      const hasAtualizar = successTexts.some(txt => txt.includes('Atualizar'));
+
       if (modalTitle.includes('Editar Marcação')) continue;
+      if (hasAtualizar && !hasConfirmar) continue;
 
-      const isFirstVisit = isFirstVisitSchedulingModalHtml(modal);
-      const isRegisteredPatient = isRegisteredPatientSchedulingModalHtml(modal);
-
-      if (isFirstVisit || isRegisteredPatient) {
+      if (hasDadosPessoais && hasOrigemPacientes && hasConfirmar) {
         modal.classList.add('tm-klingo-root');
-        modal.classList.toggle('tm-registered-patient-modal', isRegisteredPatient);
-        modal.classList.toggle('tm-first-visit-modal', isFirstVisit);
         return modal;
       }
     }
@@ -1327,22 +1250,8 @@
     );
   }
 
-  function findColByAnyLabel(root, labelTexts) {
-    for (const labelText of labelTexts) {
-      const block = findColByLabel(root, labelText);
-      if (block) return block;
-    }
-    return null;
-  }
-
-  function isRegisteredPatientSchedulingModal(root) {
-    if (!root) return false;
-    return !!findTextSmall(root, 'Nome do Paciente');
-  }
-
   function getCadTemp(root) {
-    if (!root) return null;
-    return root.querySelector('#cadTemp') || root.querySelector(':scope > .modal-body > .mt-3');
+    return root.querySelector('#cadTemp');
   }
 
   function getCadTempTitleRow(root) {
@@ -1350,20 +1259,7 @@
     if (!cadTemp) return null;
 
     const title = findTextSmall(cadTemp, 'Dados Pessoais');
-    if (title) return title.closest('.border-bottom');
-
-    if (isRegisteredPatientSchedulingModalHtml(root)) {
-      let titleRow = cadTemp.querySelector(':scope > .tm-generated-dados-pessoais-title');
-      if (!titleRow) {
-        titleRow = document.createElement('div');
-        titleRow.className = 'border-bottom mb-1 d-flex justify-content-between hover-title-bg text-primary tm-generated-dados-pessoais-title';
-        titleRow.innerHTML = '<div><small>Dados Pessoais</small></div><div></div>';
-        cadTemp.insertBefore(titleRow, cadTemp.firstChild);
-      }
-      return titleRow;
-    }
-
-    return null;
+    return title ? title.closest('.border-bottom') : null;
   }
 
   function getObservationTitleRow(root) {
@@ -1717,18 +1613,15 @@
 
     if (!cadTemp || !cadTempTitleRow || !observationTitleRow || !observationFieldsRow) return;
 
-    const isRegisteredPatient = isRegisteredPatientSchedulingModalHtml(root);
-
-    const sexoBlock = findColByAnyLabel(cadTemp, ['Sexo']);
-    const birthBlock = findColByAnyLabel(cadTemp, ['Data de Nascimento']);
-    const telefoneBlock = findColByAnyLabel(cadTemp, ['Telefone']);
-    const celularBlock = findColByAnyLabel(cadTemp, ['Celular']);
-    const emailBlock = findColByAnyLabel(cadTemp, ['e-mail', 'E-mail', 'Email']);
-    const nomeBlock = findColByAnyLabel(cadTemp, ['Nome', 'Nome do Paciente']);
-    const cpfBlock = findColByAnyLabel(cadTemp, ['CPF']);
-    const carteiraBlock = findColByAnyLabel(cadTemp, ['No. da Carteira do Plano']);
-    const validadeBlock = findColByAnyLabel(cadTemp, ['Validade da Carteira']);
-    const origemBlock = findOriginFieldBlock(root) || findColByAnyLabel(root, ['Origem de Pacientes', 'ORIGEM DE PACIENTES']);
+    const sexoBlock = findColByLabel(cadTemp, 'Sexo');
+    const birthBlock = findColByLabel(cadTemp, 'Data de Nascimento');
+    const celularBlock = findColByLabel(cadTemp, 'Celular');
+    const emailBlock = findColByLabel(cadTemp, 'e-mail');
+    const nomeBlock = findColByLabel(cadTemp, 'Nome');
+    const cpfBlock = findColByLabel(cadTemp, 'CPF');
+    const carteiraBlock = findColByLabel(cadTemp, 'No. da Carteira do Plano');
+    const validadeBlock = findColByLabel(cadTemp, 'Validade da Carteira');
+    const origemBlock = findOriginFieldBlock(root);
 
     const observationInputBlock = observationFieldsRow.children[0] || null;
     const observationSelectBlock = observationFieldsRow.children[1] || null;
@@ -1739,6 +1632,7 @@
       !celularBlock ||
       !emailBlock ||
       !nomeBlock ||
+      !cpfBlock ||
       !carteiraBlock ||
       !validadeBlock ||
       !origemBlock ||
@@ -1751,63 +1645,35 @@
     const topLayoutHost = ensureHost(cadTemp, 'tm-top-layout-host', 'tm-layout-host');
     cadTemp.insertBefore(topLayoutHost, cadTempTitleRow.nextSibling);
 
-    if (isRegisteredPatient) {
-      topLayoutHost.innerHTML = `
-        <div class="tm-top-layout">
-          <div class="tm-left-panel">
-            <div class="tm-grid-row tm-row-name-birth">
-              <div class="tm-field-slot" data-slot="nome"></div>
-              <div class="tm-field-slot" data-slot="nascimento"></div>
-            </div>
-            <div class="tm-grid-row tm-row-cpf-sexo-origem">
-              <div class="tm-field-slot" data-slot="sexo"></div>
-              <div class="tm-field-slot" data-slot="origem"></div>
-              <div class="tm-field-slot" data-slot="validade"></div>
-            </div>
-            <div class="tm-grid-row tm-row-tel-cel-email">
-              <div class="tm-field-slot" data-slot="telefone"></div>
-              <div class="tm-field-slot" data-slot="celular"></div>
-              <div class="tm-field-slot" data-slot="email"></div>
-            </div>
-            <div class="tm-grid-row tm-row-carteira-validade">
-              <div class="tm-field-slot" data-slot="carteira"></div>
-              <div class="tm-field-slot" data-slot="cpf"></div>
-            </div>
+    topLayoutHost.innerHTML = `
+      <div class="tm-top-layout">
+        <div class="tm-left-panel">
+          <div class="tm-grid-row tm-row-name-birth">
+            <div class="tm-field-slot" data-slot="nome"></div>
+            <div class="tm-field-slot" data-slot="nascimento"></div>
+          </div>
+          <div class="tm-grid-row tm-row-cpf-sexo-origem">
+            <div class="tm-field-slot" data-slot="cpf"></div>
+            <div class="tm-field-slot" data-slot="sexo"></div>
+            <div class="tm-field-slot" data-slot="origem"></div>
+          </div>
+          <div class="tm-grid-row tm-row-cel-email">
+            <div class="tm-field-slot" data-slot="celular"></div>
+            <div class="tm-field-slot" data-slot="email"></div>
+          </div>
+          <div class="tm-grid-row tm-row-carteira-validade">
+            <div class="tm-field-slot" data-slot="carteira"></div>
+            <div class="tm-field-slot" data-slot="validade"></div>
           </div>
         </div>
-      `;
-    } else {
-      topLayoutHost.innerHTML = `
-        <div class="tm-top-layout">
-          <div class="tm-left-panel">
-            <div class="tm-grid-row tm-row-name-birth">
-              <div class="tm-field-slot" data-slot="nome"></div>
-              <div class="tm-field-slot" data-slot="nascimento"></div>
-            </div>
-            <div class="tm-grid-row tm-row-cpf-sexo-origem">
-              <div class="tm-field-slot" data-slot="cpf"></div>
-              <div class="tm-field-slot" data-slot="sexo"></div>
-              <div class="tm-field-slot" data-slot="origem"></div>
-            </div>
-            <div class="tm-grid-row tm-row-cel-email">
-              <div class="tm-field-slot" data-slot="celular"></div>
-              <div class="tm-field-slot" data-slot="email"></div>
-            </div>
-            <div class="tm-grid-row tm-row-carteira-validade">
-              <div class="tm-field-slot" data-slot="carteira"></div>
-              <div class="tm-field-slot" data-slot="validade"></div>
-            </div>
-          </div>
-        </div>
-      `;
-    }
+      </div>
+    `;
 
     moveToSlot(topLayoutHost.querySelector('[data-slot="nome"]'), nomeBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="nascimento"]'), birthBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="cpf"]'), cpfBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="sexo"]'), sexoBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="origem"]'), origemBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="telefone"]'), telefoneBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="celular"]'), celularBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="email"]'), emailBlock);
     moveToSlot(topLayoutHost.querySelector('[data-slot="carteira"]'), carteiraBlock);
@@ -1839,7 +1705,6 @@
     [
       sexoBlock,
       birthBlock,
-      telefoneBlock,
       celularBlock,
       emailBlock,
       nomeBlock,
@@ -1850,7 +1715,6 @@
       observationInputBlock,
       observationSelectBlock
     ].forEach((block) => {
-      if (!block) return;
       block.style.setProperty('width', '100%', 'important');
       block.style.setProperty('max-width', 'none', 'important');
       block.style.setProperty('padding-left', '0', 'important');
@@ -1868,13 +1732,10 @@
     if (!root) return;
 
     const telefoneBlock = findColByLabel(root, 'Telefone');
-    const nomeSocialBlock = findColByAnyLabel(root, ['Nome Social', 'Nome social']);
+    const nomeSocialBlock = findColByLabel(root, 'Nome Social');
     const materialBlock = findMaterialBlock(root);
 
-    if (!isRegisteredPatientSchedulingModalHtml(root)) {
-      hideElement(telefoneBlock);
-    }
-
+    hideElement(telefoneBlock);
     hideElement(nomeSocialBlock);
     hideElement(materialBlock);
   }
@@ -2620,9 +2481,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '6.3';
+      : '6.4';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '6.3';
+    return match ? match[0] : '6.4';
   }
 
   function ensureScriptVersionIndicator() {
