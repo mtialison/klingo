@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      7.4
+// @version      7.5
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1379,6 +1379,10 @@
         overflow-y: auto !important;
       }
 
+      #cadastroModal.tm-paciente-pending-layout .modal-content {
+        visibility: hidden !important;
+      }
+
 
       @media (max-width: 1200px) {
         .tm-top-layout,
@@ -2228,12 +2232,24 @@
     if (cardBody.classList.contains('bg-success')) {
       window.__tmKlingoSchedulingFlow = 'paciente';
       window.__tmKlingoSchedulingFlowAt = Date.now();
+
+      const cadastroModal = document.getElementById('cadastroModal');
+      if (cadastroModal) {
+        cadastroModal.classList.add('tm-paciente-pending-layout');
+      }
+
+      startPacienteLayoutRetry();
       return;
     }
 
     if (cardBody.classList.contains('bg-danger')) {
       window.__tmKlingoSchedulingFlow = 'primeira_vez';
       window.__tmKlingoSchedulingFlowAt = Date.now();
+
+      const cadastroModal = document.getElementById('cadastroModal');
+      if (cadastroModal) {
+        cadastroModal.classList.remove('tm-paciente-pending-layout');
+      }
     }
   }
 
@@ -2273,7 +2289,6 @@
       modal.querySelector('.modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content');
 
     if (!root) return null;
-    if (root.dataset.tmPacienteApplied === '1') return null;
 
     const body = root.querySelector(':scope > .modal-body');
     const personal = body ? body.querySelector(':scope > .mt-3') : null;
@@ -2454,7 +2469,14 @@
 
   function applyPacienteLayoutFromCardFlow() {
     const root = getPacienteModalRootFromFreshFlow();
-    if (!root) return;
+    if (!root) return false;
+
+    const cadastroModal = document.getElementById('cadastroModal');
+
+    if (root.dataset.tmPacienteApplied === '1') {
+      if (cadastroModal) cadastroModal.classList.remove('tm-paciente-pending-layout');
+      return true;
+    }
 
     const body = root.querySelector(':scope > .modal-body');
     const personal = body ? body.querySelector(':scope > .mt-3') : null;
@@ -2493,14 +2515,48 @@
     pacienteResize(root);
     reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
+
+    root.dataset.tmPacienteApplied = '1';
+
+    if (cadastroModal) {
+      cadastroModal.classList.remove('tm-paciente-pending-layout');
+    }
+
+    return true;
+  }
+
+  function startPacienteLayoutRetry() {
+    clearTimeout(startPacienteLayoutRetry._timer);
+
+    let attempts = 0;
+    const maxAttempts = 30;
+
+    const run = () => {
+      attempts += 1;
+
+      const applied = applyPacienteLayoutFromCardFlow();
+      if (applied) return;
+
+      if (!isPacienteFlowFresh()) {
+        const cadastroModal = document.getElementById('cadastroModal');
+        if (cadastroModal) cadastroModal.classList.remove('tm-paciente-pending-layout');
+        return;
+      }
+
+      if (attempts >= maxAttempts) {
+        const cadastroModal = document.getElementById('cadastroModal');
+        if (cadastroModal) cadastroModal.classList.remove('tm-paciente-pending-layout');
+        return;
+      }
+
+      startPacienteLayoutRetry._timer = setTimeout(run, attempts < 8 ? 80 : 160);
+    };
+
+    run();
   }
 
   function schedulePacienteLayoutAfterCardClick() {
-    setTimeout(applyPacienteLayoutFromCardFlow, 150);
-    setTimeout(applyPacienteLayoutFromCardFlow, 350);
-    setTimeout(applyPacienteLayoutFromCardFlow, 700);
-    setTimeout(applyPacienteLayoutFromCardFlow, 1200);
-    setTimeout(applyPacienteLayoutFromCardFlow, 2000);
+    startPacienteLayoutRetry();
   }
 
   function burstUpdateLite() {
@@ -2541,6 +2597,11 @@
 
     if (window.__tmKlingoSchedulingFlow === 'paciente') {
       schedulePacienteLayoutAfterCardClick();
+    }
+
+    if (e.target.closest('[data-dismiss="modal"], .modal .close')) {
+      const cadastroModal = document.getElementById('cadastroModal');
+      if (cadastroModal) cadastroModal.classList.remove('tm-paciente-pending-layout');
     }
   }, true);
 
@@ -2983,9 +3044,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '7.4';
+      : '7.5';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '7.4';
+    return match ? match[0] : '7.5';
   }
 
   function ensureScriptVersionIndicator() {
