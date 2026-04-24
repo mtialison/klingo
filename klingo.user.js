@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      7.9
+// @version      8.0
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2308,18 +2308,54 @@
   function tmPacienteClearFirstVisitResidue(root) {
     if (!root) return;
 
-    root.classList.remove('tm-klingo-root');
+    root.classList.remove(
+      'tm-klingo-root',
+      'tm-first-visit-modal',
+      'tm-registered-patient-modal'
+    );
+
     root.querySelectorAll('.tm-procedure-title, .tm-header-line').forEach((el) => {
       el.classList.remove('tm-procedure-title', 'tm-header-line');
     });
 
+    const header = root.querySelector('.list-group-item.list-group-item-success, .list-group-item');
+    if (header) {
+      header.classList.remove('tm-procedure-title', 'tm-header-line');
+      header.style.removeProperty('width');
+      header.style.removeProperty('max-width');
+      header.style.removeProperty('margin-left');
+      header.style.removeProperty('margin-right');
+      header.style.removeProperty('background');
+      header.style.removeProperty('background-color');
+      header.style.removeProperty('color');
+      header.style.removeProperty('border-color');
+      header.style.removeProperty('padding');
+
+      header.querySelectorAll('*').forEach((child) => {
+        child.classList.remove('tm-procedure-title', 'tm-header-line');
+        child.style.removeProperty('color');
+        child.style.removeProperty('font-size');
+        child.style.removeProperty('line-height');
+        child.style.removeProperty('display');
+        child.style.removeProperty('flex-wrap');
+        child.style.removeProperty('align-items');
+        child.style.removeProperty('gap');
+        child.style.removeProperty('margin-bottom');
+        child.style.removeProperty('white-space');
+        child.style.removeProperty('overflow-wrap');
+        child.style.removeProperty('word-break');
+      });
+    }
+
     root.querySelectorAll(
-      '#tm-top-layout-host, #tm-observation-layout-host, .tm-layout-host, .tm-observation-layout'
+      '#tm-top-layout-host, #tm-observation-layout-host, .tm-layout-host, .tm-observation-layout, .tm-top-layout, .tm-left-panel'
     ).forEach((el) => {
       if (
         el.id === 'tm-top-layout-host' ||
         el.id === 'tm-observation-layout-host' ||
-        el.classList.contains('tm-layout-host')
+        el.classList.contains('tm-layout-host') ||
+        el.classList.contains('tm-top-layout') ||
+        el.classList.contains('tm-left-panel')
       ) {
         el.remove();
       }
@@ -2345,7 +2381,9 @@
         style.includes('540px') ||
         style.includes('580px') ||
         style.includes('flex-direction') ||
-        style.includes('align-items')
+        style.includes('align-items') ||
+        style.includes('#d5edff') ||
+        style.includes('#003358')
       ) {
         el.style.removeProperty('width');
         el.style.removeProperty('max-width');
@@ -2363,6 +2401,12 @@
         el.style.removeProperty('overflow-x');
         el.style.removeProperty('overflow-y');
         el.style.removeProperty('justify-content');
+        el.style.removeProperty('background');
+        el.style.removeProperty('background-color');
+        el.style.removeProperty('color');
+        el.style.removeProperty('border-color');
+        el.style.removeProperty('font-size');
+        el.style.removeProperty('line-height');
       }
     });
   }
@@ -2420,8 +2464,6 @@
     if (carteira && validade) carteira.parentElement?.classList.add('tm-paciente-row-carteira');
 
     tmPacienteCssApplyBirth(root);
-    simplifyUnitsSafe();
-
     root.dataset.tmPacienteCssApplied = '1';
   }
 
@@ -2923,9 +2965,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '7.9';
+      : '8.0';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '7.9';
+    return match ? match[0] : '8.0';
   }
 
   function ensureScriptVersionIndicator() {
