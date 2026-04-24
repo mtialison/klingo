@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      8.4
+// @version      8.5
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1226,6 +1226,31 @@
       }
 
 
+
+      /* =========================
+         FASE 3 - CAMPOS PACIENTE
+         Oculta Nome Social sem mover DOM
+      ========================= */
+      .tm-paciente-fields-root .tm-paciente-nome-social-field {
+        display: none !important;
+      }
+
+      .tm-paciente-fields-root .tm-paciente-nome-paciente-field {
+        width: 100% !important;
+        max-width: none !important;
+        flex: 0 0 100% !important;
+      }
+
+      .tm-paciente-fields-root .tm-paciente-nome-paciente-field .form-group {
+        margin-bottom: 0 !important;
+      }
+
+      .tm-paciente-fields-root .tm-paciente-nome-paciente-field .input-group,
+      .tm-paciente-fields-root .tm-paciente-nome-paciente-field input {
+        width: 100% !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -1434,6 +1459,46 @@
     const roomSmall = headerItem.querySelector('small.text-muted');
     if (roomSmall) {
       roomSmall.style.setProperty('display', 'none', 'important');
+    }
+  }
+
+  function findPacienteFieldBlockByLabel(root, labelText) {
+    if (!root) return null;
+
+    const labels = Array.from(root.querySelectorAll('small.form-text, small'));
+    for (const label of labels) {
+      if (norm(label.textContent || '') !== labelText) continue;
+
+      return (
+        label.closest('.col') ||
+        label.closest('[class*="col-"]') ||
+        label.closest('.form-group') ||
+        label.parentElement
+      );
+    }
+
+    return null;
+  }
+
+  function applyPacienteFieldsPhase3() {
+    const root = getActivePacienteSchedulingModalRoot();
+    if (!root) return;
+
+    root.classList.add('tm-paciente-fields-root');
+
+    const nomeBlock = findPacienteFieldBlockByLabel(root, 'Nome do Paciente');
+    const nomeSocialBlock = findPacienteFieldBlockByLabel(root, 'Nome Social');
+
+    if (nomeBlock) {
+      nomeBlock.classList.add('tm-paciente-nome-paciente-field');
+      nomeBlock.style.setProperty('width', '100%', 'important');
+      nomeBlock.style.setProperty('max-width', 'none', 'important');
+      nomeBlock.style.setProperty('flex', '0 0 100%', 'important');
+    }
+
+    if (nomeSocialBlock) {
+      nomeSocialBlock.classList.add('tm-paciente-nome-social-field');
+      nomeSocialBlock.style.setProperty('display', 'none', 'important');
     }
   }
 
@@ -2221,6 +2286,7 @@
 
     clearFirstVisitResidueFromPacienteModal();
     applyPacienteHeaderVisual();
+    applyPacienteFieldsPhase3();
 
     const root = getSchedulingModalRoot();
 
@@ -2261,14 +2327,17 @@
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         applyPacienteHeaderVisual();
+        applyPacienteFieldsPhase3();
       }, 60);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         applyPacienteHeaderVisual();
+        applyPacienteFieldsPhase3();
       }, 160);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         applyPacienteHeaderVisual();
+        applyPacienteFieldsPhase3();
       }, 320);
     }
 
@@ -2718,9 +2787,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '8.4';
+      : '8.5';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '8.4';
+    return match ? match[0] : '8.5';
   }
 
   function ensureScriptVersionIndicator() {
