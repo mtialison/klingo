@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      8.2
+// @version      8.4
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1171,6 +1171,61 @@
         display: none !important;
       }
 
+
+      /* =========================
+         FASE 2 - HEADER PACIENTE
+         Visual próprio, sem função da Primeira Vez
+      ========================= */
+      .tm-paciente-header-root .list-group,
+      .tm-paciente-header-root .list-group-item.list-group-item-success {
+        width: 509px !important;
+        max-width: 509px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .tm-paciente-header-root .list-group-item.list-group-item-success {
+        background: #d5edff !important;
+        border-color: #b7d9ee !important;
+        color: #003358 !important;
+        padding: 12px 14px !important;
+      }
+
+      .tm-paciente-header-root .list-group-item.list-group-item-success,
+      .tm-paciente-header-root .list-group-item.list-group-item-success * {
+        color: #003358 !important;
+      }
+
+      .tm-paciente-header-root .tm-paciente-procedure-title {
+        display: block !important;
+        margin-bottom: 8px !important;
+        font-size: 20px !important;
+        line-height: 1.25 !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+      }
+
+      .tm-paciente-header-root .tm-paciente-header-line {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        gap: 6px 10px !important;
+        margin-bottom: 6px !important;
+        line-height: 1.3 !important;
+      }
+
+      .tm-paciente-header-root .tm-paciente-header-line,
+      .tm-paciente-header-root .tm-paciente-header-line * {
+        font-size: 12px !important;
+      }
+
+      .tm-paciente-header-root .tm-paciente-header-line small.text-muted,
+      .tm-paciente-header-root .tm-paciente-header-line small .text-muted {
+        display: none !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -1223,9 +1278,8 @@
       if (modalTitle.includes('Editar Marcação')) continue;
       if (hasAtualizar && !hasConfirmar) continue;
 
-      // Regra definitiva:
-      // A customização pesada pertence SOMENTE ao fluxo Primeira Vez.
-      // No HTML real, Primeira Vez possui #cadTemp. Paciente não.
+      // FASE 1: Primeira Vez é o ÚNICO fluxo que pode receber a customização pesada.
+      // Regra confirmada no DOM: Primeira Vez tem #cadTemp; Paciente não tem.
       if (hasCadTemp && !hasNomeDoPaciente && hasDadosPessoais && hasOrigemPacientes && hasConfirmar) {
         modal.classList.add('tm-klingo-root');
         return modal;
@@ -1233,6 +1287,25 @@
     }
 
     return null;
+  }
+
+  function isPacienteSchedulingModalRoot(root) {
+    if (!root || !isCallCenterRoute()) return false;
+
+    const body = root.querySelector(':scope > .modal-body');
+    const personal = body ? body.querySelector(':scope > .mt-3') : null;
+    if (!body || !personal) return false;
+
+    const text = norm(personal.innerText || personal.textContent || '');
+
+    return (
+      !root.querySelector('#cadTemp') &&
+      text.includes('Nome do Paciente') &&
+      text.includes('Nome Social') &&
+      text.includes('Telefone') &&
+      text.includes('Celular') &&
+      text.includes('Data de Nascimento')
+    );
   }
 
   function getActivePacienteSchedulingModalRoot() {
@@ -1248,78 +1321,26 @@
       modal.querySelector(':scope > .modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content') ||
       modal.querySelector('.modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content');
 
-    if (!root) return null;
-
-    const body = root.querySelector(':scope > .modal-body');
-    const personal = body ? body.querySelector(':scope > .mt-3') : null;
-    if (!body || !personal) return null;
-
-    const text = norm(personal.innerText || personal.textContent || '');
-
-    if (
-      text.includes('Nome do Paciente') &&
-      text.includes('Nome Social') &&
-      text.includes('Telefone') &&
-      text.includes('Celular') &&
-      text.includes('Data de Nascimento')
-    ) {
-      return root;
-    }
-
-    return null;
-  }
-
-  function clearCadastroModalSizingBeforePacienteOpen() {
-    const cadastroModal = document.getElementById('cadastroModal');
-    if (!cadastroModal) return;
-
-    const dialog = cadastroModal.querySelector('.modal-dialog');
-    const content = cadastroModal.querySelector('.modal-content');
-    const body = cadastroModal.querySelector('.modal-body');
-
-    [dialog, content, body].forEach((el) => {
-      if (!el) return;
-
-      el.style.removeProperty('width');
-      el.style.removeProperty('max-width');
-      el.style.removeProperty('min-width');
-      el.style.removeProperty('margin-left');
-      el.style.removeProperty('margin-right');
-      el.style.removeProperty('box-sizing');
-      el.style.removeProperty('padding-left');
-      el.style.removeProperty('padding-right');
-      el.style.removeProperty('display');
-      el.style.removeProperty('flex-direction');
-      el.style.removeProperty('align-items');
-      el.style.removeProperty('overflow');
-      el.style.removeProperty('overflow-x');
-      el.style.removeProperty('overflow-y');
-      el.style.removeProperty('justify-content');
-    });
-
-    if (dialog) {
-      dialog.style.setProperty('width', '', 'important');
-      dialog.style.setProperty('max-width', '', 'important');
-      dialog.style.setProperty('min-width', '', 'important');
-    }
-
-    if (content) {
-      content.classList.remove(
-        'tm-klingo-root',
-        'tm-first-visit-modal',
-        'tm-registered-patient-modal'
-      );
-    }
+    return isPacienteSchedulingModalRoot(root) ? root : null;
   }
 
   function clearFirstVisitResidueFromPacienteModal() {
     const root = getActivePacienteSchedulingModalRoot();
     if (!root) return;
 
-    root.classList.remove('tm-klingo-root');
+    root.classList.remove(
+      'tm-klingo-root',
+      'tm-first-visit-modal',
+      'tm-registered-patient-modal'
+    );
 
-    root.querySelectorAll('.tm-procedure-title, .tm-header-line').forEach((el) => {
-      el.classList.remove('tm-procedure-title', 'tm-header-line');
+    root.querySelectorAll('.tm-procedure-title, .tm-header-line, .tm-header-line-2, .tm-header-line-3').forEach((el) => {
+      el.classList.remove(
+        'tm-procedure-title',
+        'tm-header-line',
+        'tm-header-line-2',
+        'tm-header-line-3'
+      );
     });
 
     root.querySelectorAll('#tm-top-layout-host, #tm-observation-layout-host, .tm-layout-host, .tm-top-layout, .tm-left-panel').forEach((el) => {
@@ -1346,28 +1367,73 @@
     });
 
     const dialog = root.closest('.modal-dialog');
-    if (dialog) {
-      dialog.style.removeProperty('width');
-      dialog.style.removeProperty('max-width');
-      dialog.style.removeProperty('min-width');
-      dialog.style.removeProperty('margin-left');
-      dialog.style.removeProperty('margin-right');
+    [dialog, root, root.querySelector(':scope > .modal-body')].forEach((el) => {
+      if (!el) return;
+      [
+        'width',
+        'max-width',
+        'min-width',
+        'margin-left',
+        'margin-right',
+        'box-sizing',
+        'padding-left',
+        'padding-right',
+        'display',
+        'flex-direction',
+        'align-items',
+        'flex',
+        'overflow',
+        'overflow-x',
+        'overflow-y',
+        'justify-content'
+      ].forEach((prop) => el.style.removeProperty(prop));
+    });
+  }
+
+  function applyPacienteHeaderVisual() {
+    const root = getActivePacienteSchedulingModalRoot();
+    if (!root) return;
+
+    root.classList.add('tm-paciente-header-root');
+
+    const headerItem = root.querySelector('.list-group-item.list-group-item-success');
+    if (!headerItem) return;
+
+    const label = headerItem.querySelector('label.w-100, label');
+    if (!label) return;
+
+    const title = label.querySelector('.h4.mb-1, .h4');
+    if (title) {
+      title.classList.add('tm-paciente-procedure-title');
     }
 
-    root.style.removeProperty('width');
-    root.style.removeProperty('max-width');
-    root.style.removeProperty('min-width');
-    root.style.removeProperty('overflow');
+    // Mantém o DOM original, só marca as linhas existentes.
+    const detailsLine = Array.from(label.children).find((child) => {
+      const text = norm(child.innerText || child.textContent || '');
+      return (
+        child.classList.contains('d-flex') &&
+        text.includes('PAULO') || text.includes('LEVE') || text.includes('CLINICA') || text.includes('COPACABANA')
+      );
+    });
 
-    const modalBody = root.querySelector(':scope > .modal-body');
-    if (modalBody) {
-      modalBody.style.removeProperty('padding-left');
-      modalBody.style.removeProperty('padding-right');
-      modalBody.style.removeProperty('overflow-x');
-      modalBody.style.removeProperty('overflow-y');
-      modalBody.style.removeProperty('display');
-      modalBody.style.removeProperty('flex-direction');
-      modalBody.style.removeProperty('align-items');
+    if (detailsLine) {
+      detailsLine.classList.add('tm-paciente-header-line');
+    }
+
+    // Linha de data/horário no HTML do Paciente fica dentro do bloco justify-content-between.
+    const dateTimeBlock = Array.from(label.querySelectorAll('div, span')).find((el) => {
+      const text = norm(el.innerText || el.textContent || '');
+      return /\d{2}\/[A-Za-zÀ-ÿ]{3}/.test(text) && /\d{2}:\d{2}-\d{2}:\d{2}/.test(text);
+    });
+
+    if (dateTimeBlock) {
+      dateTimeBlock.classList.add('tm-paciente-header-line');
+    }
+
+    // Oculta apenas a sala detalhada no cabeçalho do Paciente, preservando unidade.
+    const roomSmall = headerItem.querySelector('small.text-muted');
+    if (roomSmall) {
+      roomSmall.style.setProperty('display', 'none', 'important');
     }
   }
 
@@ -2154,6 +2220,7 @@
     if (!isCallCenterRoute()) return;
 
     clearFirstVisitResidueFromPacienteModal();
+    applyPacienteHeaderVisual();
 
     const root = getSchedulingModalRoot();
 
@@ -2191,15 +2258,24 @@
       : null;
 
     if (pacienteCard) {
-      clearCadastroModalSizingBeforePacienteOpen();
-      setTimeout(clearFirstVisitResidueFromPacienteModal, 60);
-      setTimeout(clearFirstVisitResidueFromPacienteModal, 140);
-      setTimeout(clearFirstVisitResidueFromPacienteModal, 300);
+      setTimeout(() => {
+        clearFirstVisitResidueFromPacienteModal();
+        applyPacienteHeaderVisual();
+      }, 60);
+      setTimeout(() => {
+        clearFirstVisitResidueFromPacienteModal();
+        applyPacienteHeaderVisual();
+      }, 160);
+      setTimeout(() => {
+        clearFirstVisitResidueFromPacienteModal();
+        applyPacienteHeaderVisual();
+      }, 320);
     }
 
     if (!e.target.closest('#minutoModal')) {
       captureSelectionFromClick(e.target, false);
     }
+
     burstUpdate();
   }, true);
 
@@ -2642,9 +2718,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '8.2';
+      : '8.4';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '8.2';
+    return match ? match[0] : '8.4';
   }
 
   function ensureScriptVersionIndicator() {
