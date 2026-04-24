@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      7.7
+// @version      7.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2305,9 +2305,72 @@
     }
   }
 
+  function tmPacienteClearFirstVisitResidue(root) {
+    if (!root) return;
+
+    root.classList.remove('tm-klingo-root');
+
+    root.querySelectorAll(
+      '#tm-top-layout-host, #tm-observation-layout-host, .tm-layout-host, .tm-observation-layout'
+    ).forEach((el) => {
+      if (
+        el.id === 'tm-top-layout-host' ||
+        el.id === 'tm-observation-layout-host' ||
+        el.classList.contains('tm-layout-host')
+      ) {
+        el.remove();
+      }
+    });
+
+    root.querySelectorAll('.tm-hidden-original-row').forEach((el) => {
+      el.classList.remove('tm-hidden-original-row');
+      el.style.removeProperty('display');
+    });
+
+    root.querySelectorAll('.tm-hidden-by-script').forEach((el) => {
+      el.classList.remove('tm-hidden-by-script');
+      el.removeAttribute('data-tm-hidden-by-script');
+      el.style.removeProperty('display');
+    });
+
+    root.querySelectorAll('.tm-observation-textarea').forEach((el) => el.remove());
+
+    root.querySelectorAll('[style]').forEach((el) => {
+      const style = el.getAttribute('style') || '';
+      if (
+        style.includes('509px') ||
+        style.includes('540px') ||
+        style.includes('580px') ||
+        style.includes('flex-direction') ||
+        style.includes('align-items')
+      ) {
+        el.style.removeProperty('width');
+        el.style.removeProperty('max-width');
+        el.style.removeProperty('min-width');
+        el.style.removeProperty('margin-left');
+        el.style.removeProperty('margin-right');
+        el.style.removeProperty('box-sizing');
+        el.style.removeProperty('padding-left');
+        el.style.removeProperty('padding-right');
+        el.style.removeProperty('display');
+        el.style.removeProperty('flex-direction');
+        el.style.removeProperty('align-items');
+        el.style.removeProperty('flex');
+        el.style.removeProperty('overflow');
+        el.style.removeProperty('overflow-x');
+        el.style.removeProperty('overflow-y');
+        el.style.removeProperty('justify-content');
+      }
+    });
+  }
+
   function tmPacienteCssApply() {
     const root = tmPacienteCssFindRoot();
     if (!root) return;
+
+    if (root.dataset.tmPacienteCssApplied !== '1') {
+      tmPacienteClearFirstVisitResidue(root);
+    }
 
     if (root.dataset.tmPacienteCssApplied === '1') {
       tmPacienteCssApplyBirth(root);
@@ -2401,9 +2464,21 @@
 
     burstUpdate();
 
-    const cardBody = e.target instanceof Element ? e.target.closest('.card-body.atalho.bg-success') : null;
-    if (cardBody) {
+    const cardBody = e.target instanceof Element ? e.target.closest('.card-body.atalho') : null;
+    if (cardBody && cardBody.classList.contains('bg-success')) {
+      const root = document.querySelector('#cadastroModal .modal-content');
+      if (root) {
+        root.dataset.tmPacienteCssApplied = '';
+      }
       schedulePacienteCssApply();
+    }
+
+    if (cardBody && cardBody.classList.contains('bg-danger')) {
+      const root = document.querySelector('#cadastroModal .modal-content');
+      if (root) {
+        root.classList.remove('tm-paciente-css-root');
+        root.dataset.tmPacienteCssApplied = '';
+      }
     }
   }, true);
 
@@ -2846,9 +2921,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '7.7';
+      : '7.8';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '7.7';
+    return match ? match[0] : '7.8';
   }
 
   function ensureScriptVersionIndicator() {
