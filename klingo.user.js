@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      7.6
+// @version      7.7
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1173,17 +1173,17 @@
 
 
       /* =========================
-         PACIENTE - MODAL VIA CARD bg-success
-         Isolado do fluxo Primeira Vez
+         PACIENTE - CSS ONLY / ESTÁVEL
+         Não move campos do Vue
       ========================= */
-      .tm-paciente-root {
+      .tm-paciente-css-root {
         width: 580px !important;
         max-width: 580px !important;
         min-width: 580px !important;
         overflow: hidden !important;
       }
 
-      .tm-paciente-root .modal-body {
+      .tm-paciente-css-root .modal-body {
         padding-left: 0 !important;
         padding-right: 0 !important;
         overflow-x: hidden !important;
@@ -1193,93 +1193,42 @@
         align-items: center !important;
       }
 
-      .tm-paciente-root .tm-paciente-section,
-      .tm-paciente-root .tm-paciente-layout,
-      .tm-paciente-root .tm-paciente-observation,
-      .tm-paciente-root #myTab,
-      .tm-paciente-root #myTabContent,
-      .tm-paciente-root .tab-content,
-      .tm-paciente-root .tab-pane,
-      .tm-paciente-root .tab-pane > .mt-3,
-      .tm-paciente-root .modal-footer {
-        width: 509px !important;
-        max-width: 509px !important;
+      .tm-paciente-css-root .modal-body > div,
+      .tm-paciente-css-root .modal-body > .mt-3,
+      .tm-paciente-css-root .modal-footer,
+      .tm-paciente-css-root #myTab,
+      .tm-paciente-css-root #myTabContent,
+      .tm-paciente-css-root .tab-content,
+      .tm-paciente-css-root .tab-pane,
+      .tm-paciente-css-root .tab-pane > .mt-3 {
+        width: 540px !important;
+        max-width: 540px !important;
         margin-left: auto !important;
         margin-right: auto !important;
         box-sizing: border-box !important;
       }
 
-      .tm-paciente-root .tm-paciente-row {
-        display: grid !important;
-        gap: 10px 12px !important;
-        margin-bottom: 10px !important;
-        align-items: end !important;
-      }
-
-      .tm-paciente-root .tm-paciente-row-name {
-        grid-template-columns: 342px 155px !important;
-      }
-
-      .tm-paciente-root .tm-paciente-row-origin {
-        grid-template-columns: 155px 342px !important;
-      }
-
-      .tm-paciente-root .tm-paciente-row-phone {
-        grid-template-columns: 155px 155px 187px !important;
-      }
-
-      .tm-paciente-root .tm-paciente-row-card {
-        grid-template-columns: 342px 155px !important;
-      }
-
-      .tm-paciente-root .tm-paciente-slot,
-      .tm-paciente-root .tm-paciente-slot > .col,
-      .tm-paciente-root .tm-paciente-slot > [class*="col-"] {
-        min-width: 0 !important;
-        width: 100% !important;
-        max-width: none !important;
-        flex: unset !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-      }
-
-      .tm-paciente-root .tm-paciente-slot .form-group {
-        margin-bottom: 0 !important;
-      }
-
-      .tm-paciente-root .tm-paciente-slot .input-group,
-      .tm-paciente-root .tm-paciente-slot .form-control,
-      .tm-paciente-root .tm-paciente-slot input,
-      .tm-paciente-root .tm-paciente-slot select,
-      .tm-paciente-root .tm-paciente-slot textarea {
-        width: 100% !important;
-      }
-
-      .tm-paciente-hidden {
-        display: none !important;
-      }
-
-      .tm-paciente-root .list-group,
-      .tm-paciente-root .list-group-item.list-group-item-success {
+      .tm-paciente-css-root .list-group,
+      .tm-paciente-css-root .list-group-item.list-group-item-success {
         width: 509px !important;
         max-width: 509px !important;
         margin-left: auto !important;
         margin-right: auto !important;
       }
 
-      .tm-paciente-root .list-group-item.list-group-item-success {
+      .tm-paciente-css-root .list-group-item.list-group-item-success {
         background: #d5edff !important;
         color: #003358 !important;
         border-color: #b7d9ee !important;
         padding: 12px 14px !important;
       }
 
-      .tm-paciente-root .list-group-item.list-group-item-success,
-      .tm-paciente-root .list-group-item.list-group-item-success * {
+      .tm-paciente-css-root .list-group-item.list-group-item-success,
+      .tm-paciente-css-root .list-group-item.list-group-item-success * {
         color: #003358 !important;
       }
 
-      .tm-paciente-root .tm-procedure-title {
+      .tm-paciente-css-root .tm-procedure-title {
         display: block !important;
         margin-bottom: 8px !important;
         font-size: 20px !important;
@@ -1289,7 +1238,7 @@
         word-break: break-word !important;
       }
 
-      .tm-paciente-root .tm-header-line {
+      .tm-paciente-css-root .tm-header-line {
         display: flex !important;
         flex-wrap: wrap !important;
         align-items: center !important;
@@ -1298,36 +1247,107 @@
         line-height: 1.3 !important;
       }
 
-      .tm-paciente-root .tm-header-line,
-      .tm-paciente-root .tm-header-line * {
+      .tm-paciente-css-root .tm-header-line,
+      .tm-paciente-css-root .tm-header-line * {
         font-size: 12px !important;
       }
 
-      .tm-paciente-root .tm-header-line small .text-muted {
+      .tm-paciente-css-root .tm-header-line small .text-muted {
         display: none !important;
       }
 
-      .tm-paciente-root [data-paciente-slot="nascimento"] .input-group {
+      .tm-paciente-css-root .tm-paciente-social-field {
+        display: none !important;
+      }
+
+      .tm-paciente-css-root .tm-paciente-field {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      .tm-paciente-css-root .tm-paciente-field .form-group {
+        margin-bottom: 0 !important;
+      }
+
+      .tm-paciente-css-root .tm-paciente-field .input-group,
+      .tm-paciente-css-root .tm-paciente-field .form-control,
+      .tm-paciente-css-root .tm-paciente-field input,
+      .tm-paciente-css-root .tm-paciente-field select {
+        width: 100% !important;
+      }
+
+      .tm-paciente-css-root .tm-paciente-row-nome {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+      }
+
+      .tm-paciente-css-root .tm-paciente-row-nome .tm-paciente-nome-field {
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-css-root .tm-paciente-row-dados {
+        display: grid !important;
+        grid-template-columns: 155px 155px 1fr !important;
+        gap: 10px 12px !important;
+      }
+
+      .tm-paciente-css-root .tm-paciente-row-dados .tm-paciente-sexo-field,
+      .tm-paciente-css-root .tm-paciente-row-dados .tm-paciente-nascimento-field,
+      .tm-paciente-css-root .tm-paciente-row-dados .tm-paciente-email-field {
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-css-root .tm-paciente-row-contato {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10px 12px !important;
+      }
+
+      .tm-paciente-css-root .tm-paciente-row-contato .tm-paciente-telefone-field,
+      .tm-paciente-css-root .tm-paciente-row-contato .tm-paciente-celular-field {
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-css-root .tm-paciente-row-carteira {
+        display: grid !important;
+        grid-template-columns: 1fr 155px !important;
+        gap: 10px 12px !important;
+      }
+
+      .tm-paciente-css-root .tm-paciente-row-carteira .tm-paciente-carteira-field,
+      .tm-paciente-css-root .tm-paciente-row-carteira .tm-paciente-validade-field {
+        width: 100% !important;
+        max-width: none !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-css-root .tm-paciente-nascimento-field .input-group {
         position: relative !important;
         display: flex !important;
         flex-wrap: nowrap !important;
         align-items: stretch !important;
       }
 
-      .tm-paciente-root [data-paciente-slot="nascimento"] input[type="date"]::-webkit-calendar-picker-indicator {
+      .tm-paciente-css-root .tm-paciente-nascimento-field input[type="date"]::-webkit-calendar-picker-indicator {
         opacity: 0 !important;
         display: none !important;
         -webkit-appearance: none !important;
       }
 
-      .tm-paciente-root [data-paciente-slot="nascimento"] input[type="date"] {
+      .tm-paciente-css-root .tm-paciente-nascimento-field input[type="date"] {
         -webkit-appearance: none !important;
         appearance: none !important;
         background-image: none !important;
         padding-right: 46px !important;
       }
 
-      .tm-paciente-root [data-paciente-slot="nascimento"] .tm-birth-age-inline {
+      .tm-paciente-css-root .tm-paciente-nascimento-field .tm-birth-age-inline {
         position: absolute !important;
         top: 1px !important;
         bottom: 1px !important;
@@ -1344,7 +1364,7 @@
         border-bottom-right-radius: .25rem !important;
       }
 
-      .tm-paciente-root [data-paciente-slot="nascimento"] .tm-birth-age-inline .input-group-text {
+      .tm-paciente-css-root .tm-paciente-nascimento-field .tm-birth-age-inline .input-group-text {
         width: 100% !important;
         min-width: 0 !important;
         height: 100% !important;
@@ -1365,22 +1385,6 @@
         box-sizing: border-box !important;
         white-space: nowrap !important;
         text-align: center !important;
-      }
-
-      .tm-paciente-observation-textarea {
-        min-height: 68px !important;
-        height: 68px !important;
-        padding: 8px 10px !important;
-        line-height: 1.35 !important;
-        resize: none !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
-        white-space: pre-wrap !important;
-        overflow-y: auto !important;
-      }
-
-      #cadastroModal.tm-paciente-pending-layout .modal-content {
-        visibility: hidden !important;
       }
 
 
@@ -2223,50 +2227,7 @@
 
 
 
-  function markSchedulingFlowByCardClick(target) {
-    if (!isCallCenterRoute()) return;
-
-    const cardBody = target instanceof Element ? target.closest('.card-body.atalho') : null;
-    if (!cardBody) return;
-
-    const cadastroModal = document.getElementById('cadastroModal');
-
-    if (cardBody.classList.contains('bg-success')) {
-      window.__tmKlingoSchedulingFlow = 'paciente';
-      window.__tmKlingoSchedulingFlowAt = Date.now();
-      window.__tmPacienteLastSignature = '';
-      window.__tmPacienteStableSignature = '';
-      window.__tmPacienteStableCount = 0;
-
-      if (cadastroModal) {
-        cadastroModal.classList.add('tm-paciente-pending-layout');
-      }
-
-      schedulePacienteLayoutAfterCardClick();
-      return;
-    }
-
-    if (cardBody.classList.contains('bg-danger')) {
-      window.__tmKlingoSchedulingFlow = 'primeira_vez';
-      window.__tmKlingoSchedulingFlowAt = Date.now();
-      window.__tmPacienteLastSignature = '';
-      window.__tmPacienteStableSignature = '';
-      window.__tmPacienteStableCount = 0;
-
-      if (cadastroModal) {
-        cadastroModal.classList.remove('tm-paciente-pending-layout');
-      }
-    }
-  }
-
-  function isPacienteFlowFresh() {
-    return (
-      window.__tmKlingoSchedulingFlow === 'paciente' &&
-      Date.now() - (window.__tmKlingoSchedulingFlowAt || 0) <= 15000
-    );
-  }
-
-  function pacienteLabelBlock(scope, labelText) {
+  function tmPacienteCssLabelBlock(scope, labelText) {
     if (!scope) return null;
 
     const labels = Array.from(scope.querySelectorAll('small.form-text, small'));
@@ -2284,9 +2245,7 @@
     return null;
   }
 
-  function getPacienteModalRootCandidate() {
-    if (!isPacienteFlowFresh()) return null;
-
+  function tmPacienteCssFindRoot() {
     const modal = document.querySelector('#cadastroModal.modal.show, #cadastroModal.show');
     if (!modal) return null;
 
@@ -2312,178 +2271,30 @@
       'Validade da Carteira'
     ];
 
-    const isPacienteModal = required.every((label) => !!pacienteLabelBlock(personal, label));
-    if (!isPacienteModal) return null;
-    if (!pacienteLabelBlock(root, 'Origem de Pacientes')) return null;
+    if (!required.every((label) => !!tmPacienteCssLabelBlock(personal, label))) return null;
 
     return root;
   }
 
-  function getPacienteModalSignature(root) {
-    if (!root) return '';
-
-    const body = root.querySelector(':scope > .modal-body');
-    const personal = body ? body.querySelector(':scope > .mt-3') : null;
-    if (!body || !personal) return '';
-
-    const readValueByLabel = (label) => {
-      const block = pacienteLabelBlock(personal, label) || pacienteLabelBlock(root, label);
-      const field = block ? block.querySelector('input, select, textarea') : null;
-      return field ? `${label}:${field.value || field.textContent || ''}` : `${label}:`;
-    };
-
-    const headerText = norm(root.querySelector('.list-group-item')?.innerText || '');
-    const labels = [
-      'Nome do Paciente',
-      'Nome Social',
-      'Sexo',
-      'Data de Nascimento',
-      'e-mail',
-      'Telefone',
-      'Celular',
-      'No. da Carteira do Plano',
-      'Validade da Carteira',
-      'Origem de Pacientes'
-    ].map(readValueByLabel).join('|');
-
-    return `${headerText}|${labels}|len:${norm(root.innerText || '').length}`;
+  function tmPacienteCssClassifyField(block, className) {
+    if (!block) return;
+    block.classList.add('tm-paciente-field', className);
   }
 
-  function pacienteIsModalStable(root) {
-    const signature = getPacienteModalSignature(root);
-    if (!signature) return false;
+  function tmPacienteCssApplyBirth(root) {
+    const birthBlock = root.querySelector('.tm-paciente-nascimento-field');
+    if (!birthBlock) return;
 
-    if (window.__tmPacienteStableSignature === signature) {
-      window.__tmPacienteStableCount = (window.__tmPacienteStableCount || 0) + 1;
-    } else {
-      window.__tmPacienteStableSignature = signature;
-      window.__tmPacienteStableCount = 1;
-    }
-
-    return window.__tmPacienteStableCount >= 2;
-  }
-
-  function pacienteHide(el) {
-    if (!el) return;
-    el.classList.add('tm-paciente-hidden');
-    el.style.setProperty('display', 'none', 'important');
-  }
-
-  function pacienteMove(slot, block) {
-    if (!slot || !block) return;
-    if (block.parentElement === slot) return;
-    slot.appendChild(block);
-  }
-
-  function pacienteEnsureHost(personal) {
-    let title = personal.querySelector('#tm-paciente-dados-title');
-    if (!title) {
-      title = document.createElement('div');
-      title.id = 'tm-paciente-dados-title';
-      title.className = 'border-bottom mb-1 d-flex justify-content-between hover-title-bg text-primary tm-paciente-section';
-      title.innerHTML = '<div><small>Dados Pessoais</small></div><div></div>';
-      personal.insertBefore(title, personal.firstChild);
-    }
-
-    let host = personal.querySelector('#tm-paciente-layout');
-    if (!host) {
-      host = document.createElement('div');
-      host.id = 'tm-paciente-layout';
-      host.className = 'tm-paciente-layout';
-      host.innerHTML = `
-        <div class="tm-paciente-row tm-paciente-row-name">
-          <div class="tm-paciente-slot" data-paciente-slot="nome"></div>
-          <div class="tm-paciente-slot" data-paciente-slot="nascimento"></div>
-        </div>
-        <div class="tm-paciente-row tm-paciente-row-origin">
-          <div class="tm-paciente-slot" data-paciente-slot="sexo"></div>
-          <div class="tm-paciente-slot" data-paciente-slot="origem"></div>
-        </div>
-        <div class="tm-paciente-row tm-paciente-row-phone">
-          <div class="tm-paciente-slot" data-paciente-slot="telefone"></div>
-          <div class="tm-paciente-slot" data-paciente-slot="celular"></div>
-          <div class="tm-paciente-slot" data-paciente-slot="email"></div>
-        </div>
-        <div class="tm-paciente-row tm-paciente-row-card">
-          <div class="tm-paciente-slot" data-paciente-slot="carteira"></div>
-          <div class="tm-paciente-slot" data-paciente-slot="validade"></div>
-        </div>
-      `;
-    }
-
-    if (title.nextSibling !== host) {
-      personal.insertBefore(host, title.nextSibling);
-    }
-
-    return host;
-  }
-
-  function pacienteApplyOrigin(root, host) {
-    const origem = pacienteLabelBlock(root, 'Origem de Pacientes');
-    pacienteMove(host.querySelector('[data-paciente-slot="origem"]'), origem);
-
-    const origemTitle = Array.from(root.querySelectorAll('small'))
-      .find((small) => norm(small.textContent || '') === 'ORIGEM DE PACIENTES');
-    const titleRow = origemTitle ? origemTitle.closest('.border-bottom') : null;
-    const row = titleRow ? titleRow.closest('.row') : null;
-
-    pacienteHide(titleRow);
-    pacienteHide(row);
-  }
-
-  function pacienteApplyObservation(root) {
-    const obsTitleSmall = Array.from(root.querySelectorAll('small'))
-      .find((small) => norm(small.textContent || '') === 'Observação');
-    const obsTitle = obsTitleSmall ? obsTitleSmall.closest('.border-bottom') : null;
-    if (!obsTitle) return;
-
-    let row = obsTitle.nextElementSibling;
-    while (row && !(row.classList && row.classList.contains('form-row'))) {
-      row = row.nextElementSibling;
-    }
-    if (!row) return;
-
-    const inputBlock = row.children[0] || null;
-    const selectBlock = row.children[1] || null;
-    if (!inputBlock || !selectBlock) return;
-
-    obsTitle.classList.add('tm-paciente-section');
-
-    let host = root.querySelector('#tm-paciente-observation');
-    if (!host) {
-      host = document.createElement('div');
-      host.id = 'tm-paciente-observation';
-      host.className = 'tm-paciente-observation tm-observation-layout';
-      host.innerHTML = `
-        <div class="tm-paciente-slot" data-paciente-slot="observacao-input"></div>
-        <div class="tm-paciente-slot" data-paciente-slot="observacao-select"></div>
-      `;
-    }
-
-    if (obsTitle.nextSibling !== host) {
-      obsTitle.parentElement.insertBefore(host, obsTitle.nextSibling);
-    }
-
-    pacienteMove(host.querySelector('[data-paciente-slot="observacao-input"]'), inputBlock);
-    pacienteMove(host.querySelector('[data-paciente-slot="observacao-select"]'), selectBlock);
-    pacienteHide(row);
-    ensureObservationTextarea(inputBlock);
-  }
-
-  function pacienteApplyBirth(root) {
-    const slot = root.querySelector('[data-paciente-slot="nascimento"]');
-    if (!slot) return;
-
-    const input = slot.querySelector('input[type="date"]');
-    const inputGroup = slot.querySelector('.input-group');
+    const input = birthBlock.querySelector('input[type="date"]');
+    const inputGroup = birthBlock.querySelector('.input-group');
     if (!input || !inputGroup) return;
 
-    const ageAppend = Array.from(slot.querySelectorAll('.input-group-append')).find((append) =>
+    const ageAppend = Array.from(birthBlock.querySelectorAll('.input-group-append')).find((append) =>
       append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]')
     );
+
     if (!ageAppend) return;
 
-    if (ageAppend.parentElement !== inputGroup) inputGroup.appendChild(ageAppend);
     ageAppend.classList.add('tm-birth-age-inline');
 
     const ageText = ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
@@ -2494,126 +2305,66 @@
     }
   }
 
-  function pacienteResize(root) {
+  function tmPacienteCssApply() {
+    const root = tmPacienteCssFindRoot();
+    if (!root) return;
+
+    if (root.dataset.tmPacienteCssApplied === '1') {
+      tmPacienteCssApplyBirth(root);
+      return;
+    }
+
     const dialog = root.closest('.modal-dialog');
-    if (!dialog) return;
-
-    dialog.style.setProperty('width', '580px', 'important');
-    dialog.style.setProperty('max-width', '580px', 'important');
-    dialog.style.setProperty('min-width', '580px', 'important');
-
-    root.style.setProperty('width', '580px', 'important');
-    root.style.setProperty('max-width', '580px', 'important');
-    root.style.setProperty('min-width', '580px', 'important');
-
-    const footer = root.querySelector(':scope > .modal-footer');
-    if (footer) {
-      footer.style.setProperty('width', '509px', 'important');
-      footer.style.setProperty('max-width', '509px', 'important');
-      footer.style.setProperty('margin-left', 'auto', 'important');
-      footer.style.setProperty('margin-right', 'auto', 'important');
-      footer.style.setProperty('justify-content', 'flex-start', 'important');
-    }
-  }
-
-  function applyPacienteLayoutFromCardFlow() {
-    const root = getPacienteModalRootCandidate();
-    const cadastroModal = document.getElementById('cadastroModal');
-
-    if (!root) return false;
-
-    const signature = getPacienteModalSignature(root);
-
-    if (root.dataset.tmPacienteApplied === '1' && root.dataset.tmPacienteSignature === signature) {
-      if (cadastroModal) cadastroModal.classList.remove('tm-paciente-pending-layout');
-      return true;
+    if (dialog) {
+      dialog.style.setProperty('width', '580px', 'important');
+      dialog.style.setProperty('max-width', '580px', 'important');
+      dialog.style.setProperty('min-width', '580px', 'important');
+      dialog.style.setProperty('margin-left', 'auto', 'important');
+      dialog.style.setProperty('margin-right', 'auto', 'important');
     }
 
-    if (!pacienteIsModalStable(root)) return false;
+    root.classList.add('tm-paciente-css-root');
 
-    const body = root.querySelector(':scope > .modal-body');
-    const personal = body ? body.querySelector(':scope > .mt-3') : null;
-    if (!body || !personal) return false;
+    const personal = root.querySelector(':scope > .modal-body > .mt-3');
+    if (!personal) return;
 
-    const nome = pacienteLabelBlock(personal, 'Nome do Paciente');
-    const nomeSocial = pacienteLabelBlock(personal, 'Nome Social');
-    const sexo = pacienteLabelBlock(personal, 'Sexo');
-    const birth = pacienteLabelBlock(personal, 'Data de Nascimento');
-    const email = pacienteLabelBlock(personal, 'e-mail');
-    const telefone = pacienteLabelBlock(personal, 'Telefone');
-    const celular = pacienteLabelBlock(personal, 'Celular');
-    const carteira = pacienteLabelBlock(personal, 'No. da Carteira do Plano');
-    const validade = pacienteLabelBlock(personal, 'Validade da Carteira');
+    const nome = tmPacienteCssLabelBlock(personal, 'Nome do Paciente');
+    const social = tmPacienteCssLabelBlock(personal, 'Nome Social');
+    const sexo = tmPacienteCssLabelBlock(personal, 'Sexo');
+    const nascimento = tmPacienteCssLabelBlock(personal, 'Data de Nascimento');
+    const email = tmPacienteCssLabelBlock(personal, 'e-mail');
+    const telefone = tmPacienteCssLabelBlock(personal, 'Telefone');
+    const celular = tmPacienteCssLabelBlock(personal, 'Celular');
+    const carteira = tmPacienteCssLabelBlock(personal, 'No. da Carteira do Plano');
+    const validade = tmPacienteCssLabelBlock(personal, 'Validade da Carteira');
 
-    if (!nome || !sexo || !birth || !email || !telefone || !celular || !carteira || !validade) return false;
+    tmPacienteCssClassifyField(nome, 'tm-paciente-nome-field');
+    tmPacienteCssClassifyField(social, 'tm-paciente-social-field');
+    tmPacienteCssClassifyField(sexo, 'tm-paciente-sexo-field');
+    tmPacienteCssClassifyField(nascimento, 'tm-paciente-nascimento-field');
+    tmPacienteCssClassifyField(email, 'tm-paciente-email-field');
+    tmPacienteCssClassifyField(telefone, 'tm-paciente-telefone-field');
+    tmPacienteCssClassifyField(celular, 'tm-paciente-celular-field');
+    tmPacienteCssClassifyField(carteira, 'tm-paciente-carteira-field');
+    tmPacienteCssClassifyField(validade, 'tm-paciente-validade-field');
 
-    const host = pacienteEnsureHost(personal);
+    if (nome && social) nome.parentElement?.classList.add('tm-paciente-row-nome');
+    if (sexo && nascimento && email) sexo.parentElement?.classList.add('tm-paciente-row-dados');
+    if (telefone && celular) telefone.parentElement?.classList.add('tm-paciente-row-contato');
+    if (carteira && validade) carteira.parentElement?.classList.add('tm-paciente-row-carteira');
 
-    pacienteMove(host.querySelector('[data-paciente-slot="nome"]'), nome);
-    pacienteMove(host.querySelector('[data-paciente-slot="nascimento"]'), birth);
-    pacienteMove(host.querySelector('[data-paciente-slot="sexo"]'), sexo);
-    pacienteMove(host.querySelector('[data-paciente-slot="telefone"]'), telefone);
-    pacienteMove(host.querySelector('[data-paciente-slot="celular"]'), celular);
-    pacienteMove(host.querySelector('[data-paciente-slot="email"]'), email);
-    pacienteMove(host.querySelector('[data-paciente-slot="carteira"]'), carteira);
-    pacienteMove(host.querySelector('[data-paciente-slot="validade"]'), validade);
-
-    pacienteApplyOrigin(root, host);
-    pacienteHide(nomeSocial);
-
-    personal.querySelectorAll(':scope > .form-row').forEach(pacienteHide);
-
-    pacienteApplyObservation(root);
-    pacienteApplyBirth(root);
-    pacienteResize(root);
+    tmPacienteCssApplyBirth(root);
     reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
 
-    root.classList.add('tm-paciente-root');
-    root.dataset.tmPacienteApplied = '1';
-    root.dataset.tmPacienteSignature = signature;
-
-    if (cadastroModal) cadastroModal.classList.remove('tm-paciente-pending-layout');
-
-    return true;
+    root.dataset.tmPacienteCssApplied = '1';
   }
 
-  function startPacienteLayoutRetry() {
-    clearTimeout(startPacienteLayoutRetry._timer);
-
-    let attempts = 0;
-    const maxAttempts = 45;
-
-    const run = () => {
-      attempts += 1;
-
-      if (document.activeElement && document.activeElement.matches('input, textarea, select')) {
-        if (attempts < maxAttempts && isPacienteFlowFresh()) {
-          startPacienteLayoutRetry._timer = setTimeout(run, 180);
-        }
-        return;
-      }
-
-      const applied = applyPacienteLayoutFromCardFlow();
-      if (applied) return;
-
-      if (!isPacienteFlowFresh() || attempts >= maxAttempts) {
-        const cadastroModal = document.getElementById('cadastroModal');
-        if (cadastroModal) cadastroModal.classList.remove('tm-paciente-pending-layout');
-        return;
-      }
-
-      startPacienteLayoutRetry._timer = setTimeout(run, attempts < 10 ? 80 : 160);
-    };
-
-    run();
-  }
-
-  function schedulePacienteLayoutAfterCardClick() {
-    const cadastroModal = document.getElementById('cadastroModal');
-    if (cadastroModal) cadastroModal.classList.add('tm-paciente-pending-layout');
-
-    startPacienteLayoutRetry();
+  function schedulePacienteCssApply() {
+    setTimeout(tmPacienteCssApply, 120);
+    setTimeout(tmPacienteCssApply, 300);
+    setTimeout(tmPacienteCssApply, 700);
+    setTimeout(tmPacienteCssApply, 1200);
   }
 
   function burstUpdateLite() {
@@ -2644,21 +2395,15 @@
   document.addEventListener('click', (e) => {
     if (!isCallCenterRoute()) return;
 
-    markSchedulingFlowByCardClick(e.target);
-
     if (!e.target.closest('#minutoModal')) {
       captureSelectionFromClick(e.target, false);
     }
 
     burstUpdate();
 
-    if (window.__tmKlingoSchedulingFlow === 'paciente') {
-      schedulePacienteLayoutAfterCardClick();
-    }
-
-    if (e.target.closest('[data-dismiss="modal"], .modal .close')) {
-      const cadastroModal = document.getElementById('cadastroModal');
-      if (cadastroModal) cadastroModal.classList.remove('tm-paciente-pending-layout');
+    const cardBody = e.target instanceof Element ? e.target.closest('.card-body.atalho.bg-success') : null;
+    if (cardBody) {
+      schedulePacienteCssApply();
     }
   }, true);
 
@@ -3101,9 +2846,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '7.6';
+      : '7.7';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '7.6';
+    return match ? match[0] : '7.7';
   }
 
   function ensureScriptVersionIndicator() {
