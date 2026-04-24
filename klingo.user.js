@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      8.1
+// @version      8.2
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1269,6 +1269,49 @@
     return null;
   }
 
+  function clearCadastroModalSizingBeforePacienteOpen() {
+    const cadastroModal = document.getElementById('cadastroModal');
+    if (!cadastroModal) return;
+
+    const dialog = cadastroModal.querySelector('.modal-dialog');
+    const content = cadastroModal.querySelector('.modal-content');
+    const body = cadastroModal.querySelector('.modal-body');
+
+    [dialog, content, body].forEach((el) => {
+      if (!el) return;
+
+      el.style.removeProperty('width');
+      el.style.removeProperty('max-width');
+      el.style.removeProperty('min-width');
+      el.style.removeProperty('margin-left');
+      el.style.removeProperty('margin-right');
+      el.style.removeProperty('box-sizing');
+      el.style.removeProperty('padding-left');
+      el.style.removeProperty('padding-right');
+      el.style.removeProperty('display');
+      el.style.removeProperty('flex-direction');
+      el.style.removeProperty('align-items');
+      el.style.removeProperty('overflow');
+      el.style.removeProperty('overflow-x');
+      el.style.removeProperty('overflow-y');
+      el.style.removeProperty('justify-content');
+    });
+
+    if (dialog) {
+      dialog.style.setProperty('width', '', 'important');
+      dialog.style.setProperty('max-width', '', 'important');
+      dialog.style.setProperty('min-width', '', 'important');
+    }
+
+    if (content) {
+      content.classList.remove(
+        'tm-klingo-root',
+        'tm-first-visit-modal',
+        'tm-registered-patient-modal'
+      );
+    }
+  }
+
   function clearFirstVisitResidueFromPacienteModal() {
     const root = getActivePacienteSchedulingModalRoot();
     if (!root) return;
@@ -2142,6 +2185,18 @@
 
   document.addEventListener('click', (e) => {
     if (!isCallCenterRoute()) return;
+
+    const pacienteCard = e.target instanceof Element
+      ? e.target.closest('.card-body.atalho.bg-success')
+      : null;
+
+    if (pacienteCard) {
+      clearCadastroModalSizingBeforePacienteOpen();
+      setTimeout(clearFirstVisitResidueFromPacienteModal, 60);
+      setTimeout(clearFirstVisitResidueFromPacienteModal, 140);
+      setTimeout(clearFirstVisitResidueFromPacienteModal, 300);
+    }
+
     if (!e.target.closest('#minutoModal')) {
       captureSelectionFromClick(e.target, false);
     }
@@ -2587,9 +2642,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '8.1';
+      : '8.2';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '8.1';
+    return match ? match[0] : '8.2';
   }
 
   function ensureScriptVersionIndicator() {
