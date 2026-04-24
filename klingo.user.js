@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      7.5
+// @version      7.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2229,24 +2229,30 @@
     const cardBody = target instanceof Element ? target.closest('.card-body.atalho') : null;
     if (!cardBody) return;
 
+    const cadastroModal = document.getElementById('cadastroModal');
+
     if (cardBody.classList.contains('bg-success')) {
       window.__tmKlingoSchedulingFlow = 'paciente';
       window.__tmKlingoSchedulingFlowAt = Date.now();
+      window.__tmPacienteLastSignature = '';
+      window.__tmPacienteStableSignature = '';
+      window.__tmPacienteStableCount = 0;
 
-      const cadastroModal = document.getElementById('cadastroModal');
       if (cadastroModal) {
         cadastroModal.classList.add('tm-paciente-pending-layout');
       }
 
-      startPacienteLayoutRetry();
+      schedulePacienteLayoutAfterCardClick();
       return;
     }
 
     if (cardBody.classList.contains('bg-danger')) {
       window.__tmKlingoSchedulingFlow = 'primeira_vez';
       window.__tmKlingoSchedulingFlowAt = Date.now();
+      window.__tmPacienteLastSignature = '';
+      window.__tmPacienteStableSignature = '';
+      window.__tmPacienteStableCount = 0;
 
-      const cadastroModal = document.getElementById('cadastroModal');
       if (cadastroModal) {
         cadastroModal.classList.remove('tm-paciente-pending-layout');
       }
@@ -2256,7 +2262,7 @@
   function isPacienteFlowFresh() {
     return (
       window.__tmKlingoSchedulingFlow === 'paciente' &&
-      Date.now() - (window.__tmKlingoSchedulingFlowAt || 0) <= 12000
+      Date.now() - (window.__tmKlingoSchedulingFlowAt || 0) <= 15000
     );
   }
 
@@ -2278,7 +2284,7 @@
     return null;
   }
 
-  function getPacienteModalRootFromFreshFlow() {
+  function getPacienteModalRootCandidate() {
     if (!isPacienteFlowFresh()) return null;
 
     const modal = document.querySelector('#cadastroModal.modal.show, #cadastroModal.show');
@@ -2310,9 +2316,51 @@
     if (!isPacienteModal) return null;
     if (!pacienteLabelBlock(root, 'Origem de Pacientes')) return null;
 
-    root.classList.add('tm-paciente-root');
-    root.dataset.tmPacienteApplied = '1';
     return root;
+  }
+
+  function getPacienteModalSignature(root) {
+    if (!root) return '';
+
+    const body = root.querySelector(':scope > .modal-body');
+    const personal = body ? body.querySelector(':scope > .mt-3') : null;
+    if (!body || !personal) return '';
+
+    const readValueByLabel = (label) => {
+      const block = pacienteLabelBlock(personal, label) || pacienteLabelBlock(root, label);
+      const field = block ? block.querySelector('input, select, textarea') : null;
+      return field ? `${label}:${field.value || field.textContent || ''}` : `${label}:`;
+    };
+
+    const headerText = norm(root.querySelector('.list-group-item')?.innerText || '');
+    const labels = [
+      'Nome do Paciente',
+      'Nome Social',
+      'Sexo',
+      'Data de Nascimento',
+      'e-mail',
+      'Telefone',
+      'Celular',
+      'No. da Carteira do Plano',
+      'Validade da Carteira',
+      'Origem de Pacientes'
+    ].map(readValueByLabel).join('|');
+
+    return `${headerText}|${labels}|len:${norm(root.innerText || '').length}`;
+  }
+
+  function pacienteIsModalStable(root) {
+    const signature = getPacienteModalSignature(root);
+    if (!signature) return false;
+
+    if (window.__tmPacienteStableSignature === signature) {
+      window.__tmPacienteStableCount = (window.__tmPacienteStableCount || 0) + 1;
+    } else {
+      window.__tmPacienteStableSignature = signature;
+      window.__tmPacienteStableCount = 1;
+    }
+
+    return window.__tmPacienteStableCount >= 2;
   }
 
   function pacienteHide(el) {
@@ -2323,6 +2371,7 @@
 
   function pacienteMove(slot, block) {
     if (!slot || !block) return;
+    if (block.parentElement === slot) return;
     slot.appendChild(block);
   }
 
@@ -2468,19 +2517,23 @@
   }
 
   function applyPacienteLayoutFromCardFlow() {
-    const root = getPacienteModalRootFromFreshFlow();
-    if (!root) return false;
-
+    const root = getPacienteModalRootCandidate();
     const cadastroModal = document.getElementById('cadastroModal');
 
-    if (root.dataset.tmPacienteApplied === '1') {
+    if (!root) return false;
+
+    const signature = getPacienteModalSignature(root);
+
+    if (root.dataset.tmPacienteApplied === '1' && root.dataset.tmPacienteSignature === signature) {
       if (cadastroModal) cadastroModal.classList.remove('tm-paciente-pending-layout');
       return true;
     }
 
+    if (!pacienteIsModalStable(root)) return false;
+
     const body = root.querySelector(':scope > .modal-body');
     const personal = body ? body.querySelector(':scope > .mt-3') : null;
-    if (!body || !personal) return;
+    if (!body || !personal) return false;
 
     const nome = pacienteLabelBlock(personal, 'Nome do Paciente');
     const nomeSocial = pacienteLabelBlock(personal, 'Nome Social');
@@ -2492,7 +2545,7 @@
     const carteira = pacienteLabelBlock(personal, 'No. da Carteira do Plano');
     const validade = pacienteLabelBlock(personal, 'Validade da Carteira');
 
-    if (!nome || !sexo || !birth || !email || !telefone || !celular || !carteira || !validade) return;
+    if (!nome || !sexo || !birth || !email || !telefone || !celular || !carteira || !validade) return false;
 
     const host = pacienteEnsureHost(personal);
 
@@ -2516,11 +2569,11 @@
     reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
 
+    root.classList.add('tm-paciente-root');
     root.dataset.tmPacienteApplied = '1';
+    root.dataset.tmPacienteSignature = signature;
 
-    if (cadastroModal) {
-      cadastroModal.classList.remove('tm-paciente-pending-layout');
-    }
+    if (cadastroModal) cadastroModal.classList.remove('tm-paciente-pending-layout');
 
     return true;
   }
@@ -2529,33 +2582,37 @@
     clearTimeout(startPacienteLayoutRetry._timer);
 
     let attempts = 0;
-    const maxAttempts = 30;
+    const maxAttempts = 45;
 
     const run = () => {
       attempts += 1;
 
+      if (document.activeElement && document.activeElement.matches('input, textarea, select')) {
+        if (attempts < maxAttempts && isPacienteFlowFresh()) {
+          startPacienteLayoutRetry._timer = setTimeout(run, 180);
+        }
+        return;
+      }
+
       const applied = applyPacienteLayoutFromCardFlow();
       if (applied) return;
 
-      if (!isPacienteFlowFresh()) {
+      if (!isPacienteFlowFresh() || attempts >= maxAttempts) {
         const cadastroModal = document.getElementById('cadastroModal');
         if (cadastroModal) cadastroModal.classList.remove('tm-paciente-pending-layout');
         return;
       }
 
-      if (attempts >= maxAttempts) {
-        const cadastroModal = document.getElementById('cadastroModal');
-        if (cadastroModal) cadastroModal.classList.remove('tm-paciente-pending-layout');
-        return;
-      }
-
-      startPacienteLayoutRetry._timer = setTimeout(run, attempts < 8 ? 80 : 160);
+      startPacienteLayoutRetry._timer = setTimeout(run, attempts < 10 ? 80 : 160);
     };
 
     run();
   }
 
   function schedulePacienteLayoutAfterCardClick() {
+    const cadastroModal = document.getElementById('cadastroModal');
+    if (cadastroModal) cadastroModal.classList.add('tm-paciente-pending-layout');
+
     startPacienteLayoutRetry();
   }
 
@@ -3044,9 +3101,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '7.5';
+      : '7.6';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '7.5';
+    return match ? match[0] : '7.6';
   }
 
   function ensureScriptVersionIndicator() {
