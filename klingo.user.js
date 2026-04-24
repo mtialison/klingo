@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      6.5
+// @version      6.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1173,16 +1173,16 @@
 
 
       /* =========================
-         MODAL PACIENTE - ISOLADO
+         MODAL PACIENTE - DIRETO E ISOLADO
       ========================= */
-      .tm-klingo-paciente-root {
+      .tm-paciente-agendamento-root {
         width: 580px !important;
         max-width: 580px !important;
         min-width: 580px !important;
         overflow: hidden !important;
       }
 
-      .tm-klingo-paciente-root .modal-body {
+      .tm-paciente-agendamento-root .modal-body {
         padding-left: 0 !important;
         padding-right: 0 !important;
         overflow-x: hidden !important;
@@ -1192,7 +1192,15 @@
         align-items: center !important;
       }
 
-      .tm-klingo-paciente-root .tm-paciente-section {
+      .tm-paciente-agendamento-root .tm-paciente-agendamento-content,
+      .tm-paciente-agendamento-root .tm-paciente-agendamento-header-host,
+      .tm-paciente-agendamento-root .tm-paciente-agendamento-form-host,
+      .tm-paciente-agendamento-root .tm-paciente-agendamento-observation-host,
+      .tm-paciente-agendamento-root #myTab,
+      .tm-paciente-agendamento-root .tab-content,
+      .tm-paciente-agendamento-root .tab-pane,
+      .tm-paciente-agendamento-root .tab-pane .mt-3,
+      .tm-paciente-agendamento-root .modal-footer {
         width: 509px !important;
         max-width: 509px !important;
         margin-left: auto !important;
@@ -1200,90 +1208,77 @@
         box-sizing: border-box !important;
       }
 
-      .tm-klingo-paciente-root .tm-paciente-layout-host {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin: 8px auto !important;
+      .tm-paciente-agendamento-root .tm-paciente-grid-row {
+        display: grid !important;
+        gap: 10px 12px !important;
+        margin-bottom: 10px !important;
+        align-items: end !important;
       }
 
-      .tm-paciente-grid-row {
-        display: grid;
-        gap: 10px 12px;
-        margin-bottom: 10px;
-        align-items: end;
+      .tm-paciente-agendamento-root .tm-paciente-row-name-birth {
+        grid-template-columns: 342px 155px !important;
       }
 
-      .tm-paciente-row-name-birth {
-        grid-template-columns: 342px 155px;
+      .tm-paciente-agendamento-root .tm-paciente-row-sexo-origem {
+        grid-template-columns: 155px 342px !important;
       }
 
-      .tm-paciente-row-sexo-origem {
-        grid-template-columns: 155px 342px;
+      .tm-paciente-agendamento-root .tm-paciente-row-phone {
+        grid-template-columns: 155px 155px 187px !important;
       }
 
-      .tm-paciente-row-phone {
-        grid-template-columns: 155px 155px 187px;
+      .tm-paciente-agendamento-root .tm-paciente-row-card {
+        grid-template-columns: 342px 155px !important;
       }
 
-      .tm-paciente-row-card {
-        grid-template-columns: 342px 155px;
-      }
-
-      .tm-klingo-paciente-root .tm-paciente-field-slot,
-      .tm-klingo-paciente-root .tm-paciente-field-slot > .col,
-      .tm-klingo-paciente-root .tm-paciente-field-slot > [class*="col-"],
-      .tm-klingo-paciente-root .tm-paciente-field-slot > .form-group {
-        min-width: 0;
+      .tm-paciente-agendamento-root .tm-paciente-slot,
+      .tm-paciente-agendamento-root .tm-paciente-slot > .col,
+      .tm-paciente-agendamento-root .tm-paciente-slot > [class*="col-"] {
         width: 100% !important;
         max-width: none !important;
-        flex: unset !important;
+        min-width: 0 !important;
         padding-left: 0 !important;
         padding-right: 0 !important;
+        flex: unset !important;
       }
 
-      .tm-klingo-paciente-root .tm-paciente-field-slot .form-group {
+      .tm-paciente-agendamento-root .tm-paciente-slot .form-group {
         margin-bottom: 0 !important;
       }
 
-      .tm-klingo-paciente-root .tm-paciente-field-slot .input-group,
-      .tm-klingo-paciente-root .tm-paciente-field-slot .form-control,
-      .tm-klingo-paciente-root .tm-paciente-field-slot select,
-      .tm-klingo-paciente-root .tm-paciente-field-slot input,
-      .tm-klingo-paciente-root .tm-paciente-field-slot textarea {
+      .tm-paciente-agendamento-root .tm-paciente-slot .input-group,
+      .tm-paciente-agendamento-root .tm-paciente-slot .form-control,
+      .tm-paciente-agendamento-root .tm-paciente-slot input,
+      .tm-paciente-agendamento-root .tm-paciente-slot select,
+      .tm-paciente-agendamento-root .tm-paciente-slot textarea {
         width: 100% !important;
       }
 
-      .tm-klingo-paciente-root .tm-paciente-hidden-original-row,
-      .tm-klingo-paciente-root .tm-paciente-hidden {
+      .tm-paciente-agendamento-root .tm-paciente-hide {
         display: none !important;
       }
 
-      .tm-klingo-paciente-root .list-group,
-      .tm-klingo-paciente-root .list-group-item.list-group-item-success {
+      .tm-paciente-agendamento-root .list-group,
+      .tm-paciente-agendamento-root .list-group-item.list-group-item-success {
         width: 509px !important;
         max-width: 509px !important;
         margin-left: auto !important;
         margin-right: auto !important;
       }
 
-      .tm-klingo-paciente-root .list-group-item.list-group-item-success {
+      .tm-paciente-agendamento-root .list-group-item.list-group-item-success {
         background: #d5edff !important;
         color: #003358 !important;
         border-color: #b7d9ee !important;
         padding: 12px 14px !important;
       }
 
-      .tm-klingo-paciente-root .list-group-item.list-group-item-success,
-      .tm-klingo-paciente-root .list-group-item.list-group-item-success label,
-      .tm-klingo-paciente-root .list-group-item.list-group-item-success .h4,
-      .tm-klingo-paciente-root .list-group-item.list-group-item-success .lead,
-      .tm-klingo-paciente-root .list-group-item.list-group-item-success small,
-      .tm-klingo-paciente-root .list-group-item.list-group-item-success span,
-      .tm-klingo-paciente-root .list-group-item.list-group-item-success i {
+      .tm-paciente-agendamento-root .list-group-item.list-group-item-success,
+      .tm-paciente-agendamento-root .list-group-item.list-group-item-success * {
         color: #003358 !important;
       }
 
-      .tm-klingo-paciente-root .tm-procedure-title {
+      .tm-paciente-agendamento-root .tm-procedure-title {
         display: block !important;
         margin-bottom: 8px !important;
         font-size: 20px !important;
@@ -1293,7 +1288,7 @@
         word-break: break-word !important;
       }
 
-      .tm-klingo-paciente-root .tm-header-line {
+      .tm-paciente-agendamento-root .tm-header-line {
         display: flex !important;
         flex-wrap: wrap !important;
         align-items: center !important;
@@ -1302,29 +1297,36 @@
         line-height: 1.3 !important;
       }
 
-      .tm-klingo-paciente-root .tm-header-line,
-      .tm-klingo-paciente-root .tm-header-line * {
+      .tm-paciente-agendamento-root .tm-header-line,
+      .tm-paciente-agendamento-root .tm-header-line * {
         font-size: 12px !important;
       }
 
-      .tm-klingo-paciente-root .tm-header-line small .text-muted {
+      .tm-paciente-agendamento-root .tm-header-line small .text-muted {
         display: none !important;
       }
 
-      .tm-klingo-paciente-root [data-paciente-slot="nascimento"] input[type="date"]::-webkit-calendar-picker-indicator {
+      .tm-paciente-agendamento-root [data-tm-paciente-slot="nascimento"] .input-group {
+        position: relative !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+      }
+
+      .tm-paciente-agendamento-root [data-tm-paciente-slot="nascimento"] input[type="date"]::-webkit-calendar-picker-indicator {
         opacity: 0 !important;
         display: none !important;
         -webkit-appearance: none !important;
       }
 
-      .tm-klingo-paciente-root [data-paciente-slot="nascimento"] input[type="date"] {
+      .tm-paciente-agendamento-root [data-tm-paciente-slot="nascimento"] input[type="date"] {
         -webkit-appearance: none !important;
         appearance: none !important;
         background-image: none !important;
         padding-right: 46px !important;
       }
 
-      .tm-klingo-paciente-root [data-paciente-slot="nascimento"] .tm-birth-age-inline {
+      .tm-paciente-agendamento-root [data-tm-paciente-slot="nascimento"] .tm-birth-age-inline {
         position: absolute !important;
         top: 1px !important;
         bottom: 1px !important;
@@ -1341,7 +1343,7 @@
         border-bottom-right-radius: .25rem !important;
       }
 
-      .tm-klingo-paciente-root [data-paciente-slot="nascimento"] .tm-birth-age-inline .input-group-text {
+      .tm-paciente-agendamento-root [data-tm-paciente-slot="nascimento"] .tm-birth-age-inline .input-group-text {
         width: 100% !important;
         min-width: 0 !important;
         height: 100% !important;
@@ -1364,7 +1366,7 @@
         text-align: center !important;
       }
 
-      .tm-klingo-paciente-root .tm-paciente-observation-textarea {
+      .tm-paciente-agendamento-root .tm-paciente-observation-textarea {
         min-height: 68px !important;
         height: 68px !important;
         padding: 8px 10px !important;
@@ -2216,226 +2218,176 @@
 
 
 
-  function getPacienteSchedulingModalRoot() {
+  function tmPacienteGetRoot() {
     if (!isCallCenterRoute()) return null;
 
-    const modalContents = Array.from(document.querySelectorAll('.modal-content'));
-    for (const modal of modalContents) {
-      if (modal.closest('#cadastroModal')) continue;
-      if (modal.closest('#minutoModal')) continue;
-      if (!modal.closest('.modal-dialog.modal-xl.modal-dialog-scrollable')) continue;
+    const modalContents = Array.from(document.querySelectorAll('.modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content'));
 
-      const body = modal.querySelector(':scope > .modal-body');
-      if (!body) continue;
+    for (const root of modalContents) {
+      if (root.closest('#cadastroModal')) continue;
+      if (root.closest('#minutoModal')) continue;
 
-      const personalBlock = body.querySelector(':scope > .mt-3');
-      if (!personalBlock) continue;
+      const body = root.querySelector(':scope > .modal-body');
+      const personal = body ? body.querySelector(':scope > .mt-3') : null;
+      if (!body || !personal) continue;
 
-      const hasNomePaciente = !!findTextSmall(personalBlock, 'Nome do Paciente');
-      const hasNomeSocial = !!findTextSmall(personalBlock, 'Nome Social');
-      const hasTelefone = !!findTextSmall(personalBlock, 'Telefone');
-      const hasCelular = !!findTextSmall(personalBlock, 'Celular');
-      const hasNascimento = !!findTextSmall(personalBlock, 'Data de Nascimento');
-      const hasOrigem = !!findTextSmall(modal, 'Origem de Pacientes');
-      const hasAdicionarProcedimento = !!modal.querySelector('input[placeholder="Adicionar procedimento..."]');
-      const hasConfirmar = Array.from(modal.querySelectorAll(':scope > .modal-footer button, .modal-footer button'))
-        .some((btn) => norm(btn.textContent || '') === 'Confirmar');
+      const nomePaciente = findTextSmall(personal, 'Nome do Paciente');
+      const nomeSocial = findTextSmall(personal, 'Nome Social');
+      const sexo = findTextSmall(personal, 'Sexo');
+      const nascimento = findTextSmall(personal, 'Data de Nascimento');
+      const telefone = findTextSmall(personal, 'Telefone');
+      const celular = findTextSmall(personal, 'Celular');
+      const carteira = findTextSmall(personal, 'No. da Carteira do Plano');
+      const validade = findTextSmall(personal, 'Validade da Carteira');
 
-      if (
-        hasNomePaciente &&
-        hasNomeSocial &&
-        hasTelefone &&
-        hasCelular &&
-        hasNascimento &&
-        hasOrigem &&
-        hasAdicionarProcedimento &&
-        hasConfirmar
-      ) {
-        modal.classList.add('tm-klingo-paciente-root');
-        return modal;
+      if (!nomePaciente || !nomeSocial || !sexo || !nascimento || !telefone || !celular || !carteira || !validade) {
+        continue;
       }
+
+      root.classList.add('tm-paciente-agendamento-root');
+      return root;
     }
 
     return null;
   }
 
-  function getPacientePersonalBlock(root) {
-    return root ? root.querySelector(':scope > .modal-body > .mt-3') : null;
+  function tmPacienteFindBlock(root, label) {
+    return findColByLabel(root, label);
   }
 
-  function ensurePacienteSectionTitle(parent, id, text) {
-    if (!parent) return null;
-
+  function tmPacienteEnsureTitle(parent, id, text) {
     let title = parent.querySelector('#' + id);
     if (!title) {
       title = document.createElement('div');
       title.id = id;
-      title.className = 'border-bottom mb-1 d-flex justify-content-between hover-title-bg text-primary tm-paciente-section';
+      title.className = 'border-bottom mb-1 d-flex justify-content-between hover-title-bg text-primary tm-paciente-agendamento-content';
       title.innerHTML = `<div><small>${text}</small></div><div></div>`;
       parent.insertBefore(title, parent.firstChild);
     }
-
     return title;
   }
 
-  function findPacienteObservationRows(root) {
-    const title = findTextSmall(root, 'Observação');
-    const titleRow = title ? title.closest('.border-bottom') : null;
-    let fieldsRow = null;
-
-    if (titleRow) {
-      let current = titleRow.nextElementSibling;
-      while (current) {
-        if (current.classList && current.classList.contains('form-row')) {
-          fieldsRow = current;
-          break;
-        }
-        current = current.nextElementSibling;
-      }
-    }
-
-    return { titleRow, fieldsRow };
-  }
-
-  function findPacienteOriginRows(root) {
-    const title = findTextSmall(root, 'ORIGEM DE PACIENTES');
-    const titleRow = title ? title.closest('.border-bottom') : null;
-    const fieldBlock = findColByLabel(root, 'Origem de Pacientes');
-    return { titleRow, fieldBlock };
-  }
-
-  function movePacienteToSlot(host, slotName, block) {
-    const slot = host ? host.querySelector(`[data-paciente-slot="${slotName}"]`) : null;
+  function tmPacienteMove(slot, block) {
     if (!slot || !block) return;
     slot.innerHTML = '';
     slot.appendChild(block);
   }
 
-  function hidePacienteOriginalRow(el) {
+  function tmPacienteHide(el) {
     if (!el) return;
-    el.classList.add('tm-paciente-hidden-original-row');
+    el.classList.add('tm-paciente-hide');
     el.style.setProperty('display', 'none', 'important');
   }
 
-  function hidePacienteElement(el) {
-    if (!el) return;
-    el.classList.add('tm-paciente-hidden');
-    el.style.setProperty('display', 'none', 'important');
+  function tmPacienteOriginalRowsHide(parent) {
+    if (!parent) return;
+    parent.querySelectorAll(':scope > .form-row').forEach(tmPacienteHide);
   }
 
-  function ensurePacienteObservationTextarea(block) {
-    if (!block) return;
+  function tmPacienteObservation(root) {
+    const obsTitleSmall = findTextSmall(root, 'Observação');
+    const obsTitle = obsTitleSmall ? obsTitleSmall.closest('.border-bottom') : null;
+    if (!obsTitle) return;
 
-    const input = block.querySelector('input.form-control[type="text"]');
-    if (!input) return;
+    let obsRow = obsTitle.nextElementSibling;
+    while (obsRow && !(obsRow.classList && obsRow.classList.contains('form-row'))) {
+      obsRow = obsRow.nextElementSibling;
+    }
+    if (!obsRow) return;
 
-    let textarea = block.querySelector('textarea.tm-paciente-observation-textarea');
-    if (!textarea) {
-      textarea = document.createElement('textarea');
-      textarea.className = `${input.className} tm-paciente-observation-textarea`;
-      textarea.placeholder = input.placeholder || '';
-      textarea.autocomplete = input.autocomplete || 'off';
-      textarea.value = input.value || '';
-      textarea.rows = 4;
-      input.insertAdjacentElement('afterend', textarea);
-      input.classList.add('tm-paciente-hidden');
-      input.style.setProperty('display', 'none', 'important');
+    const inputBlock = obsRow.children[0] || null;
+    const selectBlock = obsRow.children[1] || null;
+    if (!inputBlock || !selectBlock) return;
 
-      const syncToInput = () => {
-        setNativeInputValue(input, textarea.value);
-        dispatchEvents(input, ['input', 'change']);
-      };
+    obsTitle.classList.add('tm-paciente-agendamento-content');
 
-      textarea.addEventListener('input', syncToInput, true);
-      textarea.addEventListener('change', syncToInput, true);
-      textarea.addEventListener('blur', () => {
-        syncToInput();
-        dispatchEvents(input, ['blur']);
-      }, true);
+    const parent = obsTitle.parentElement;
+    let host = parent.querySelector('#tm-paciente-observation-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'tm-paciente-observation-host';
+      host.className = 'tm-paciente-agendamento-observation-host tm-observation-layout';
     }
 
-    if (textarea.value !== (input.value || '')) {
-      textarea.value = input.value || '';
+    if (obsTitle.nextSibling !== host) {
+      parent.insertBefore(host, obsTitle.nextSibling);
     }
+
+    host.innerHTML = `
+      <div class="tm-paciente-slot" data-tm-paciente-slot="observacao-input"></div>
+      <div class="tm-paciente-slot" data-tm-paciente-slot="observacao-select"></div>
+    `;
+
+    tmPacienteMove(host.querySelector('[data-tm-paciente-slot="observacao-input"]'), inputBlock);
+    tmPacienteMove(host.querySelector('[data-tm-paciente-slot="observacao-select"]'), selectBlock);
+    tmPacienteHide(obsRow);
+
+    ensureObservationTextarea(inputBlock);
   }
 
-  function applyPacienteBirthAgeBadge(root) {
-    const birthSlot = root ? root.querySelector('[data-paciente-slot="nascimento"]') : null;
-    if (!birthSlot) return;
+  function tmPacienteOrigin(root, host) {
+    const origemBlock = tmPacienteFindBlock(root, 'Origem de Pacientes');
+    if (!origemBlock) return;
 
-    const input = birthSlot.querySelector('input[type="date"]');
-    const inputGroup = birthSlot.querySelector('.input-group');
-    if (!input || !inputGroup) return;
+    const origemSlot = host.querySelector('[data-tm-paciente-slot="origem"]');
+    tmPacienteMove(origemSlot, origemBlock);
 
-    const appends = Array.from(birthSlot.querySelectorAll('.input-group-append'));
-    const ageAppend = appends.find((append) =>
+    const origemTitle = findTextSmall(root, 'ORIGEM DE PACIENTES');
+    const origemTitleRow = origemTitle ? origemTitle.closest('.border-bottom') : null;
+    const origemMainRow = origemTitleRow ? origemTitleRow.closest('.row') : null;
+
+    tmPacienteHide(origemTitleRow);
+    tmPacienteHide(origemMainRow);
+  }
+
+  function tmPacienteBirth(root) {
+    const slot = root.querySelector('[data-tm-paciente-slot="nascimento"]');
+    if (!slot) return;
+
+    const input = slot.querySelector('input[type="date"]');
+    const inputGroup = slot.querySelector('.input-group');
+    const ageAppend = Array.from(slot.querySelectorAll('.input-group-append')).find((append) =>
       append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]')
     );
-    if (!ageAppend) return;
 
-    if (ageAppend.parentElement !== inputGroup) {
-      inputGroup.appendChild(ageAppend);
-    }
+    if (!input || !inputGroup || !ageAppend) return;
 
+    if (ageAppend.parentElement !== inputGroup) inputGroup.appendChild(ageAppend);
     ageAppend.classList.add('tm-birth-age-inline');
 
     const ageText = ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
-    if (!ageText) return;
-
-    syncBirthAgeBadgeFontSafe(input, ageText);
-
-    const age = calculateBirthAgeSafe(input.value);
-    if (!age) {
-      ageAppend.classList.add('tm-age-hidden');
-      return;
+    if (ageText) {
+      syncBirthAgeBadgeFontSafe(input, ageText);
+      const age = calculateBirthAgeSafe(input.value);
+      if (age) ageText.textContent = age;
     }
 
-    ageText.textContent = age;
-    ageAppend.classList.remove('tm-age-hidden');
-  }
-
-  function bindPacienteBirthAge(root) {
-    const birthSlot = root ? root.querySelector('[data-paciente-slot="nascimento"]') : null;
-    const input = birthSlot ? birthSlot.querySelector('input[type="date"]') : null;
-    if (!input) return;
-
-    if (input.dataset.tmPacienteBirthAgeBound === '1') {
-      applyPacienteBirthAgeBadge(root);
-      return;
+    if (input.dataset.tmPacienteBirthBound !== '1') {
+      input.dataset.tmPacienteBirthBound = '1';
+      let timer = null;
+      const handler = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => tmPacienteBirth(root), 80);
+      };
+      input.addEventListener('input', handler, true);
+      input.addEventListener('change', handler, true);
+      input.addEventListener('blur', handler, true);
     }
-
-    input.dataset.tmPacienteBirthAgeBound = '1';
-    let timer = null;
-    const handler = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => applyPacienteBirthAgeBadge(root), 80);
-    };
-
-    input.addEventListener('input', handler, true);
-    input.addEventListener('change', handler, true);
-    input.addEventListener('blur', handler, true);
-
-    applyPacienteBirthAgeBadge(root);
   }
 
-  function resizePacienteSchedulingModal(root) {
-    if (!root) return;
-
+  function tmPacienteResize(root) {
     const dialog = root.closest('.modal-dialog');
     if (!dialog) return;
 
-    const MODAL_W = '580px';
-    const CONTENT_W = '540px';
-
-    dialog.style.setProperty('width', MODAL_W, 'important');
-    dialog.style.setProperty('max-width', MODAL_W, 'important');
-    dialog.style.setProperty('min-width', MODAL_W, 'important');
+    dialog.style.setProperty('width', '580px', 'important');
+    dialog.style.setProperty('max-width', '580px', 'important');
+    dialog.style.setProperty('min-width', '580px', 'important');
     dialog.style.setProperty('margin-left', 'auto', 'important');
     dialog.style.setProperty('margin-right', 'auto', 'important');
 
-    root.style.setProperty('width', MODAL_W, 'important');
-    root.style.setProperty('max-width', MODAL_W, 'important');
-    root.style.setProperty('min-width', MODAL_W, 'important');
+    root.style.setProperty('width', '580px', 'important');
+    root.style.setProperty('max-width', '580px', 'important');
+    root.style.setProperty('min-width', '580px', 'important');
     root.style.setProperty('overflow', 'hidden', 'important');
 
     const body = root.querySelector(':scope > .modal-body');
@@ -2449,26 +2401,6 @@
       body.style.setProperty('align-items', 'center', 'important');
     }
 
-    root.querySelectorAll(
-      ':scope > .modal-body > div, :scope > .modal-body > .mt-3, #tm-paciente-layout-host, #tm-paciente-observation-layout-host, #myTab, .tab-content, .tab-pane, .tab-pane .mt-3, .tab-pane .form-group.mb-1, hr, :scope > .modal-footer'
-    ).forEach((el) => {
-      el.style.setProperty('width', CONTENT_W, 'important');
-      el.style.setProperty('max-width', CONTENT_W, 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    root.querySelectorAll(
-      '.tm-paciente-section, #tm-paciente-layout-host, #tm-paciente-observation-layout-host, #myTab, .tab-content, .tab-pane, .tab-pane .mt-3, .tab-pane .form-group.mb-1, .tab-pane .autocomplete, .tab-pane .autocomplete .input-group, .tab-pane input.az-autocomplete, .tab-pane hr'
-    ).forEach((el) => {
-      el.style.setProperty('width', '509px', 'important');
-      el.style.setProperty('max-width', '509px', 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
     const footer = root.querySelector(':scope > .modal-footer');
     if (footer) {
       footer.style.setProperty('width', '509px', 'important');
@@ -2476,143 +2408,80 @@
       footer.style.setProperty('padding-left', '0', 'important');
       footer.style.setProperty('padding-right', '8px', 'important');
       footer.style.setProperty('justify-content', 'flex-start', 'important');
+      footer.style.setProperty('margin-left', 'auto', 'important');
+      footer.style.setProperty('margin-right', 'auto', 'important');
     }
   }
 
-  function reorganizePacienteSchedulingModalLayout() {
-    if (!isCallCenterRoute()) return;
-
-    const root = getPacienteSchedulingModalRoot();
+  function tmPacienteApply() {
+    const root = tmPacienteGetRoot();
     if (!root) return;
 
-    const personalBlock = getPacientePersonalBlock(root);
-    if (!personalBlock) return;
+    const body = root.querySelector(':scope > .modal-body');
+    const personal = body ? body.querySelector(':scope > .mt-3') : null;
+    if (!body || !personal) return;
 
-    const nomeBlock = findColByLabel(personalBlock, 'Nome do Paciente');
-    const nomeSocialBlock = findColByLabel(personalBlock, 'Nome Social');
-    const sexoBlock = findColByLabel(personalBlock, 'Sexo');
-    const birthBlock = findColByLabel(personalBlock, 'Data de Nascimento');
-    const emailBlock = findColByLabel(personalBlock, 'e-mail');
-    const telefoneBlock = findColByLabel(personalBlock, 'Telefone');
-    const celularBlock = findColByLabel(personalBlock, 'Celular');
-    const carteiraBlock = findColByLabel(personalBlock, 'No. da Carteira do Plano');
-    const validadeBlock = findColByLabel(personalBlock, 'Validade da Carteira');
+    const nome = tmPacienteFindBlock(personal, 'Nome do Paciente');
+    const nomeSocial = tmPacienteFindBlock(personal, 'Nome Social');
+    const sexo = tmPacienteFindBlock(personal, 'Sexo');
+    const nascimento = tmPacienteFindBlock(personal, 'Data de Nascimento');
+    const email = tmPacienteFindBlock(personal, 'e-mail');
+    const telefone = tmPacienteFindBlock(personal, 'Telefone');
+    const celular = tmPacienteFindBlock(personal, 'Celular');
+    const carteira = tmPacienteFindBlock(personal, 'No. da Carteira do Plano');
+    const validade = tmPacienteFindBlock(personal, 'Validade da Carteira');
 
-    const originInfo = findPacienteOriginRows(root);
-    const origemBlock = originInfo.fieldBlock;
+    if (!nome || !sexo || !nascimento || !email || !telefone || !celular || !carteira || !validade) return;
 
-    const observationInfo = findPacienteObservationRows(root);
-    const observationInputBlock = observationInfo.fieldsRow ? observationInfo.fieldsRow.children[0] : null;
-    const observationSelectBlock = observationInfo.fieldsRow ? observationInfo.fieldsRow.children[1] : null;
+    const title = tmPacienteEnsureTitle(personal, 'tm-paciente-dados-title', 'Dados Pessoais');
 
-    if (
-      !nomeBlock ||
-      !sexoBlock ||
-      !birthBlock ||
-      !emailBlock ||
-      !telefoneBlock ||
-      !celularBlock ||
-      !carteiraBlock ||
-      !validadeBlock ||
-      !origemBlock ||
-      !observationInputBlock ||
-      !observationSelectBlock
-    ) {
-      return;
+    let host = personal.querySelector('#tm-paciente-form-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'tm-paciente-form-host';
+      host.className = 'tm-paciente-agendamento-form-host';
     }
 
-    const titleRow = ensurePacienteSectionTitle(personalBlock, 'tm-paciente-dados-title', 'Dados Pessoais');
-    const layoutHost = ensureHost(personalBlock, 'tm-paciente-layout-host', 'tm-paciente-layout-host tm-paciente-section');
-
-    if (titleRow && titleRow.nextSibling !== layoutHost) {
-      personalBlock.insertBefore(layoutHost, titleRow.nextSibling);
+    if (title.nextSibling !== host) {
+      personal.insertBefore(host, title.nextSibling);
     }
 
-    layoutHost.innerHTML = `
+    host.innerHTML = `
       <div class="tm-paciente-grid-row tm-paciente-row-name-birth">
-        <div class="tm-paciente-field-slot" data-paciente-slot="nome"></div>
-        <div class="tm-paciente-field-slot" data-paciente-slot="nascimento"></div>
+        <div class="tm-paciente-slot" data-tm-paciente-slot="nome"></div>
+        <div class="tm-paciente-slot" data-tm-paciente-slot="nascimento"></div>
       </div>
       <div class="tm-paciente-grid-row tm-paciente-row-sexo-origem">
-        <div class="tm-paciente-field-slot" data-paciente-slot="sexo"></div>
-        <div class="tm-paciente-field-slot" data-paciente-slot="origem"></div>
+        <div class="tm-paciente-slot" data-tm-paciente-slot="sexo"></div>
+        <div class="tm-paciente-slot" data-tm-paciente-slot="origem"></div>
       </div>
       <div class="tm-paciente-grid-row tm-paciente-row-phone">
-        <div class="tm-paciente-field-slot" data-paciente-slot="telefone"></div>
-        <div class="tm-paciente-field-slot" data-paciente-slot="celular"></div>
-        <div class="tm-paciente-field-slot" data-paciente-slot="email"></div>
+        <div class="tm-paciente-slot" data-tm-paciente-slot="telefone"></div>
+        <div class="tm-paciente-slot" data-tm-paciente-slot="celular"></div>
+        <div class="tm-paciente-slot" data-tm-paciente-slot="email"></div>
       </div>
       <div class="tm-paciente-grid-row tm-paciente-row-card">
-        <div class="tm-paciente-field-slot" data-paciente-slot="carteira"></div>
-        <div class="tm-paciente-field-slot" data-paciente-slot="validade"></div>
+        <div class="tm-paciente-slot" data-tm-paciente-slot="carteira"></div>
+        <div class="tm-paciente-slot" data-tm-paciente-slot="validade"></div>
       </div>
     `;
 
-    movePacienteToSlot(layoutHost, 'nome', nomeBlock);
-    movePacienteToSlot(layoutHost, 'nascimento', birthBlock);
-    movePacienteToSlot(layoutHost, 'sexo', sexoBlock);
-    movePacienteToSlot(layoutHost, 'origem', origemBlock);
-    movePacienteToSlot(layoutHost, 'telefone', telefoneBlock);
-    movePacienteToSlot(layoutHost, 'celular', celularBlock);
-    movePacienteToSlot(layoutHost, 'email', emailBlock);
-    movePacienteToSlot(layoutHost, 'carteira', carteiraBlock);
-    movePacienteToSlot(layoutHost, 'validade', validadeBlock);
+    tmPacienteMove(host.querySelector('[data-tm-paciente-slot="nome"]'), nome);
+    tmPacienteMove(host.querySelector('[data-tm-paciente-slot="nascimento"]'), nascimento);
+    tmPacienteMove(host.querySelector('[data-tm-paciente-slot="sexo"]'), sexo);
+    tmPacienteMove(host.querySelector('[data-tm-paciente-slot="telefone"]'), telefone);
+    tmPacienteMove(host.querySelector('[data-tm-paciente-slot="celular"]'), celular);
+    tmPacienteMove(host.querySelector('[data-tm-paciente-slot="email"]'), email);
+    tmPacienteMove(host.querySelector('[data-tm-paciente-slot="carteira"]'), carteira);
+    tmPacienteMove(host.querySelector('[data-tm-paciente-slot="validade"]'), validade);
 
-    if (nomeSocialBlock) hidePacienteElement(nomeSocialBlock);
-
-    personalBlock.querySelectorAll(':scope > .form-row').forEach((row) => hidePacienteOriginalRow(row));
-
-    if (originInfo.titleRow) {
-      const originRow = originInfo.titleRow.closest('.row');
-      hidePacienteOriginalRow(originInfo.titleRow);
-      hidePacienteOriginalRow(originRow);
-    }
-
-    if (observationInfo.titleRow && observationInfo.fieldsRow) {
-      observationInfo.titleRow.classList.add('tm-paciente-section');
-
-      const observationHostParent = observationInfo.titleRow.parentElement;
-      const observationHost = ensureHost(observationHostParent, 'tm-paciente-observation-layout-host', 'tm-observation-layout tm-paciente-section');
-      if (observationInfo.titleRow.nextSibling !== observationHost) {
-        observationHostParent.insertBefore(observationHost, observationInfo.titleRow.nextSibling);
-      }
-
-      observationHost.innerHTML = `
-        <div class="tm-paciente-field-slot" data-paciente-slot="observacao-input"></div>
-        <div class="tm-paciente-field-slot" data-paciente-slot="observacao-select"></div>
-      `;
-
-      movePacienteToSlot(observationHost, 'observacao-input', observationInputBlock);
-      movePacienteToSlot(observationHost, 'observacao-select', observationSelectBlock);
-      hidePacienteOriginalRow(observationInfo.fieldsRow);
-      ensurePacienteObservationTextarea(observationInputBlock);
-    }
-
-    [
-      nomeBlock,
-      sexoBlock,
-      birthBlock,
-      emailBlock,
-      telefoneBlock,
-      celularBlock,
-      carteiraBlock,
-      validadeBlock,
-      origemBlock,
-      observationInputBlock,
-      observationSelectBlock
-    ].forEach((block) => {
-      if (!block) return;
-      block.style.setProperty('width', '100%', 'important');
-      block.style.setProperty('max-width', 'none', 'important');
-      block.style.setProperty('padding-left', '0', 'important');
-      block.style.setProperty('padding-right', '0', 'important');
-      block.style.setProperty('flex', 'unset', 'important');
-    });
-
-    bindPacienteBirthAge(root);
-    resizePacienteSchedulingModal(root);
+    tmPacienteOrigin(root, host);
+    tmPacienteHide(nomeSocial);
+    tmPacienteOriginalRowsHide(personal);
+    tmPacienteObservation(root);
+    tmPacienteBirth(root);
+    tmPacienteResize(root);
     reorganizeHeaderStructure(root);
-    simplifyUnitsSafe();
   }
 
   function burstUpdateLite() {
@@ -2628,7 +2497,7 @@
     resizeSchedulingModal();
     if (root) reorganizeHeaderStructure(root);
     simplifyUnitsSafe();
-    reorganizePacienteSchedulingModalLayout();
+    tmPacienteApply();
   }
 
   function burstUpdate() {
@@ -2654,7 +2523,7 @@
     enableBirthDatePaste();
     hideAppointmentModalFields();
     reorganizeSchedulingModalLayout();
-    reorganizePacienteSchedulingModalLayout();
+    tmPacienteApply();
     enableBirthAgeBadgeSafe();
   }, true);
 
@@ -3089,9 +2958,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '6.5';
+      : '6.6';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '6.5';
+    return match ? match[0] : '6.6';
   }
 
   function ensureScriptVersionIndicator() {
