@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      6.1
+// @version      6.3
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -705,6 +705,22 @@
         grid-template-columns: 155px 155px 187px;
       }
 
+      .tm-klingo-root.tm-registered-patient-modal .tm-row-name-birth {
+        grid-template-columns: 342px 155px;
+      }
+
+      .tm-klingo-root.tm-registered-patient-modal .tm-row-cpf-sexo-origem {
+        grid-template-columns: 155px 175px 155px;
+      }
+
+      .tm-klingo-root .tm-generated-dados-pessoais-title {
+        width: 509px !important;
+        max-width: 509px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        box-sizing: border-box !important;
+      }
+
       .tm-row-carteira-validade {
         grid-template-columns: 342px 155px;
       }
@@ -1205,28 +1221,85 @@
     el.style.setProperty('display', 'none', 'important');
   }
 
+  function hasExactSmallText(root, labelText) {
+    return Array.from(root.querySelectorAll('small'))
+      .some((small) => norm(small.textContent || '') === labelText);
+  }
+
+  function hasFooterButtonsExact(modal, labels) {
+    const footer = modal.querySelector(':scope > .modal-footer, .modal-footer');
+    if (!footer) return false;
+
+    const buttonTexts = Array.from(footer.querySelectorAll('button'))
+      .map((btn) => norm(btn.textContent || ''))
+      .filter(Boolean);
+
+    return labels.every((label) => buttonTexts.includes(label));
+  }
+
+  function isFirstVisitSchedulingModalHtml(modal) {
+    if (!modal || modal.closest('#minutoModal')) return false;
+
+    const wrapper = modal.closest('#cadastroModal');
+    const dialog = modal.closest('.modal-dialog.modal-xl.modal-dialog-scrollable');
+
+    return !!(
+      wrapper &&
+      dialog &&
+      modal.querySelector(':scope > .modal-body') &&
+      modal.querySelector('#cadTemp') &&
+      hasExactSmallText(modal, 'Dados Pessoais') &&
+      hasExactSmallText(modal, 'Nome') &&
+      hasExactSmallText(modal, 'CPF') &&
+      hasExactSmallText(modal, 'Data de Nascimento') &&
+      hasExactSmallText(modal, 'ORIGEM DE PACIENTES') &&
+      hasExactSmallText(modal, 'Origem de Pacientes') &&
+      hasFooterButtonsExact(modal, ['Recorrência...', 'Reservar', 'Voltar', 'Confirmar'])
+    );
+  }
+
+  function isRegisteredPatientSchedulingModalHtml(modal) {
+    if (!modal || modal.closest('#cadastroModal') || modal.closest('#minutoModal')) return false;
+
+    const dialog = modal.closest('.modal-dialog.modal-xl.modal-dialog-scrollable');
+    const body = modal.querySelector(':scope > .modal-body');
+    const personalBlock = body ? body.querySelector(':scope > .mt-3') : null;
+
+    return !!(
+      dialog &&
+      body &&
+      personalBlock &&
+      !modal.querySelector('#cadTemp') &&
+      body.querySelector(':scope > div[data-v-06af4983]') &&
+      hasExactSmallText(personalBlock, 'Nome do Paciente') &&
+      hasExactSmallText(personalBlock, 'Nome Social') &&
+      hasExactSmallText(personalBlock, 'Sexo') &&
+      hasExactSmallText(personalBlock, 'Data de Nascimento') &&
+      hasExactSmallText(personalBlock, 'Telefone') &&
+      hasExactSmallText(personalBlock, 'Celular') &&
+      hasExactSmallText(personalBlock, 'No. da Carteira do Plano') &&
+      hasExactSmallText(personalBlock, 'Validade da Carteira') &&
+      hasExactSmallText(modal, 'ORIGEM DE PACIENTES') &&
+      hasExactSmallText(modal, 'Origem de Pacientes') &&
+      hasFooterButtonsExact(modal, ['Recorrência...', 'Reservar', 'Voltar', 'Confirmar'])
+    );
+  }
+
   function getSchedulingModalRoot() {
     if (!isCallCenterRoute()) return null;
     const modalContents = document.querySelectorAll('.modal-content');
 
     for (const modal of modalContents) {
-      const text = norm(modal.innerText || modal.textContent || '');
-      if (!text) continue;
-
       const modalTitle = norm(modal.querySelector('.modal-title')?.textContent || '');
-      const successTexts = Array.from(modal.querySelectorAll('.btn-success'))
-        .map(btn => norm(btn.textContent || ''));
-
-      const hasDadosPessoais = text.includes('Dados Pessoais');
-      const hasOrigemPacientes = text.includes('ORIGEM DE PACIENTES') || text.includes('Origem de Pacientes');
-      const hasConfirmar = successTexts.some(txt => txt.includes('Confirmar'));
-      const hasAtualizar = successTexts.some(txt => txt.includes('Atualizar'));
-
       if (modalTitle.includes('Editar Marcação')) continue;
-      if (hasAtualizar && !hasConfirmar) continue;
 
-      if (hasDadosPessoais && hasOrigemPacientes && hasConfirmar) {
+      const isFirstVisit = isFirstVisitSchedulingModalHtml(modal);
+      const isRegisteredPatient = isRegisteredPatientSchedulingModalHtml(modal);
+
+      if (isFirstVisit || isRegisteredPatient) {
         modal.classList.add('tm-klingo-root');
+        modal.classList.toggle('tm-registered-patient-modal', isRegisteredPatient);
+        modal.classList.toggle('tm-first-visit-modal', isFirstVisit);
         return modal;
       }
     }
@@ -1268,7 +1341,8 @@
   }
 
   function getCadTemp(root) {
-    return root.querySelector('#cadTemp');
+    if (!root) return null;
+    return root.querySelector('#cadTemp') || root.querySelector(':scope > .modal-body > .mt-3');
   }
 
   function getCadTempTitleRow(root) {
@@ -1276,7 +1350,20 @@
     if (!cadTemp) return null;
 
     const title = findTextSmall(cadTemp, 'Dados Pessoais');
-    return title ? title.closest('.border-bottom') : null;
+    if (title) return title.closest('.border-bottom');
+
+    if (isRegisteredPatientSchedulingModalHtml(root)) {
+      let titleRow = cadTemp.querySelector(':scope > .tm-generated-dados-pessoais-title');
+      if (!titleRow) {
+        titleRow = document.createElement('div');
+        titleRow.className = 'border-bottom mb-1 d-flex justify-content-between hover-title-bg text-primary tm-generated-dados-pessoais-title';
+        titleRow.innerHTML = '<div><small>Dados Pessoais</small></div><div></div>';
+        cadTemp.insertBefore(titleRow, cadTemp.firstChild);
+      }
+      return titleRow;
+    }
+
+    return null;
   }
 
   function getObservationTitleRow(root) {
@@ -1630,7 +1717,7 @@
 
     if (!cadTemp || !cadTempTitleRow || !observationTitleRow || !observationFieldsRow) return;
 
-    const isRegisteredPatient = isRegisteredPatientSchedulingModal(root);
+    const isRegisteredPatient = isRegisteredPatientSchedulingModalHtml(root);
 
     const sexoBlock = findColByAnyLabel(cadTemp, ['Sexo']);
     const birthBlock = findColByAnyLabel(cadTemp, ['Data de Nascimento']);
@@ -1641,7 +1728,7 @@
     const cpfBlock = findColByAnyLabel(cadTemp, ['CPF']);
     const carteiraBlock = findColByAnyLabel(cadTemp, ['No. da Carteira do Plano']);
     const validadeBlock = findColByAnyLabel(cadTemp, ['Validade da Carteira']);
-    const origemBlock = findOriginFieldBlock(root);
+    const origemBlock = findOriginFieldBlock(root) || findColByAnyLabel(root, ['Origem de Pacientes', 'ORIGEM DE PACIENTES']);
 
     const observationInputBlock = observationFieldsRow.children[0] || null;
     const observationSelectBlock = observationFieldsRow.children[1] || null;
@@ -1781,10 +1868,10 @@
     if (!root) return;
 
     const telefoneBlock = findColByLabel(root, 'Telefone');
-    const nomeSocialBlock = findColByLabel(root, 'Nome Social');
+    const nomeSocialBlock = findColByAnyLabel(root, ['Nome Social', 'Nome social']);
     const materialBlock = findMaterialBlock(root);
 
-    if (!isRegisteredPatientSchedulingModal(root)) {
+    if (!isRegisteredPatientSchedulingModalHtml(root)) {
       hideElement(telefoneBlock);
     }
 
@@ -2533,9 +2620,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '6.1';
+      : '6.3';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '6.1';
+    return match ? match[0] : '6.3';
   }
 
   function ensureScriptVersionIndicator() {
