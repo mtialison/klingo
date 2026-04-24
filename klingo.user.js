@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      5.9
+// @version      6.0
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2481,9 +2481,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '5.9';
+      : '6.0';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '5.9';
+    return match ? match[0] : '6.0';
   }
 
   function ensureScriptVersionIndicator() {
@@ -2513,6 +2513,32 @@ function setDateCalculatorOpen(isOpen) {
       indicator.style.setProperty('font-weight', cs.fontWeight, 'important');
       indicator.style.setProperty('font-family', cs.fontFamily, 'important');
     }
+  }
+
+  function startHeaderToolsInitialRenderSafe() {
+    if (!isKlingoHost()) return;
+
+    clearTimeout(startHeaderToolsInitialRenderSafe._timer);
+
+    let attempts = 0;
+    const maxAttempts = 24;
+
+    const run = () => {
+      attempts += 1;
+
+      ensureDateCalculatorHeaderTrigger();
+      ensureScriptVersionIndicator();
+
+      const hasCalculator = !!document.querySelector('[data-tm-datecalc-header-trigger="1"]');
+      const hasVersion = !!document.querySelector('#tm-script-version-indicator');
+
+      if (hasCalculator && hasVersion) return;
+      if (attempts >= maxAttempts) return;
+
+      startHeaderToolsInitialRenderSafe._timer = setTimeout(run, 250);
+    };
+
+    run();
   }
 
   function getDateCalculatorHeaderHost() {
@@ -2681,8 +2707,15 @@ function setDateCalculatorOpen(isOpen) {
       refreshDateCalculatorResults();
     }, true);
 
-    window.addEventListener('hashchange', scheduleDateCalculatorMenuRefresh, true);
-    window.addEventListener('focus', scheduleDateCalculatorMenuRefresh, true);
+    window.addEventListener('hashchange', () => {
+      scheduleDateCalculatorMenuRefresh();
+      startHeaderToolsInitialRenderSafe();
+    }, true);
+
+    window.addEventListener('focus', () => {
+      scheduleDateCalculatorMenuRefresh();
+      startHeaderToolsInitialRenderSafe();
+    }, true);
   }
 
   function initDateCalculatorFeature() {
@@ -2706,12 +2739,15 @@ function setDateCalculatorOpen(isOpen) {
       ensureDateCalculatorHeaderTrigger();
       ensureScriptVersionIndicator();
     }, 700);
+
+    startHeaderToolsInitialRenderSafe();
   }
 
   const observer = new MutationObserver(() => {
     applyLoginIndicator();
     enableBirthDatePaste();
     burstUpdateLite();
+    scheduleDateCalculatorMenuRefresh();
   });
 
   observer.observe(document.body, {
