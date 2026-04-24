@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      8.5
+// @version      8.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1251,6 +1251,86 @@
       }
 
 
+
+      /* =========================
+         FASE 4 - LARGURA E ESPAÇAMENTO PACIENTE
+         Sem mover DOM
+      ========================= */
+      .tm-paciente-spacing-root {
+        width: 580px !important;
+        max-width: 580px !important;
+        min-width: 580px !important;
+        overflow: hidden !important;
+      }
+
+      .tm-paciente-spacing-root .modal-body {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+      }
+
+      .tm-paciente-spacing-root .modal-body > div,
+      .tm-paciente-spacing-root .modal-body > .mt-3,
+      .tm-paciente-spacing-root .modal-footer,
+      .tm-paciente-spacing-root #myTab,
+      .tm-paciente-spacing-root #myTabContent,
+      .tm-paciente-spacing-root .tab-content,
+      .tm-paciente-spacing-root .tab-pane,
+      .tm-paciente-spacing-root .tab-pane > .mt-3 {
+        width: 540px !important;
+        max-width: 540px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-spacing-root .border-bottom,
+      .tm-paciente-spacing-root .tm-paciente-title,
+      .tm-paciente-spacing-root .tm-paciente-section {
+        width: 509px !important;
+        max-width: 509px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-spacing-root .form-row {
+        width: 509px !important;
+        max-width: 509px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-spacing-root .form-row > .col,
+      .tm-paciente-spacing-root .form-row > [class*="col-"] {
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-spacing-root .form-group {
+        margin-bottom: 8px !important;
+      }
+
+      .tm-paciente-spacing-root .input-group,
+      .tm-paciente-spacing-root .form-control,
+      .tm-paciente-spacing-root input,
+      .tm-paciente-spacing-root select {
+        min-width: 0 !important;
+      }
+
+      .tm-paciente-spacing-root .modal-footer {
+        justify-content: flex-start !important;
+        padding-left: 0 !important;
+        padding-right: 8px !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -1499,6 +1579,50 @@
     if (nomeSocialBlock) {
       nomeSocialBlock.classList.add('tm-paciente-nome-social-field');
       nomeSocialBlock.style.setProperty('display', 'none', 'important');
+    }
+  }
+
+  function applyPacienteSpacingPhase4() {
+    const root = getActivePacienteSchedulingModalRoot();
+    if (!root) return;
+
+    root.classList.add('tm-paciente-spacing-root');
+
+    const dialog = root.closest('.modal-dialog');
+    if (dialog) {
+      dialog.style.setProperty('width', '580px', 'important');
+      dialog.style.setProperty('max-width', '580px', 'important');
+      dialog.style.setProperty('min-width', '580px', 'important');
+      dialog.style.setProperty('margin-left', 'auto', 'important');
+      dialog.style.setProperty('margin-right', 'auto', 'important');
+    }
+
+    root.style.setProperty('width', '580px', 'important');
+    root.style.setProperty('max-width', '580px', 'important');
+    root.style.setProperty('min-width', '580px', 'important');
+    root.style.setProperty('overflow', 'hidden', 'important');
+
+    const body = root.querySelector(':scope > .modal-body');
+    if (body) {
+      body.style.setProperty('padding-left', '0', 'important');
+      body.style.setProperty('padding-right', '0', 'important');
+      body.style.setProperty('overflow-x', 'hidden', 'important');
+      body.style.setProperty('overflow-y', 'auto', 'important');
+      body.style.setProperty('display', 'flex', 'important');
+      body.style.setProperty('flex-direction', 'column', 'important');
+      body.style.setProperty('align-items', 'center', 'important');
+    }
+
+    const footer = root.querySelector(':scope > .modal-footer');
+    if (footer) {
+      footer.style.setProperty('width', '509px', 'important');
+      footer.style.setProperty('max-width', '509px', 'important');
+      footer.style.setProperty('margin-left', 'auto', 'important');
+      footer.style.setProperty('margin-right', 'auto', 'important');
+      footer.style.setProperty('box-sizing', 'border-box', 'important');
+      footer.style.setProperty('justify-content', 'flex-start', 'important');
+      footer.style.setProperty('padding-left', '0', 'important');
+      footer.style.setProperty('padding-right', '8px', 'important');
     }
   }
 
@@ -2287,6 +2411,7 @@
     clearFirstVisitResidueFromPacienteModal();
     applyPacienteHeaderVisual();
     applyPacienteFieldsPhase3();
+    applyPacienteSpacingPhase4();
 
     const root = getSchedulingModalRoot();
 
@@ -2328,16 +2453,19 @@
         clearFirstVisitResidueFromPacienteModal();
         applyPacienteHeaderVisual();
         applyPacienteFieldsPhase3();
+        applyPacienteSpacingPhase4();
       }, 60);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         applyPacienteHeaderVisual();
         applyPacienteFieldsPhase3();
+        applyPacienteSpacingPhase4();
       }, 160);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         applyPacienteHeaderVisual();
         applyPacienteFieldsPhase3();
+        applyPacienteSpacingPhase4();
       }, 320);
     }
 
@@ -2787,9 +2915,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '8.5';
+      : '8.6';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '8.5';
+    return match ? match[0] : '8.6';
   }
 
   function ensureScriptVersionIndicator() {
