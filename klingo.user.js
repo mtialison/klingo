@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      9.5
+// @version      9.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1795,6 +1795,72 @@
       }
 
 
+
+      /* =========================
+         PACIENTE 9.6 - ? AO LADO DO SELECT
+      ========================= */
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select {
+        width: 240px !important;
+        max-width: 240px !important;
+        min-width: 240px !important;
+        margin-left: 0 !important;
+        margin-right: auto !important;
+        margin-top: 10px !important;
+        padding-left: 0 !important;
+        display: block !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select > .col,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select > [class*="col-"] {
+        width: 240px !important;
+        max-width: 240px !important;
+        min-width: 240px !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        flex: unset !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group {
+        width: 240px !important;
+        max-width: 240px !important;
+        min-width: 240px !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-prepend {
+        display: flex !important;
+        align-items: stretch !important;
+        flex: 0 0 auto !important;
+        margin-left: 0 !important;
+        margin-right: -1px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-prepend .input-group-text,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-text {
+        height: 34px !important;
+        min-height: 34px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select select,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-control {
+        flex: 1 1 auto !important;
+        width: 1% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: 34px !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -3099,6 +3165,33 @@
   function tmPaciente91AlignLowerBlocks(root) {
     if (!root) return;
 
+    const observationSelect = root.querySelector('.tm-paciente-v91-observation-select');
+    if (observationSelect) {
+      observationSelect.style.setProperty('width', '240px', 'important');
+      observationSelect.style.setProperty('max-width', '240px', 'important');
+      observationSelect.style.setProperty('min-width', '240px', 'important');
+      observationSelect.style.setProperty('margin-left', '0', 'important');
+      observationSelect.style.setProperty('margin-right', 'auto', 'important');
+      observationSelect.style.setProperty('display', 'block', 'important');
+
+      const group = observationSelect.querySelector('.input-group');
+      if (group) {
+        group.style.setProperty('width', '240px', 'important');
+        group.style.setProperty('max-width', '240px', 'important');
+        group.style.setProperty('display', 'flex', 'important');
+        group.style.setProperty('flex-wrap', 'nowrap', 'important');
+        group.style.setProperty('align-items', 'stretch', 'important');
+      }
+
+      const prepend = observationSelect.querySelector('.input-group-prepend');
+      if (prepend) {
+        prepend.style.setProperty('display', 'flex', 'important');
+        prepend.style.setProperty('align-items', 'stretch', 'important');
+        prepend.style.setProperty('margin-left', '0', 'important');
+        prepend.style.setProperty('margin-right', '-1px', 'important');
+      }
+    }
+
     const width = '509px';
 
     [
@@ -3753,9 +3846,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '9.5';
+      : '9.6';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '9.5';
+    return match ? match[0] : '9.6';
   }
 
   function ensureScriptVersionIndicator() {
