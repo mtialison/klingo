@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      10.1
+// @version      10.2
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -3154,6 +3154,7 @@
     return false;
   }
 
+  
   function tmPaciente91Birth(root) {
     const birthBlock = root.querySelector('.tm-paciente-v91-birth');
     if (!birthBlock) return;
@@ -3162,15 +3163,67 @@
     const inputGroup = birthBlock.querySelector('.input-group');
     if (!input || !inputGroup) return;
 
-    const ageAppend = Array.from(birthBlock.querySelectorAll('.input-group-append')).find((append) =>
-      append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]')
-    );
+    // REMOVE append original (causa bug)
+    birthBlock.querySelectorAll('.input-group-append').forEach(el => el.remove());
 
-    if (!ageAppend) return;
+    // cria badge limpa
+    let badge = inputGroup.querySelector('.tm-birth-age-inline');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'tm-birth-age-inline';
 
-    if (ageAppend.parentElement !== inputGroup) {
-      inputGroup.appendChild(ageAppend);
+      const span = document.createElement('div');
+      span.className = 'input-group-text';
+      badge.appendChild(span);
+
+      inputGroup.appendChild(badge);
     }
+
+    const ageText = badge.querySelector('.input-group-text');
+
+    inputGroup.style.setProperty('position', 'relative', 'important');
+    input.style.setProperty('padding-right', '48px', 'important');
+
+    const syncAge = () => {
+      const raw = (input.value || '').replace(/[^0-9]/g, '');
+
+      if (raw.length !== 8) {
+        badge.style.setProperty('display', 'none', 'important');
+        ageText.textContent = '';
+        return;
+      }
+
+      const day = raw.substring(0,2);
+      const month = raw.substring(2,4);
+      const year = raw.substring(4,8);
+
+      const birthDate = new Date(year + '-' + month + '-' + day);
+      if (isNaN(birthDate.getTime())) {
+        badge.style.setProperty('display', 'none', 'important');
+        return;
+      }
+
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+
+      badge.style.setProperty('display', 'flex', 'important');
+      ageText.textContent = age + 'a';
+    };
+
+    if (!input.dataset.tmPaciente91BirthListener) {
+      input.addEventListener('input', syncAge);
+      input.addEventListener('change', syncAge);
+      input.dataset.tmPaciente91BirthListener = '1';
+    }
+
+    syncAge();
+  }
+
 
     inputGroup.style.setProperty('position', 'relative', 'important');
     inputGroup.style.setProperty('overflow', 'hidden', 'important');
@@ -4176,9 +4229,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '10.1';
+      : '10.2';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '10.1';
+    return match ? match[0] : '10.2';
   }
 
   function ensureScriptVersionIndicator() {
