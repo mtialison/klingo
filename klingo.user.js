@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      9.6
+// @version      9.7
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1861,6 +1861,105 @@
       }
 
 
+
+      /* =========================
+         PACIENTE 9.7 - COMPACTAÇÃO PROPORCIONAL
+      ========================= */
+      .tm-paciente-v91-root .list-group-item.list-group-item-success {
+        min-height: 132px !important;
+        padding: 10px 14px !important;
+        margin-bottom: 12px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-title {
+        margin-bottom: 6px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-host {
+        row-gap: 0 !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-row {
+        gap: 7px 10px !important;
+        margin-bottom: 7px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-slot .form-group {
+        margin-bottom: 0 !important;
+      }
+
+      .tm-paciente-v91-root small.form-text,
+      .tm-paciente-v91-root small {
+        line-height: 1.15 !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-slot .form-control,
+      .tm-paciente-v91-root .tm-paciente-v91-slot input,
+      .tm-paciente-v91-root .tm-paciente-v91-slot select,
+      .tm-paciente-v91-root .tm-paciente-v91-slot .input-group-text {
+        height: 31px !important;
+        min-height: 31px !important;
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
+        font-size: 14px !important;
+        line-height: 1.2 !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
+        height: 100% !important;
+        min-height: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-host {
+        margin-top: 6px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-title {
+        margin-bottom: 3px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-control,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
+        height: 74px !important;
+        min-height: 74px !important;
+        padding: 6px 9px !important;
+        font-size: 14px !important;
+        line-height: 1.25 !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select {
+        margin-top: 7px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-control,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select select,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-text {
+        height: 31px !important;
+        min-height: 31px !important;
+        font-size: 14px !important;
+        line-height: 1.2 !important;
+      }
+
+      .tm-paciente-v91-root #myTab {
+        margin-top: 8px !important;
+      }
+
+      .tm-paciente-v91-root .modal-footer {
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+      }
+
+      .tm-paciente-v91-root .modal-footer .btn {
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
+        font-size: 16px !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -3002,8 +3101,8 @@
       textarea.style.setProperty('width', '509px', 'important');
       textarea.style.setProperty('max-width', '509px', 'important');
       textarea.style.setProperty('min-width', '509px', 'important');
-      textarea.style.setProperty('height', '84px', 'important');
-      textarea.style.setProperty('min-height', '84px', 'important');
+      textarea.style.setProperty('height', '74px', 'important');
+      textarea.style.setProperty('min-height', '74px', 'important');
       textarea.style.setProperty('resize', 'none', 'important');
       textarea.style.setProperty('overflow-y', 'auto', 'important');
     }
@@ -3846,9 +3945,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '9.6';
+      : '9.7';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '9.6';
+    return match ? match[0] : '9.7';
   }
 
   function ensureScriptVersionIndicator() {
