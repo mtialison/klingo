@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      10.2
+// @version      10.3
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2114,6 +2114,55 @@
       }
 
 
+
+      /* =========================
+         PACIENTE 10.3 - CORREÇÃO SEGURA DATA NASCIMENTO
+      ========================= */
+      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
+        position: relative !important;
+        overflow: hidden !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth input {
+        padding-right: 48px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline {
+        position: absolute !important;
+        top: 1px !important;
+        right: 1px !important;
+        bottom: 1px !important;
+        width: 46px !important;
+        height: auto !important;
+        z-index: 5 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: stretch !important;
+        pointer-events: none !important;
+        overflow: hidden !important;
+        background: #d9d9d9 !important;
+        border-top-right-radius: .25rem !important;
+        border-bottom-right-radius: .25rem !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
+        width: 100% !important;
+        height: 100% !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #d9d9d9 !important;
+        color: #666 !important;
+        border-left: 1px solid #cfd4da !important;
+        border-top: 0 !important;
+        border-right: 0 !important;
+        border-bottom: 0 !important;
+        box-sizing: border-box !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -3154,7 +3203,6 @@
     return false;
   }
 
-  
   function tmPaciente91Birth(root) {
     const birthBlock = root.querySelector('.tm-paciente-v91-birth');
     if (!birthBlock) return;
@@ -3163,67 +3211,15 @@
     const inputGroup = birthBlock.querySelector('.input-group');
     if (!input || !inputGroup) return;
 
-    // REMOVE append original (causa bug)
-    birthBlock.querySelectorAll('.input-group-append').forEach(el => el.remove());
+    const ageAppend = Array.from(birthBlock.querySelectorAll('.input-group-append')).find((append) =>
+      append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]')
+    );
 
-    // cria badge limpa
-    let badge = inputGroup.querySelector('.tm-birth-age-inline');
-    if (!badge) {
-      badge = document.createElement('div');
-      badge.className = 'tm-birth-age-inline';
+    if (!ageAppend) return;
 
-      const span = document.createElement('div');
-      span.className = 'input-group-text';
-      badge.appendChild(span);
-
-      inputGroup.appendChild(badge);
+    if (ageAppend.parentElement !== inputGroup) {
+      inputGroup.appendChild(ageAppend);
     }
-
-    const ageText = badge.querySelector('.input-group-text');
-
-    inputGroup.style.setProperty('position', 'relative', 'important');
-    input.style.setProperty('padding-right', '48px', 'important');
-
-    const syncAge = () => {
-      const raw = (input.value || '').replace(/[^0-9]/g, '');
-
-      if (raw.length !== 8) {
-        badge.style.setProperty('display', 'none', 'important');
-        ageText.textContent = '';
-        return;
-      }
-
-      const day = raw.substring(0,2);
-      const month = raw.substring(2,4);
-      const year = raw.substring(4,8);
-
-      const birthDate = new Date(year + '-' + month + '-' + day);
-      if (isNaN(birthDate.getTime())) {
-        badge.style.setProperty('display', 'none', 'important');
-        return;
-      }
-
-      const today = new Date();
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const m = today.getMonth() - birthDate.getMonth();
-
-      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
-
-      badge.style.setProperty('display', 'flex', 'important');
-      ageText.textContent = age + 'a';
-    };
-
-    if (!input.dataset.tmPaciente91BirthListener) {
-      input.addEventListener('input', syncAge);
-      input.addEventListener('change', syncAge);
-      input.dataset.tmPaciente91BirthListener = '1';
-    }
-
-    syncAge();
-  }
-
 
     inputGroup.style.setProperty('position', 'relative', 'important');
     inputGroup.style.setProperty('overflow', 'hidden', 'important');
@@ -3726,11 +3722,84 @@
     setTimeout(tmPaciente91Layout, 700);
   }
 
+
+  function tmPaciente103NormalizeBirthBadge() {
+    const root = getActivePacienteSchedulingModalRoot();
+    if (!root) return;
+
+    const birthBlock = root.querySelector('.tm-paciente-v91-birth');
+    if (!birthBlock) return;
+
+    const inputGroup = birthBlock.querySelector('.input-group');
+    const input = birthBlock.querySelector('input[type="date"], input');
+    if (!inputGroup || !input) return;
+
+    const appends = Array.from(birthBlock.querySelectorAll('.input-group-append'));
+
+    let badge = birthBlock.querySelector('.tm-birth-age-inline');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'input-group-append tm-birth-age-inline';
+      const span = document.createElement('div');
+      span.className = 'input-group-text';
+      span.setAttribute('title', 'Idade');
+      badge.appendChild(span);
+      inputGroup.appendChild(badge);
+    }
+
+    appends.forEach((append) => {
+      if (append !== badge) append.remove();
+    });
+
+    const ageText = badge.querySelector('.input-group-text');
+    inputGroup.style.setProperty('position', 'relative', 'important');
+    inputGroup.style.setProperty('overflow', 'hidden', 'important');
+    input.style.setProperty('padding-right', '48px', 'important');
+
+    const sync = () => {
+      const raw = String(input.value || '').replace(/[^0-9]/g, '');
+
+      if (raw.length !== 8) {
+        badge.style.setProperty('display', 'none', 'important');
+        if (ageText) ageText.textContent = '';
+        return;
+      }
+
+      const day = raw.slice(0, 2);
+      const month = raw.slice(2, 4);
+      const year = raw.slice(4, 8);
+      const date = new Date(year + '-' + month + '-' + day);
+
+      if (isNaN(date.getTime())) {
+        badge.style.setProperty('display', 'none', 'important');
+        if (ageText) ageText.textContent = '';
+        return;
+      }
+
+      const today = new Date();
+      let age = today.getFullYear() - date.getFullYear();
+      const m = today.getMonth() - date.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < date.getDate())) age--;
+
+      badge.style.setProperty('display', 'flex', 'important');
+      if (ageText) ageText.textContent = age + 'a';
+    };
+
+    if (!input.dataset.tmPaciente103BirthFix) {
+      input.addEventListener('input', sync);
+      input.addEventListener('change', sync);
+      input.dataset.tmPaciente103BirthFix = '1';
+    }
+
+    sync();
+  }
+
   function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
 
     clearFirstVisitResidueFromPacienteModal();
     tmPaciente91Layout();
+    tmPaciente103NormalizeBirthBadge();
 
     const root = getSchedulingModalRoot();
 
@@ -3771,14 +3840,17 @@
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
+        tmPaciente103NormalizeBirthBadge();
       }, 60);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
+        tmPaciente103NormalizeBirthBadge();
       }, 160);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
+        tmPaciente103NormalizeBirthBadge();
       }, 320);
       schedulePaciente91Layout();
     }
@@ -4229,9 +4301,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '10.2';
+      : '10.3';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '10.2';
+    return match ? match[0] : '10.3';
   }
 
   function ensureScriptVersionIndicator() {
