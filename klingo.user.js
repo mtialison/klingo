@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      10.4
+// @version      10.5
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2116,7 +2116,7 @@
 
 
       /* =========================
-         PACIENTE 10.4 - CORREÇÃO SEGURA DATA NASCIMENTO
+         PACIENTE 10.5 - CORREÇÃO SEGURA DATA NASCIMENTO
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
         position: relative !important;
@@ -2168,6 +2168,56 @@
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline) {
         display: none !important;
       }
+
+
+      /* =========================
+         PACIENTE 10.5 - BADGE IDADE FINAL
+      ========================= */
+      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline-final) {
+        display: none !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline-final {
+        position: absolute !important;
+        top: 1px !important;
+        right: 1px !important;
+        bottom: 1px !important;
+        width: 46px !important;
+        height: auto !important;
+        z-index: 10 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        align-items: stretch !important;
+        pointer-events: none !important;
+        overflow: hidden !important;
+        background: #d9d9d9 !important;
+        border-top-right-radius: .25rem !important;
+        border-bottom-right-radius: .25rem !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline-final .input-group-text {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #d9d9d9 !important;
+        color: #666 !important;
+        line-height: 1 !important;
+        border-top: 0 !important;
+        border-right: 0 !important;
+        border-bottom: 0 !important;
+        border-left: 1px solid #cfd4da !important;
+        box-sizing: border-box !important;
+        white-space: nowrap !important;
+        text-align: center !important;
+      }
+
 
 @media (max-width: 1200px) {
         .tm-top-layout,
@@ -3806,12 +3856,127 @@
     sync();
   }
 
+
+  function tmPaciente105NormalizeBirthValue(input) {
+    const visible = String(input.value || '').trim();
+    const digits = visible.replace(/[^0-9]/g, '');
+
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(visible)) {
+      const parts = visible.split('/');
+      return { day: parts[0], month: parts[1], year: parts[2] };
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(visible)) {
+      const parts = visible.split('-');
+      return { day: parts[2], month: parts[1], year: parts[0] };
+    }
+
+    if (digits.length === 8) {
+      return { day: digits.slice(0, 2), month: digits.slice(2, 4), year: digits.slice(4, 8) };
+    }
+
+    return null;
+  }
+
+  function tmPaciente105ApplyBirthBadge() {
+    const root = getActivePacienteSchedulingModalRoot();
+    if (!root) return;
+
+    const birthBlock = root.querySelector('.tm-paciente-v91-birth');
+    if (!birthBlock) return;
+
+    const inputGroup = birthBlock.querySelector('.input-group');
+    const input = birthBlock.querySelector('input[type="date"], input');
+    if (!inputGroup || !input) return;
+
+    Array.from(birthBlock.querySelectorAll('.input-group-append')).forEach((append) => {
+      if (!append.classList.contains('tm-birth-age-inline-final')) append.remove();
+    });
+
+    let badge = inputGroup.querySelector('.tm-birth-age-inline-final');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'input-group-append tm-birth-age-inline tm-birth-age-inline-final';
+
+      const text = document.createElement('div');
+      text.className = 'input-group-text';
+      text.setAttribute('title', 'Idade');
+      badge.appendChild(text);
+
+      inputGroup.appendChild(badge);
+    }
+
+    const ageText = badge.querySelector('.input-group-text');
+
+    inputGroup.style.setProperty('position', 'relative', 'important');
+    inputGroup.style.setProperty('overflow', 'hidden', 'important');
+    input.style.setProperty('padding-right', '48px', 'important');
+
+    const sync = () => {
+      const parsed = tmPaciente105NormalizeBirthValue(input);
+
+      if (!parsed) {
+        badge.style.setProperty('display', 'none', 'important');
+        if (ageText) ageText.textContent = '';
+        return;
+      }
+
+      const dayNum = Number(parsed.day);
+      const monthNum = Number(parsed.month);
+      const yearNum = Number(parsed.year);
+
+      if (
+        !Number.isInteger(dayNum) || !Number.isInteger(monthNum) || !Number.isInteger(yearNum) ||
+        dayNum < 1 || dayNum > 31 ||
+        monthNum < 1 || monthNum > 12 ||
+        yearNum < 1900 || yearNum > 2100
+      ) {
+        badge.style.setProperty('display', 'none', 'important');
+        if (ageText) ageText.textContent = '';
+        return;
+      }
+
+      const birthDate = new Date(yearNum, monthNum - 1, dayNum);
+      if (
+        birthDate.getFullYear() !== yearNum ||
+        birthDate.getMonth() !== monthNum - 1 ||
+        birthDate.getDate() !== dayNum
+      ) {
+        badge.style.setProperty('display', 'none', 'important');
+        if (ageText) ageText.textContent = '';
+        return;
+      }
+
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+
+      badge.style.setProperty('display', 'flex', 'important');
+      if (ageText) ageText.textContent = age + 'a';
+    };
+
+    if (!input.dataset.tmPaciente105BirthFix) {
+      input.addEventListener('input', sync);
+      input.addEventListener('keyup', sync);
+      input.addEventListener('change', sync);
+      input.addEventListener('blur', sync);
+      input.dataset.tmPaciente105BirthFix = '1';
+    }
+
+    sync();
+  }
+
   function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
 
     clearFirstVisitResidueFromPacienteModal();
     tmPaciente91Layout();
     tmPaciente103NormalizeBirthBadge();
+    tmPaciente105ApplyBirthBadge();
 
     const root = getSchedulingModalRoot();
 
@@ -3853,16 +4018,19 @@
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
         tmPaciente103NormalizeBirthBadge();
+        tmPaciente105ApplyBirthBadge();
       }, 60);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
         tmPaciente103NormalizeBirthBadge();
+        tmPaciente105ApplyBirthBadge();
       }, 160);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
         tmPaciente103NormalizeBirthBadge();
+        tmPaciente105ApplyBirthBadge();
       }, 320);
       schedulePaciente91Layout();
     }
@@ -4313,9 +4481,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '10.4';
+      : '10.5';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '10.4';
+    return match ? match[0] : '10.5';
   }
 
   function ensureScriptVersionIndicator() {
