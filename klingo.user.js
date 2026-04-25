@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      9.2
+// @version      9.3
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1431,6 +1431,84 @@
       }
 
 
+
+      /* =========================
+         PACIENTE 9.3 - HEADER IGUAL PRIMEIRA VEZ
+      ========================= */
+      .tm-paciente-v91-root .list-group,
+      .tm-paciente-v91-root .list-group-item.list-group-item-success {
+        width: 509px !important;
+        max-width: 509px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .tm-paciente-v91-root .list-group-item.list-group-item-success {
+        background: #d5edff !important;
+        border-color: #b7d9ee !important;
+        color: #003358 !important;
+        padding: 12px 14px !important;
+        min-height: 132px !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root .list-group-item.list-group-item-success,
+      .tm-paciente-v91-root .list-group-item.list-group-item-success * {
+        color: #003358 !important;
+      }
+
+      .tm-paciente-v91-header-title {
+        display: block !important;
+        margin-bottom: 8px !important;
+        font-size: 16px !important;
+        line-height: 1.25 !important;
+        font-weight: 400 !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+      }
+
+      .tm-paciente-v91-header-line {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        gap: 6px 12px !important;
+        margin-bottom: 6px !important;
+        line-height: 1.25 !important;
+        font-size: 12px !important;
+      }
+
+      .tm-paciente-v91-header-line,
+      .tm-paciente-v91-header-line * {
+        font-size: 12px !important;
+        line-height: 1.25 !important;
+      }
+
+      .tm-paciente-v91-header-line .lead,
+      .tm-paciente-v91-header-line small,
+      .tm-paciente-v91-header-line span {
+        font-size: 12px !important;
+      }
+
+      .tm-paciente-v91-header-note {
+        display: block !important;
+        margin-top: 8px !important;
+        font-size: 12px !important;
+        line-height: 1.3 !important;
+        text-align: center !important;
+        color: #6c757d !important;
+        white-space: normal !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+
+      .tm-paciente-v91-header-line small.text-muted,
+      .tm-paciente-v91-header-line small .text-muted,
+      .tm-paciente-v91-header-line .text-muted {
+        display: none !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -2549,13 +2627,157 @@
     });
   }
 
+
+  function tmPaciente91ShortUnitText(text) {
+    const cleaned = norm(text || '');
+    const paren = cleaned.match(/\(([^)]+)\)/);
+    if (paren && paren[1]) return paren[1].trim();
+
+    const beforeSlash = cleaned.split('/')[0].trim();
+    const beforeDash = beforeSlash.split('-')[0].trim();
+
+    return beforeDash || cleaned;
+  }
+
+  function tmPaciente91NormalizeHeaderSmall(span) {
+    if (!span) return null;
+
+    const small = span.querySelector('small.lead, small');
+    if (!small) return span;
+
+    return span;
+  }
+
+  function tmPaciente91ApplyHeaderLikeFirstVisit(root) {
+    if (!root) return;
+
+    const item = root.querySelector('.list-group-item.list-group-item-success');
+    if (!item) return;
+
+    const label = item.querySelector('label.w-100, label');
+    if (!label) return;
+
+    const title = label.querySelector('.h4.mb-1, .h4');
+    if (!title) return;
+
+    title.classList.add('tm-paciente-v91-header-title');
+
+    let line2 = label.querySelector('.tm-paciente-v91-header-line-2');
+    let line3 = label.querySelector('.tm-paciente-v91-header-line-3');
+    let note = label.querySelector('.tm-paciente-v91-header-note');
+
+    if (!line2) {
+      line2 = document.createElement('div');
+      line2.className = 'tm-paciente-v91-header-line tm-paciente-v91-header-line-2';
+    }
+
+    if (!line3) {
+      line3 = document.createElement('div');
+      line3.className = 'tm-paciente-v91-header-line tm-paciente-v91-header-line-3';
+    }
+
+    if (!note) {
+      note = document.createElement('div');
+      note.className = 'tm-paciente-v91-header-note';
+    }
+
+    const originalInfo = Array.from(label.children).find((child) => {
+      if (child === title || child === line2 || child === line3 || child === note) return false;
+      const text = norm(child.innerText || child.textContent || '');
+      return child.classList.contains('d-flex') && text.includes(':');
+    }) || Array.from(label.children).find((child) => {
+      if (child === title || child === line2 || child === line3 || child === note) return false;
+      const text = norm(child.innerText || child.textContent || '');
+      return child.classList.contains('d-flex') && (
+        text.includes('LEVE') ||
+        text.includes('SAÚDE') ||
+        text.includes('GOLDEN') ||
+        text.includes('PAULO') ||
+        text.includes('GLAUCIA') ||
+        text.includes('CLINICA') ||
+        /\d{2}\/[A-Za-zÀ-ÿ]{3}/.test(text)
+      );
+    });
+
+    if (!originalInfo && line2.children.length && line3.children.length) return;
+
+    const spans = originalInfo ? Array.from(originalInfo.querySelectorAll(':scope span.mr-3, :scope span.mr-2, :scope span')) : [];
+    const convenio = spans.find((span) => {
+      const text = norm(span.innerText || span.textContent || '');
+      return text && !text.includes('CLINICA') && !text.includes('SALA') && !/\d{2}\/[A-Za-zÀ-ÿ]{3}/.test(text) && !/\d{2}:\d{2}/.test(text) && span.querySelector('.fa-credit-card');
+    }) || spans.find((span) => span.querySelector('.fa-credit-card'));
+
+    const profissional = spans.find((span) => span.querySelector('.fa-user-md'));
+    const unidade = spans.find((span) => span.querySelector('.fa-building'));
+
+    const calendarSmall = originalInfo ? Array.from(originalInfo.querySelectorAll('small')).find((small) =>
+      !!small.querySelector('.fa-calendar-alt') || /\d{2}\/[A-Za-zÀ-ÿ]{3}/.test(norm(small.innerText || small.textContent || ''))
+    ) : null;
+
+    const clockSmall = originalInfo ? Array.from(originalInfo.querySelectorAll('small')).find((small) =>
+      !!small.querySelector('.fa-clock') || /\d{2}:\d{2}-\d{2}:\d{2}/.test(norm(small.innerText || small.textContent || ''))
+    ) : null;
+
+    line2.innerHTML = '';
+    line3.innerHTML = '';
+
+    if (convenio) line2.appendChild(tmPaciente91NormalizeHeaderSmall(convenio));
+    if (profissional) line2.appendChild(tmPaciente91NormalizeHeaderSmall(profissional));
+
+    if (unidade) {
+      const small = unidade.querySelector('small.lead, small');
+      if (small && !small.dataset.tmPaciente91UnitShort) {
+        const icon = small.querySelector('i') ? small.querySelector('i').cloneNode(true) : null;
+        const unit = tmPaciente91ShortUnitText(small.textContent || '');
+        small.textContent = '';
+        if (icon) small.appendChild(icon);
+        small.appendChild(document.createTextNode(' ' + unit));
+        small.dataset.tmPaciente91UnitShort = '1';
+      }
+      line3.appendChild(tmPaciente91NormalizeHeaderSmall(unidade));
+    }
+
+    if (calendarSmall) line3.appendChild(calendarSmall);
+    if (clockSmall) line3.appendChild(clockSmall);
+
+    // Texto complementar do procedimento, quando existir.
+    const allLabelText = norm(label.innerText || label.textContent || '');
+    const extraMatch = allLabelText.match(/[-–—]\s*-\s*.+/);
+    if (extraMatch && extraMatch[0]) {
+      note.textContent = extraMatch[0].replace(/\s+/g, ' ').trim();
+    } else if (!note.textContent.trim()) {
+      note.textContent = '';
+    }
+
+    if (title.nextSibling !== line2) {
+      label.insertBefore(line2, title.nextSibling);
+    }
+    if (line2.nextSibling !== line3) {
+      label.insertBefore(line3, line2.nextSibling);
+    }
+    if (line3.nextSibling !== note) {
+      label.insertBefore(note, line3.nextSibling);
+    }
+
+    if (originalInfo && originalInfo.parentElement) {
+      originalInfo.remove();
+    }
+
+    item.style.setProperty('width', '509px', 'important');
+    item.style.setProperty('max-width', '509px', 'important');
+    item.style.setProperty('margin-left', 'auto', 'important');
+    item.style.setProperty('margin-right', 'auto', 'important');
+  }
+
   function tmPaciente91Layout() {
     const root = getActivePacienteSchedulingModalRoot();
     if (!root) return;
 
     root.classList.add('tm-paciente-v91-root');
+    tmPaciente91ApplyHeaderLikeFirstVisit(root);
 
     if (root.dataset.tmPaciente91Applied === '1') {
+      tmPaciente91ApplyHeaderLikeFirstVisit(root);
       tmPaciente91Birth(root);
       return;
     }
@@ -3157,9 +3379,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '9.2';
+      : '9.3';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '9.2';
+    return match ? match[0] : '9.3';
   }
 
   function ensureScriptVersionIndicator() {
