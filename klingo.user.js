@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      9.4
+// @version      9.5
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1609,6 +1609,192 @@
       }
 
 
+
+      /* =========================
+         PACIENTE 9.5 - GRID UNIFICADO / ALINHAMENTO DEFINITIVO
+      ========================= */
+      .tm-paciente-v91-root {
+        --tm-paciente-width: 509px;
+        --tm-paciente-gap: 10px;
+      }
+
+      .tm-paciente-v91-root .modal-body {
+        overflow-x: hidden !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-title,
+      .tm-paciente-v91-root .tm-paciente-v91-host,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-host,
+      .tm-paciente-v91-root .modal-footer {
+        width: var(--tm-paciente-width) !important;
+        max-width: var(--tm-paciente-width) !important;
+        min-width: var(--tm-paciente-width) !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-host,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-host {
+        overflow: visible !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-host *,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-host * {
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-row {
+        width: var(--tm-paciente-width) !important;
+        max-width: var(--tm-paciente-width) !important;
+        min-width: var(--tm-paciente-width) !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        display: grid !important;
+        gap: 10px !important;
+        align-items: end !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-row-name-birth {
+        grid-template-columns: 344px 155px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-row-basic,
+      .tm-paciente-v91-root .tm-paciente-v91-row-basic-has-cpf {
+        grid-template-columns: 155px 155px 179px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-row-basic-no-cpf {
+        grid-template-columns: 155px 344px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-row-contact {
+        grid-template-columns: 155px 155px 179px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-row-card {
+        grid-template-columns: 344px 155px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-slot,
+      .tm-paciente-v91-root .tm-paciente-v91-slot > .col,
+      .tm-paciente-v91-root .tm-paciente-v91-slot > [class*="col-"],
+      .tm-paciente-v91-root .tm-paciente-v91-field {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        flex: unset !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-slot .form-group,
+      .tm-paciente-v91-root .tm-paciente-v91-slot .input-group,
+      .tm-paciente-v91-root .tm-paciente-v91-slot .form-control,
+      .tm-paciente-v91-root .tm-paciente-v91-slot input,
+      .tm-paciente-v91-root .tm-paciente-v91-slot select {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-origin,
+      .tm-paciente-v91-root .tm-paciente-v91-origin .form-group,
+      .tm-paciente-v91-root .tm-paciente-v91-origin select,
+      .tm-paciente-v91-root .tm-paciente-v91-origin .form-control {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-title,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input > .col,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input > [class*="col-"],
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-group,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input .input-group,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-control,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
+        width: var(--tm-paciente-width) !important;
+        max-width: var(--tm-paciente-width) !important;
+        min-width: var(--tm-paciente-width) !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-control,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
+        height: 84px !important;
+        min-height: 84px !important;
+        resize: none !important;
+        overflow-y: auto !important;
+        padding: 8px 10px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select {
+        width: 240px !important;
+        max-width: 240px !important;
+        min-width: 240px !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        margin-top: 10px !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select > .col,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select > [class*="col-"],
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-group,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select select,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-control {
+        width: 240px !important;
+        max-width: 240px !important;
+        min-width: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+
+      .tm-paciente-v91-root #myTab,
+      .tm-paciente-v91-root #myTabContent,
+      .tm-paciente-v91-root .tab-content,
+      .tm-paciente-v91-root .tab-pane,
+      .tm-paciente-v91-root .tab-pane > .mt-3,
+      .tm-paciente-v91-root .input-group {
+        max-width: var(--tm-paciente-width) !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root #myTab,
+      .tm-paciente-v91-root #myTabContent,
+      .tm-paciente-v91-root .tab-content,
+      .tm-paciente-v91-root .tab-pane {
+        width: var(--tm-paciente-width) !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      .tm-paciente-v91-root .input-group:has([placeholder*="Adicionar procedimento"]),
+      .tm-paciente-v91-root .input-group:has([placeholder*="Incluir material"]) {
+        width: 240px !important;
+        max-width: 240px !important;
+        margin-left: 0 !important;
+        margin-right: auto !important;
+      }
+
+      .tm-paciente-v91-root .modal-footer {
+        justify-content: flex-start !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -2739,6 +2925,10 @@
     inputBlock.style.setProperty('max-width', '509px', 'important');
     inputBlock.style.setProperty('min-width', '509px', 'important');
     inputBlock.style.setProperty('flex', '0 0 509px', 'important');
+    inputBlock.style.setProperty('margin-left', '0', 'important');
+    inputBlock.style.setProperty('margin-right', '0', 'important');
+    inputBlock.style.setProperty('padding-left', '0', 'important');
+    inputBlock.style.setProperty('padding-right', '0', 'important');
 
     const textarea = inputBlock.querySelector('textarea, .tm-observation-textarea, .form-control');
     if (textarea) {
@@ -2905,6 +3095,46 @@
     item.style.setProperty('margin-right', 'auto', 'important');
   }
 
+
+  function tmPaciente91AlignLowerBlocks(root) {
+    if (!root) return;
+
+    const width = '509px';
+
+    [
+      root.querySelector('#myTab'),
+      root.querySelector('#myTabContent'),
+      root.querySelector('.tab-content'),
+      root.querySelector('.tab-pane'),
+      root.querySelector('.tab-pane > .mt-3')
+    ].filter(Boolean).forEach((el) => {
+      el.style.setProperty('width', width, 'important');
+      el.style.setProperty('max-width', width, 'important');
+      el.style.setProperty('margin-left', 'auto', 'important');
+      el.style.setProperty('margin-right', 'auto', 'important');
+      el.style.setProperty('box-sizing', 'border-box', 'important');
+    });
+
+    const lowerInputs = Array.from(root.querySelectorAll('.input-group')).filter((group) => {
+      const text = norm(group.innerText || group.textContent || '');
+      const input = group.querySelector('input');
+      const placeholder = input ? norm(input.getAttribute('placeholder') || '') : '';
+      return (
+        text.includes('Adicionar procedimento') ||
+        text.includes('Incluir material') ||
+        placeholder.includes('Adicionar procedimento') ||
+        placeholder.includes('Incluir material')
+      );
+    });
+
+    lowerInputs.forEach((group) => {
+      group.style.setProperty('width', '240px', 'important');
+      group.style.setProperty('max-width', '240px', 'important');
+      group.style.setProperty('margin-left', '0', 'important');
+      group.style.setProperty('margin-right', 'auto', 'important');
+    });
+  }
+
   function tmPaciente91Layout() {
     const root = getActivePacienteSchedulingModalRoot();
     if (!root) return;
@@ -2914,6 +3144,8 @@
 
     if (root.dataset.tmPaciente91Applied === '1') {
       tmPaciente91ApplyHeaderLikeFirstVisit(root);
+      tmPaciente91Observation(root);
+      tmPaciente91AlignLowerBlocks(root);
       tmPaciente91Birth(root);
       return;
     }
@@ -3005,6 +3237,7 @@
 
     tmPaciente91HideRows(root);
     tmPaciente91Observation(root);
+    tmPaciente91AlignLowerBlocks(root);
     tmPaciente91Birth(root);
 
     root.dataset.tmPaciente91Applied = '1';
@@ -3520,9 +3753,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '9.4';
+      : '9.5';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '9.4';
+    return match ? match[0] : '9.5';
   }
 
   function ensureScriptVersionIndicator() {
