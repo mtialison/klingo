@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      9.3
+// @version      9.4
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1509,6 +1509,106 @@
       }
 
 
+
+      /* =========================
+         PACIENTE 9.4 - AJUSTES EMAIL / NASCIMENTO / OBSERVAÇÃO
+      ========================= */
+      .tm-paciente-v91-row-basic.tm-paciente-v91-row-basic-no-cpf {
+        grid-template-columns: 155px 342px !important;
+      }
+
+      .tm-paciente-v91-row-basic.tm-paciente-v91-row-basic-no-cpf [data-v91-slot="email"] {
+        grid-column: auto !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-email,
+      .tm-paciente-v91-root .tm-paciente-v91-email .form-group,
+      .tm-paciente-v91-root .tm-paciente-v91-email .input-group,
+      .tm-paciente-v91-root .tm-paciente-v91-email input,
+      .tm-paciente-v91-root .tm-paciente-v91-email .form-control {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
+        position: relative !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+        width: 100% !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"],
+      .tm-paciente-v91-root .tm-paciente-v91-birth input {
+        padding-right: 46px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline {
+        position: absolute !important;
+        top: 1px !important;
+        bottom: 1px !important;
+        right: 1px !important;
+        width: 44px !important;
+        z-index: 4 !important;
+        margin: 0 !important;
+        pointer-events: none !important;
+        overflow: hidden !important;
+        border-top-right-radius: .25rem !important;
+        border-bottom-right-radius: .25rem !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline.tm-birth-age-waiting {
+        visibility: hidden !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
+        width: 100% !important;
+        height: 100% !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+        white-space: nowrap !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-host,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-title,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input {
+        width: 509px !important;
+        max-width: 509px !important;
+        min-width: 509px !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input > .col,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input > [class*="col-"],
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-group,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input .input-group,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-control,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
+        width: 509px !important;
+        max-width: 509px !important;
+        min-width: 509px !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
+        height: 84px !important;
+        min-height: 84px !important;
+        resize: none !important;
+        overflow-y: auto !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -2538,11 +2638,20 @@
     return host;
   }
 
+  function tmPaciente91IsCompleteBirthValue(value) {
+    const raw = String(value || '').trim();
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return true;
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return true;
+
+    return false;
+  }
+
   function tmPaciente91Birth(root) {
     const birthBlock = root.querySelector('.tm-paciente-v91-birth');
     if (!birthBlock) return;
 
-    const input = birthBlock.querySelector('input[type="date"]');
+    const input = birthBlock.querySelector('input[type="date"], input');
     const inputGroup = birthBlock.querySelector('.input-group');
     if (!input || !inputGroup) return;
 
@@ -2559,11 +2668,32 @@
     ageAppend.classList.add('tm-birth-age-inline');
 
     const ageText = ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
-    if (ageText) {
-      syncBirthAgeBadgeFontSafe(input, ageText);
-      const age = calculateBirthAgeSafe(input.value);
-      if (age) ageText.textContent = age;
+
+    const syncAge = () => {
+      const complete = tmPaciente91IsCompleteBirthValue(input.value);
+
+      if (!complete) {
+        ageAppend.classList.add('tm-birth-age-waiting');
+        if (ageText) ageText.textContent = '';
+        return;
+      }
+
+      ageAppend.classList.remove('tm-birth-age-waiting');
+
+      if (ageText) {
+        syncBirthAgeBadgeFontSafe(input, ageText);
+        const age = calculateBirthAgeSafe(input.value);
+        if (age) ageText.textContent = age;
+      }
+    };
+
+    if (!input.dataset.tmPaciente91BirthListener) {
+      input.addEventListener('input', syncAge);
+      input.addEventListener('change', syncAge);
+      input.dataset.tmPaciente91BirthListener = '1';
     }
+
+    syncAge();
   }
 
   function tmPaciente91Observation(root) {
@@ -2605,11 +2735,17 @@
     tmPaciente91Hide(obsRow);
     ensureObservationTextarea(inputBlock);
 
+    inputBlock.style.setProperty('width', '509px', 'important');
+    inputBlock.style.setProperty('max-width', '509px', 'important');
+    inputBlock.style.setProperty('min-width', '509px', 'important');
+    inputBlock.style.setProperty('flex', '0 0 509px', 'important');
+
     const textarea = inputBlock.querySelector('textarea, .tm-observation-textarea, .form-control');
     if (textarea) {
       textarea.classList.add('tm-paciente-v91-observation-textarea');
       textarea.style.setProperty('width', '509px', 'important');
       textarea.style.setProperty('max-width', '509px', 'important');
+      textarea.style.setProperty('min-width', '509px', 'important');
       textarea.style.setProperty('height', '84px', 'important');
       textarea.style.setProperty('min-height', '84px', 'important');
       textarea.style.setProperty('resize', 'none', 'important');
@@ -2836,19 +2972,24 @@
     tmPaciente91Move(host.querySelector('[data-v91-slot="nome"]'), nome, 'tm-paciente-v91-name');
     tmPaciente91Move(host.querySelector('[data-v91-slot="nascimento"]'), nascimento, 'tm-paciente-v91-birth');
 
+    const basicRow = host.querySelector('.tm-paciente-v91-row-basic');
+
     if (cpf) {
-      host.querySelector('.tm-paciente-v91-row-basic')?.classList.add('tm-paciente-v91-row-basic-has-cpf');
+      basicRow?.classList.add('tm-paciente-v91-row-basic-has-cpf');
+      basicRow?.classList.remove('tm-paciente-v91-row-basic-no-cpf');
       tmPaciente91Move(host.querySelector('[data-v91-slot="cpf"]'), cpf, 'tm-paciente-v91-cpf');
     } else {
+      basicRow?.classList.add('tm-paciente-v91-row-basic-no-cpf');
+      basicRow?.classList.remove('tm-paciente-v91-row-basic-has-cpf');
       host.querySelector('[data-v91-slot="cpf"]')?.remove();
     }
 
     tmPaciente91Move(host.querySelector('[data-v91-slot="sexo"]'), sexo, 'tm-paciente-v91-sex');
-    tmPaciente91Move(host.querySelector('[data-v91-slot="origem"]'), origem, 'tm-paciente-v91-origin');
+    tmPaciente91Move(host.querySelector('[data-v91-slot="email"]'), email, 'tm-paciente-v91-email');
 
     tmPaciente91Move(host.querySelector('[data-v91-slot="celular"]'), celular, 'tm-paciente-v91-cell');
     tmPaciente91Move(host.querySelector('[data-v91-slot="telefone"]'), telefone, 'tm-paciente-v91-phone');
-    tmPaciente91Move(host.querySelector('[data-v91-slot="email"]'), email, 'tm-paciente-v91-email');
+    tmPaciente91Move(host.querySelector('[data-v91-slot="origem"]'), origem, 'tm-paciente-v91-origin');
 
     tmPaciente91Move(host.querySelector('[data-v91-slot="carteira"]'), carteira, 'tm-paciente-v91-card');
     tmPaciente91Move(host.querySelector('[data-v91-slot="validade"]'), validade, 'tm-paciente-v91-valid');
@@ -3379,9 +3520,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '9.3';
+      : '9.4';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '9.3';
+    return match ? match[0] : '9.4';
   }
 
   function ensureScriptVersionIndicator() {
