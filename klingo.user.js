@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      10.3
+// @version      10.4
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2116,7 +2116,7 @@
 
 
       /* =========================
-         PACIENTE 10.3 - CORREÇÃO SEGURA DATA NASCIMENTO
+         PACIENTE 10.4 - CORREÇÃO SEGURA DATA NASCIMENTO
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
         position: relative !important;
@@ -2163,7 +2163,13 @@
       }
 
 
-      @media (max-width: 1200px) {
+      
+      /* FIX DEFINITIVO DATA NASCIMENTO */
+      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline) {
+        display: none !important;
+      }
+
+@media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
           grid-template-columns: 1fr;
@@ -3757,7 +3763,13 @@
     input.style.setProperty('padding-right', '48px', 'important');
 
     const sync = () => {
-      const raw = String(input.value || '').replace(/[^0-9]/g, '');
+      const value = String(input.value || '');
+      if (!/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+        badge.style.setProperty('display', 'none', 'important');
+        if (ageText) ageText.textContent = '';
+        return;
+      }
+      const raw = value.replace(/[^0-9]/g, '');
 
       if (raw.length !== 8) {
         badge.style.setProperty('display', 'none', 'important');
@@ -4301,9 +4313,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '10.3';
+      : '10.4';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '10.3';
+    return match ? match[0] : '10.4';
   }
 
   function ensureScriptVersionIndicator() {
