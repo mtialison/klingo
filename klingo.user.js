@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      9.1
+// @version      9.2
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1237,7 +1237,7 @@
       }
 
       .tm-paciente-v91-row-basic {
-        grid-template-columns: 155px 342px !important;
+        grid-template-columns: 155px 155px 187px !important;
       }
 
       .tm-paciente-v91-row-basic-has-cpf {
@@ -1245,11 +1245,11 @@
       }
 
       .tm-paciente-v91-row-contact {
-        grid-template-columns: 155px 155px !important;
+        grid-template-columns: 155px 155px 187px !important;
       }
 
       .tm-paciente-v91-row-email {
-        grid-template-columns: 1fr !important;
+        display: none !important;
       }
 
       .tm-paciente-v91-row-card {
@@ -1381,6 +1381,53 @@
       .tm-paciente-v91-observation-select select {
         width: 240px !important;
         max-width: 240px !important;
+      }
+
+
+
+      /* =========================
+         PACIENTE 9.2 - ORDEM E TAMANHO DOS INPUTS
+      ========================= */
+      .tm-paciente-v91-root .tm-paciente-v91-host,
+      .tm-paciente-v91-root .tm-paciente-v91-title,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-host,
+      .tm-paciente-v91-root .modal-footer {
+        width: 509px !important;
+        max-width: 509px !important;
+      }
+
+      .tm-paciente-v91-row-name-birth {
+        grid-template-columns: 342px 155px !important;
+      }
+
+      .tm-paciente-v91-row-basic {
+        grid-template-columns: 155px 155px 187px !important;
+      }
+
+      .tm-paciente-v91-row-contact {
+        grid-template-columns: 155px 155px 187px !important;
+      }
+
+      .tm-paciente-v91-row-card {
+        grid-template-columns: 342px 155px !important;
+      }
+
+      .tm-paciente-v91-row-email {
+        display: none !important;
+      }
+
+      .tm-paciente-v91-slot,
+      .tm-paciente-v91-slot > .col,
+      .tm-paciente-v91-slot > [class*="col-"] {
+        min-width: 0 !important;
+        max-width: none !important;
+      }
+
+      .tm-paciente-v91-slot .form-control,
+      .tm-paciente-v91-slot input,
+      .tm-paciente-v91-slot select {
+        height: 34px !important;
+        font-size: 14px !important;
       }
 
 
@@ -2392,14 +2439,12 @@
         <div class="tm-paciente-v91-row tm-paciente-v91-row-basic">
           <div class="tm-paciente-v91-slot" data-v91-slot="cpf"></div>
           <div class="tm-paciente-v91-slot" data-v91-slot="sexo"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="origem"></div>
+          <div class="tm-paciente-v91-slot" data-v91-slot="email"></div>
         </div>
         <div class="tm-paciente-v91-row tm-paciente-v91-row-contact">
           <div class="tm-paciente-v91-slot" data-v91-slot="celular"></div>
           <div class="tm-paciente-v91-slot" data-v91-slot="telefone"></div>
-        </div>
-        <div class="tm-paciente-v91-row tm-paciente-v91-row-email">
-          <div class="tm-paciente-v91-slot" data-v91-slot="email"></div>
+          <div class="tm-paciente-v91-slot" data-v91-slot="origem"></div>
         </div>
         <div class="tm-paciente-v91-row tm-paciente-v91-row-card">
           <div class="tm-paciente-v91-slot" data-v91-slot="carteira"></div>
@@ -3112,9 +3157,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '9.1';
+      : '9.2';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '9.1';
+    return match ? match[0] : '9.2';
   }
 
   function ensureScriptVersionIndicator() {
