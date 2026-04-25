@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      10.6
+// @version      10.7
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2116,7 +2116,7 @@
 
 
       /* =========================
-         PACIENTE 10.6 - CORREÇÃO SEGURA DATA NASCIMENTO
+         PACIENTE 10.7 - CORREÇÃO SEGURA DATA NASCIMENTO
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
         position: relative !important;
@@ -2171,7 +2171,7 @@
 
 
       /* =========================
-         PACIENTE 10.6 - BADGE IDADE FINAL
+         PACIENTE 10.7 - BADGE IDADE FINAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline-final) {
         display: none !important;
@@ -4088,7 +4088,79 @@
     }
   }
 
-  function burstUpdateLite() {
+  
+  // === FIX FINAL: usar EXATAMENTE a lógica do modal Primeira Vez ===
+  function tmPaciente107MirrorFirstVisitBirth() {
+    const root = getActivePacienteSchedulingModalRoot();
+    if (!root) return;
+
+    const firstVisit = document.querySelector('.tm-klingo-root');
+    const pacienteBirth = root.querySelector('.tm-paciente-v91-birth input');
+
+    if (!firstVisit || !pacienteBirth) return;
+
+    const fvBirth = firstVisit.querySelector('input[type="date"], input');
+
+    if (!fvBirth) return;
+
+    // força o mesmo comportamento visual
+    pacienteBirth.style.cssText = fvBirth.style.cssText;
+
+    // remove qualquer overlay quebrado
+    const group = pacienteBirth.closest('.input-group');
+    if (group) {
+      group.querySelectorAll('.input-group-append').forEach(e => e.remove());
+    }
+
+    // reaplica badge exatamente igual Primeira Vez
+    const wrapper = document.createElement('div');
+    wrapper.className = 'input-group-append';
+
+    const badge = document.createElement('div');
+    badge.className = 'input-group-text';
+    badge.style.pointerEvents = 'none';
+
+    wrapper.appendChild(badge);
+
+    const parent = pacienteBirth.parentElement;
+    parent.appendChild(wrapper);
+
+    const calc = () => {
+      const v = pacienteBirth.value;
+      if (!v || v.length < 10) {
+        badge.textContent = '';
+        return;
+      }
+
+      let y,m,d;
+
+      if (v.includes('-')) {
+        [y,m,d] = v.split('-');
+      } else if (v.includes('/')) {
+        [d,m,y] = v.split('/');
+      }
+
+      const birth = new Date(y, m-1, d);
+      if (isNaN(birth)) return;
+
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+
+      const md = today.getMonth() - birth.getMonth();
+      if (md < 0 || (md === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+
+      badge.textContent = age + 'a';
+    };
+
+    pacienteBirth.oninput = calc;
+    pacienteBirth.onchange = calc;
+
+    calc();
+  }
+
+function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
 
     clearFirstVisitResidueFromPacienteModal();
@@ -4096,6 +4168,7 @@
     tmPaciente103NormalizeBirthBadge();
     tmPaciente105ApplyBirthBadge();
     tmPaciente106ApplyFinalBirthBadge();
+    tmPaciente107MirrorFirstVisitBirth();
 
     const root = getSchedulingModalRoot();
 
@@ -4139,6 +4212,7 @@
         tmPaciente103NormalizeBirthBadge();
         tmPaciente105ApplyBirthBadge();
         tmPaciente106ApplyFinalBirthBadge();
+    tmPaciente107MirrorFirstVisitBirth();
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 60);
@@ -4148,6 +4222,7 @@
         tmPaciente103NormalizeBirthBadge();
         tmPaciente105ApplyBirthBadge();
         tmPaciente106ApplyFinalBirthBadge();
+    tmPaciente107MirrorFirstVisitBirth();
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 160);
@@ -4157,6 +4232,7 @@
         tmPaciente103NormalizeBirthBadge();
         tmPaciente105ApplyBirthBadge();
         tmPaciente106ApplyFinalBirthBadge();
+    tmPaciente107MirrorFirstVisitBirth();
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 320);
@@ -4609,9 +4685,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '10.6';
+      : '10.7';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '10.6';
+    return match ? match[0] : '10.7';
   }
 
   function ensureScriptVersionIndicator() {
