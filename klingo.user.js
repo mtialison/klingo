@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      10.5
+// @version      10.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2116,7 +2116,7 @@
 
 
       /* =========================
-         PACIENTE 10.5 - CORREÇÃO SEGURA DATA NASCIMENTO
+         PACIENTE 10.6 - CORREÇÃO SEGURA DATA NASCIMENTO
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
         position: relative !important;
@@ -2171,7 +2171,7 @@
 
 
       /* =========================
-         PACIENTE 10.5 - BADGE IDADE FINAL
+         PACIENTE 10.6 - BADGE IDADE FINAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline-final) {
         display: none !important;
@@ -3970,6 +3970,124 @@
     sync();
   }
 
+
+  function tmPaciente106ApplyFinalBirthBadge() {
+    const root = getActivePacienteSchedulingModalRoot();
+    if (!root) return;
+
+    const birthBlock =
+      root.querySelector('.tm-paciente-v91-birth') ||
+      tmPaciente91Field(root, 'Data de Nascimento');
+
+    if (!birthBlock) return;
+
+    const inputGroup = birthBlock.querySelector('.input-group') || birthBlock;
+    const input = birthBlock.querySelector('input[type="date"], input');
+    if (!inputGroup || !input) return;
+
+    // Remove qualquer badge anterior do sistema ou das versões anteriores.
+    birthBlock.querySelectorAll('.input-group-append, .tm-birth-age-inline, .tm-birth-age-inline-final, .tm-paciente-age-badge-final')
+      .forEach((el) => el.remove());
+
+    const rawValue = String(input.value || '').trim();
+    const digits = rawValue.replace(/[^0-9]/g, '');
+
+    let day = '';
+    let month = '';
+    let year = '';
+
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(rawValue)) {
+      [day, month, year] = rawValue.split('/');
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
+      const parts = rawValue.split('-');
+      year = parts[0];
+      month = parts[1];
+      day = parts[2];
+    } else if (digits.length === 8) {
+      day = digits.slice(0, 2);
+      month = digits.slice(2, 4);
+      year = digits.slice(4, 8);
+    } else {
+      inputGroup.style.setProperty('position', 'relative', 'important');
+      input.style.setProperty('padding-right', '48px', 'important');
+      return;
+    }
+
+    const d = Number(day);
+    const m = Number(month);
+    const y = Number(year);
+
+    if (
+      !Number.isInteger(d) || !Number.isInteger(m) || !Number.isInteger(y) ||
+      d < 1 || d > 31 || m < 1 || m > 12 || y < 1900 || y > 2100
+    ) {
+      inputGroup.style.setProperty('position', 'relative', 'important');
+      input.style.setProperty('padding-right', '48px', 'important');
+      return;
+    }
+
+    const birthDate = new Date(y, m - 1, d);
+    if (
+      birthDate.getFullYear() !== y ||
+      birthDate.getMonth() !== m - 1 ||
+      birthDate.getDate() !== d
+    ) {
+      inputGroup.style.setProperty('position', 'relative', 'important');
+      input.style.setProperty('padding-right', '48px', 'important');
+      return;
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const diffMonth = today.getMonth() - birthDate.getMonth();
+
+    if (diffMonth < 0 || (diffMonth === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
+    const badge = document.createElement('div');
+    badge.className = 'tm-paciente-age-badge-final';
+    badge.textContent = age + 'a';
+
+    inputGroup.appendChild(badge);
+
+    inputGroup.style.setProperty('position', 'relative', 'important');
+    inputGroup.style.setProperty('overflow', 'hidden', 'important');
+
+    input.style.setProperty('padding-right', '48px', 'important');
+
+    badge.style.setProperty('position', 'absolute', 'important');
+    badge.style.setProperty('top', '1px', 'important');
+    badge.style.setProperty('right', '1px', 'important');
+    badge.style.setProperty('bottom', '1px', 'important');
+    badge.style.setProperty('width', '46px', 'important');
+    badge.style.setProperty('z-index', '50', 'important');
+    badge.style.setProperty('display', 'flex', 'important');
+    badge.style.setProperty('align-items', 'center', 'important');
+    badge.style.setProperty('justify-content', 'center', 'important');
+    badge.style.setProperty('background', '#d9d9d9', 'important');
+    badge.style.setProperty('color', '#666', 'important');
+    badge.style.setProperty('border-left', '1px solid #cfd4da', 'important');
+    badge.style.setProperty('border-top-right-radius', '.25rem', 'important');
+    badge.style.setProperty('border-bottom-right-radius', '.25rem', 'important');
+    badge.style.setProperty('font-size', '14px', 'important');
+    badge.style.setProperty('line-height', '1', 'important');
+    badge.style.setProperty('pointer-events', 'none', 'important');
+    badge.style.setProperty('box-sizing', 'border-box', 'important');
+
+    if (!input.dataset.tmPaciente106BirthFix) {
+      const rerender = () => {
+        setTimeout(tmPaciente106ApplyFinalBirthBadge, 0);
+      };
+
+      input.addEventListener('input', rerender);
+      input.addEventListener('keyup', rerender);
+      input.addEventListener('change', rerender);
+      input.addEventListener('blur', rerender);
+      input.dataset.tmPaciente106BirthFix = '1';
+    }
+  }
+
   function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
 
@@ -3977,6 +4095,7 @@
     tmPaciente91Layout();
     tmPaciente103NormalizeBirthBadge();
     tmPaciente105ApplyBirthBadge();
+    tmPaciente106ApplyFinalBirthBadge();
 
     const root = getSchedulingModalRoot();
 
@@ -4019,18 +4138,27 @@
         tmPaciente91Layout();
         tmPaciente103NormalizeBirthBadge();
         tmPaciente105ApplyBirthBadge();
+        tmPaciente106ApplyFinalBirthBadge();
+        setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
+        setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 60);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
         tmPaciente103NormalizeBirthBadge();
         tmPaciente105ApplyBirthBadge();
+        tmPaciente106ApplyFinalBirthBadge();
+        setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
+        setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 160);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
         tmPaciente103NormalizeBirthBadge();
         tmPaciente105ApplyBirthBadge();
+        tmPaciente106ApplyFinalBirthBadge();
+        setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
+        setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 320);
       schedulePaciente91Layout();
     }
@@ -4481,9 +4609,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '10.5';
+      : '10.6';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '10.5';
+    return match ? match[0] : '10.6';
   }
 
   function ensureScriptVersionIndicator() {
