@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      10.0
+// @version      10.1
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2038,6 +2038,82 @@
       }
 
 
+
+      /* =========================
+         PACIENTE 10.1 - DATA DE NASCIMENTO IGUAL PRIMEIRA VEZ
+      ========================= */
+      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
+        position: relative !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        overflow: hidden !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"],
+      .tm-paciente-v91-root .tm-paciente-v91-birth input {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        padding-right: 48px !important;
+        box-sizing: border-box !important;
+        background: #fff !important;
+        -webkit-appearance: none !important;
+        appearance: none !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 0 !important;
+        display: none !important;
+        -webkit-appearance: none !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline {
+        position: absolute !important;
+        top: 1px !important;
+        right: 1px !important;
+        bottom: 1px !important;
+        width: 46px !important;
+        height: auto !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        z-index: 5 !important;
+        display: flex !important;
+        align-items: stretch !important;
+        pointer-events: none !important;
+        overflow: hidden !important;
+        border-top-right-radius: .25rem !important;
+        border-bottom-right-radius: .25rem !important;
+        background: #d9d9d9 !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #d9d9d9 !important;
+        color: #666 !important;
+        line-height: 1 !important;
+        border-top: 0 !important;
+        border-right: 0 !important;
+        border-bottom: 0 !important;
+        border-left: 1px solid #cfd4da !important;
+        box-shadow: none !important;
+        box-sizing: border-box !important;
+        white-space: nowrap !important;
+        text-align: center !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -3069,9 +3145,11 @@
 
   function tmPaciente91IsCompleteBirthValue(value) {
     const raw = String(value || '').trim();
+    const digits = raw.replace(/\D+/g, '');
 
     if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return true;
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return true;
+    if (digits.length === 8) return true;
 
     return false;
   }
@@ -3094,6 +3172,10 @@
       inputGroup.appendChild(ageAppend);
     }
 
+    inputGroup.style.setProperty('position', 'relative', 'important');
+    inputGroup.style.setProperty('overflow', 'hidden', 'important');
+    input.style.setProperty('padding-right', '48px', 'important');
+
     ageAppend.classList.add('tm-birth-age-inline');
 
     const ageText = ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
@@ -3103,16 +3185,20 @@
 
       if (!complete) {
         ageAppend.classList.add('tm-birth-age-waiting');
+        ageAppend.style.setProperty('visibility', 'hidden', 'important');
         if (ageText) ageText.textContent = '';
         return;
       }
 
       ageAppend.classList.remove('tm-birth-age-waiting');
+      ageAppend.style.removeProperty('visibility');
 
       if (ageText) {
         syncBirthAgeBadgeFontSafe(input, ageText);
         const age = calculateBirthAgeSafe(input.value);
-        if (age) ageText.textContent = age;
+        if (age && !/^\d{4}a$/.test(age)) {
+          ageText.textContent = age;
+        }
       }
     };
 
@@ -4090,9 +4176,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '10.0';
+      : '10.1';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '10.0';
+    return match ? match[0] : '10.1';
   }
 
   function ensureScriptVersionIndicator() {
