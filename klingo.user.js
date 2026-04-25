@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      9.8
+// @version      10.0
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1979,6 +1979,65 @@
       }
 
 
+
+      /* =========================
+         PACIENTE 9.9 - PREPEND ? MESMA ALTURA DO SELECT
+      ========================= */
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group {
+        height: 31px !important;
+        min-height: 31px !important;
+        max-height: 31px !important;
+        align-items: stretch !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-prepend,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-append {
+        height: 31px !important;
+        min-height: 31px !important;
+        max-height: 31px !important;
+        display: flex !important;
+        align-items: stretch !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-text {
+        height: 31px !important;
+        min-height: 31px !important;
+        max-height: 31px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        line-height: 1 !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select select,
+      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-control {
+        height: 31px !important;
+        min-height: 31px !important;
+        max-height: 31px !important;
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
+        line-height: 1.2 !important;
+        box-sizing: border-box !important;
+      }
+
+
+
+      /* =========================
+         PACIENTE 10.0 - OBSERVAÇÃO 3 LINHAS
+      ========================= */
+      .tm-paciente-v91-root textarea,
+      .tm-paciente-v91-root .tm-paciente-v91-observation textarea {
+        height: 72px !important;
+        min-height: 72px !important;
+        max-height: 72px !important;
+        resize: none !important;
+        line-height: 1.4 !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -3356,8 +3415,24 @@
       if (prepend) {
         prepend.style.setProperty('display', 'flex', 'important');
         prepend.style.setProperty('align-items', 'stretch', 'important');
+        prepend.style.setProperty('height', '31px', 'important');
+        prepend.style.setProperty('min-height', '31px', 'important');
+        prepend.style.setProperty('max-height', '31px', 'important');
         prepend.style.setProperty('margin-left', '0', 'important');
         prepend.style.setProperty('margin-right', '-1px', 'important');
+      }
+
+      const prependText = observationSelect.querySelector('.input-group-text');
+      if (prependText) {
+        prependText.style.setProperty('height', '31px', 'important');
+        prependText.style.setProperty('min-height', '31px', 'important');
+        prependText.style.setProperty('max-height', '31px', 'important');
+        prependText.style.setProperty('padding-top', '0', 'important');
+        prependText.style.setProperty('padding-bottom', '0', 'important');
+        prependText.style.setProperty('line-height', '1', 'important');
+        prependText.style.setProperty('display', 'flex', 'important');
+        prependText.style.setProperty('align-items', 'center', 'important');
+        prependText.style.setProperty('justify-content', 'center', 'important');
       }
     }
 
@@ -4015,9 +4090,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '9.8';
+      : '10.0';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '9.8';
+    return match ? match[0] : '10.0';
   }
 
   function ensureScriptVersionIndicator() {
