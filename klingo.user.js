@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      9.7
+// @version      9.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1960,6 +1960,25 @@
       }
 
 
+
+      /* =========================
+         PACIENTE 9.8 - HEADER DINÂMICO SEM ESPAÇO VAZIO
+      ========================= */
+      .tm-paciente-v91-root .list-group-item.list-group-item-success {
+        min-height: 0 !important;
+        height: auto !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-header-note:empty,
+      .tm-paciente-v91-root .tm-paciente-v91-header-note.tm-paciente-v91-note-empty {
+        display: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 0 !important;
+        min-height: 0 !important;
+      }
+
+
       @media (max-width: 1200px) {
         .tm-top-layout,
         .tm-observation-layout {
@@ -3139,6 +3158,53 @@
     return span;
   }
 
+
+  function tmPaciente91CleanEmptyHeaderNote(root) {
+    if (!root) return;
+
+    const item = root.querySelector('.list-group-item.list-group-item-success');
+    if (!item) return;
+
+    const note = item.querySelector('.tm-paciente-v91-header-note');
+    if (note) {
+      const text = norm(note.textContent || '');
+      const isEmpty =
+        !text ||
+        text === '-' ||
+        text === '—' ||
+        text === '–' ||
+        /^[-–—\s]+$/.test(text);
+
+      if (isEmpty) {
+        note.textContent = '';
+        note.classList.add('tm-paciente-v91-note-empty');
+      } else {
+        note.classList.remove('tm-paciente-v91-note-empty');
+      }
+    }
+
+    // Remove linhas residuais vazias criadas/reaproveitadas pelo header do Vue.
+    Array.from(item.querySelectorAll('div, small, span')).forEach((el) => {
+      if (
+        el.classList.contains('tm-paciente-v91-header-line') ||
+        el.classList.contains('tm-paciente-v91-header-title') ||
+        el.classList.contains('tm-paciente-v91-header-note')
+      ) return;
+
+      const text = norm(el.textContent || '');
+      const hasIcon = !!el.querySelector('i');
+      const hasField = !!el.querySelector('input, select, textarea, button');
+
+      if (!hasIcon && !hasField && (/^[-–—\s]*$/.test(text))) {
+        el.style.setProperty('display', 'none', 'important');
+        el.style.setProperty('height', '0', 'important');
+        el.style.setProperty('min-height', '0', 'important');
+        el.style.setProperty('margin', '0', 'important');
+        el.style.setProperty('padding', '0', 'important');
+      }
+    });
+  }
+
   function tmPaciente91ApplyHeaderLikeFirstVisit(root) {
     if (!root) return;
 
@@ -3254,10 +3320,14 @@
       originalInfo.remove();
     }
 
+    tmPaciente91CleanEmptyHeaderNote(root);
+
     item.style.setProperty('width', '509px', 'important');
     item.style.setProperty('max-width', '509px', 'important');
     item.style.setProperty('margin-left', 'auto', 'important');
     item.style.setProperty('margin-right', 'auto', 'important');
+    item.style.setProperty('min-height', '0', 'important');
+    item.style.setProperty('height', 'auto', 'important');
   }
 
 
@@ -3945,9 +4015,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '9.7';
+      : '9.8';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '9.7';
+    return match ? match[0] : '9.8';
   }
 
   function ensureScriptVersionIndicator() {
