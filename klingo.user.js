@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      10.8
+// @version      10.9
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2116,7 +2116,7 @@
 
 
       /* =========================
-         PACIENTE 10.8 - CORREÇÃO SEGURA DATA NASCIMENTO
+         PACIENTE 10.9 - CORREÇÃO SEGURA DATA NASCIMENTO
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
         position: relative !important;
@@ -2171,7 +2171,7 @@
 
 
       /* =========================
-         PACIENTE 10.8 - BADGE IDADE FINAL
+         PACIENTE 10.9 - BADGE IDADE FINAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline-final) {
         display: none !important;
@@ -2221,7 +2221,7 @@
 
 
       /* =========================
-         PACIENTE 10.8 - PROCEDIMENTO 509 / OCULTAR MATERIAL
+         PACIENTE 10.9 - PROCEDIMENTO 509 / OCULTAR MATERIAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-procedimento-add,
       .tm-paciente-v91-root .tm-paciente-procedimento-add .input-group,
@@ -2236,6 +2236,49 @@
       }
 
       .tm-paciente-v91-root .tm-paciente-material-hidden {
+        display: none !important;
+      }
+
+
+
+      /* =========================
+         PACIENTE 10.9 - AJUSTE DEFINITIVO PROCEDIMENTO / MATERIAL
+      ========================= */
+      .tm-paciente-v91-root .tm-paciente-proc-row-final,
+      .tm-paciente-v91-root .tm-paciente-proc-row-final .input-group,
+      .tm-paciente-v91-root .tm-paciente-proc-row-final input,
+      .tm-paciente-v91-root .tm-paciente-proc-row-final .form-control {
+        width: 509px !important;
+        max-width: 509px !important;
+        min-width: 509px !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-material-row-final {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .tm-paciente-v91-root .input-group:has(input[placeholder*="Adicionar procedimento"]),
+      .tm-paciente-v91-root .input-group:has(input[placeholder*="Adicionar Procedimento"]) {
+        width: 509px !important;
+        max-width: 509px !important;
+        min-width: 509px !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+
+      .tm-paciente-v91-root .input-group:has(input[placeholder*="Incluir material"]),
+      .tm-paciente-v91-root .input-group:has(input[placeholder*="medicamento"]),
+      .tm-paciente-v91-root .input-group:has(input[placeholder*="taxa"]) {
         display: none !important;
       }
 
@@ -4239,16 +4282,109 @@
     });
   }
 
+
+  function tmPaciente109HardProcedureMaterialFix() {
+    const root = getActivePacienteSchedulingModalRoot();
+    if (!root) return;
+
+    const normalizeText = (v) => String(v || '').replace(/\s+/g, ' ').trim();
+
+    const allInputs = Array.from(root.querySelectorAll('input, .form-control'));
+    allInputs.forEach((input) => {
+      const placeholder = normalizeText(input.getAttribute ? input.getAttribute('placeholder') : '');
+      const valueText = normalizeText(input.value || input.textContent || '');
+      const aroundText = normalizeText((input.closest('.input-group') || input.parentElement || input).innerText || '');
+
+      const haystack = `${placeholder} ${valueText} ${aroundText}`;
+
+      const isProcedure = /Adicionar procedimento/i.test(haystack);
+      const isMaterial = /Incluir material|medicamento|taxa/i.test(haystack);
+
+      const group = input.closest('.input-group') || input;
+      const row =
+        group.closest('.form-group') ||
+        group.closest('.col') ||
+        group.closest('[class*="col-"]') ||
+        group.closest('.row') ||
+        group.parentElement;
+
+      if (isProcedure) {
+        [row, group, input].filter(Boolean).forEach((el) => {
+          el.classList.add('tm-paciente-proc-row-final');
+          el.style.setProperty('width', '509px', 'important');
+          el.style.setProperty('max-width', '509px', 'important');
+          el.style.setProperty('min-width', '509px', 'important');
+          el.style.setProperty('margin-left', '0', 'important');
+          el.style.setProperty('margin-right', '0', 'important');
+          el.style.setProperty('box-sizing', 'border-box', 'important');
+        });
+      }
+
+      if (isMaterial) {
+        [row, group].filter(Boolean).forEach((el) => {
+          el.classList.add('tm-paciente-material-row-final');
+          el.style.setProperty('display', 'none', 'important');
+          el.style.setProperty('visibility', 'hidden', 'important');
+          el.style.setProperty('height', '0', 'important');
+          el.style.setProperty('min-height', '0', 'important');
+          el.style.setProperty('max-height', '0', 'important');
+          el.style.setProperty('overflow', 'hidden', 'important');
+          el.style.setProperty('margin', '0', 'important');
+          el.style.setProperty('padding', '0', 'important');
+        });
+      }
+    });
+
+    // Fallback por texto do input-group, mesmo quando placeholder não vem no input.
+    Array.from(root.querySelectorAll('.input-group')).forEach((group) => {
+      const text = normalizeText(group.innerText || group.textContent || '');
+      const row =
+        group.closest('.form-group') ||
+        group.closest('.col') ||
+        group.closest('[class*="col-"]') ||
+        group.closest('.row') ||
+        group.parentElement;
+
+      if (/Adicionar procedimento/i.test(text)) {
+        [row, group].filter(Boolean).forEach((el) => {
+          el.classList.add('tm-paciente-proc-row-final');
+          el.style.setProperty('width', '509px', 'important');
+          el.style.setProperty('max-width', '509px', 'important');
+          el.style.setProperty('min-width', '509px', 'important');
+          el.style.setProperty('margin-left', '0', 'important');
+          el.style.setProperty('margin-right', '0', 'important');
+        });
+      }
+
+      if (/Incluir material|medicamento|taxa/i.test(text)) {
+        [row, group].filter(Boolean).forEach((el) => {
+          el.classList.add('tm-paciente-material-row-final');
+          el.style.setProperty('display', 'none', 'important');
+          el.style.setProperty('visibility', 'hidden', 'important');
+          el.style.setProperty('height', '0', 'important');
+          el.style.setProperty('min-height', '0', 'important');
+          el.style.setProperty('max-height', '0', 'important');
+          el.style.setProperty('overflow', 'hidden', 'important');
+          el.style.setProperty('margin', '0', 'important');
+          el.style.setProperty('padding', '0', 'important');
+        });
+      }
+    });
+  }
+
 function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
 
     clearFirstVisitResidueFromPacienteModal();
     tmPaciente91Layout();
+    tmPaciente109HardProcedureMaterialFix();
     tmPaciente103NormalizeBirthBadge();
     tmPaciente105ApplyBirthBadge();
     tmPaciente106ApplyFinalBirthBadge();
     tmPaciente107MirrorFirstVisitBirth();
+    tmPaciente109HardProcedureMaterialFix();
     tmPaciente108AdjustProcedureMaterial();
+    tmPaciente109HardProcedureMaterialFix();
 
     const root = getSchedulingModalRoot();
 
@@ -4289,33 +4425,42 @@ function burstUpdateLite() {
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
+    tmPaciente109HardProcedureMaterialFix();
         tmPaciente103NormalizeBirthBadge();
         tmPaciente105ApplyBirthBadge();
         tmPaciente106ApplyFinalBirthBadge();
     tmPaciente107MirrorFirstVisitBirth();
+    tmPaciente109HardProcedureMaterialFix();
     tmPaciente108AdjustProcedureMaterial();
+    tmPaciente109HardProcedureMaterialFix();
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 60);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
+    tmPaciente109HardProcedureMaterialFix();
         tmPaciente103NormalizeBirthBadge();
         tmPaciente105ApplyBirthBadge();
         tmPaciente106ApplyFinalBirthBadge();
     tmPaciente107MirrorFirstVisitBirth();
+    tmPaciente109HardProcedureMaterialFix();
     tmPaciente108AdjustProcedureMaterial();
+    tmPaciente109HardProcedureMaterialFix();
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 160);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
+    tmPaciente109HardProcedureMaterialFix();
         tmPaciente103NormalizeBirthBadge();
         tmPaciente105ApplyBirthBadge();
         tmPaciente106ApplyFinalBirthBadge();
     tmPaciente107MirrorFirstVisitBirth();
+    tmPaciente109HardProcedureMaterialFix();
     tmPaciente108AdjustProcedureMaterial();
+    tmPaciente109HardProcedureMaterialFix();
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 320);
@@ -4768,9 +4913,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '10.8';
+      : '10.9';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '10.8';
+    return match ? match[0] : '10.9';
   }
 
   function ensureScriptVersionIndicator() {
@@ -5100,4 +5245,12 @@ function setDateCalculatorOpen(isOpen) {
   }, 1500);
   setTimeout(tmPaciente108AdjustProcedureMaterial, 300);
   setTimeout(tmPaciente108AdjustProcedureMaterial, 800);
+
+  setTimeout(tmPaciente109HardProcedureMaterialFix, 200);
+  setTimeout(tmPaciente109HardProcedureMaterialFix, 500);
+  setTimeout(tmPaciente109HardProcedureMaterialFix, 1000);
+  setInterval(() => {
+    if (getActivePacienteSchedulingModalRoot()) tmPaciente109HardProcedureMaterialFix();
+  }, 700);
+
 })();
