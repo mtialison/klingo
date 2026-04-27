@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      10.9
+// @version      11.0
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2116,7 +2116,7 @@
 
 
       /* =========================
-         PACIENTE 10.9 - CORREÇÃO SEGURA DATA NASCIMENTO
+         PACIENTE 11.0 - CORREÇÃO SEGURA DATA NASCIMENTO
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
         position: relative !important;
@@ -2171,7 +2171,7 @@
 
 
       /* =========================
-         PACIENTE 10.9 - BADGE IDADE FINAL
+         PACIENTE 11.0 - BADGE IDADE FINAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline-final) {
         display: none !important;
@@ -2221,7 +2221,7 @@
 
 
       /* =========================
-         PACIENTE 10.9 - PROCEDIMENTO 509 / OCULTAR MATERIAL
+         PACIENTE 11.0 - PROCEDIMENTO 509 / OCULTAR MATERIAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-procedimento-add,
       .tm-paciente-v91-root .tm-paciente-procedimento-add .input-group,
@@ -2242,7 +2242,7 @@
 
 
       /* =========================
-         PACIENTE 10.9 - AJUSTE DEFINITIVO PROCEDIMENTO / MATERIAL
+         PACIENTE 11.0 - AJUSTE DEFINITIVO PROCEDIMENTO / MATERIAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-proc-row-final,
       .tm-paciente-v91-root .tm-paciente-proc-row-final .input-group,
@@ -2280,6 +2280,45 @@
       .tm-paciente-v91-root .input-group:has(input[placeholder*="medicamento"]),
       .tm-paciente-v91-root .input-group:has(input[placeholder*="taxa"]) {
         display: none !important;
+      }
+
+
+
+      /* =========================
+         PACIENTE 11.0 - BADGE IDADE DATA NASCIMENTO
+      ========================= */
+      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group,
+      .tm-paciente-v91-root .tm-paciente-v91-birth {
+        position: relative !important;
+        overflow: hidden !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-v91-birth input {
+        padding-right: 48px !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-age-badge-110 {
+        position: absolute !important;
+        top: 1px !important;
+        right: 1px !important;
+        bottom: 1px !important;
+        width: 46px !important;
+        height: auto !important;
+        z-index: 9999 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #d9d9d9 !important;
+        color: #555 !important;
+        border-left: 1px solid #cfd4da !important;
+        border-top-right-radius: .25rem !important;
+        border-bottom-right-radius: .25rem !important;
+        font-size: 14px !important;
+        line-height: 1 !important;
+        pointer-events: none !important;
+        box-sizing: border-box !important;
+        white-space: nowrap !important;
       }
 
 
@@ -4372,19 +4411,118 @@
     });
   }
 
+
+  function tmPaciente110ApplyBirthAgeBadge() {
+    const root = getActivePacienteSchedulingModalRoot();
+    if (!root) return;
+
+    const birthBlock =
+      root.querySelector('.tm-paciente-v91-birth') ||
+      tmPaciente91Field(root, 'Data de Nascimento');
+
+    if (!birthBlock) return;
+
+    const input = birthBlock.querySelector('input');
+    if (!input) return;
+
+    const holder = input.closest('.input-group') || input.parentElement;
+    if (!holder) return;
+
+    // Remove badges antigas que estavam conflitando.
+    birthBlock.querySelectorAll(
+      '.tm-birth-age-inline, .tm-birth-age-inline-final, .tm-paciente-age-badge-final, .tm-paciente-age-badge-110, .input-group-append'
+    ).forEach((el) => el.remove());
+
+    const value = String(input.value || '').trim();
+    const digits = value.replace(/[^0-9]/g, '');
+
+    let day = '';
+    let month = '';
+    let year = '';
+
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+      [day, month, year] = value.split('/');
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const p = value.split('-');
+      year = p[0];
+      month = p[1];
+      day = p[2];
+    } else if (digits.length === 8) {
+      day = digits.slice(0, 2);
+      month = digits.slice(2, 4);
+      year = digits.slice(4, 8);
+    } else {
+      holder.style.setProperty('position', 'relative', 'important');
+      holder.style.setProperty('overflow', 'hidden', 'important');
+      input.style.setProperty('padding-right', '48px', 'important');
+      return;
+    }
+
+    const d = Number(day);
+    const m = Number(month);
+    const y = Number(year);
+
+    if (!d || !m || !y || d < 1 || d > 31 || m < 1 || m > 12 || y < 1900 || y > 2100) {
+      return;
+    }
+
+    const birthDate = new Date(y, m - 1, d);
+
+    if (
+      birthDate.getFullYear() !== y ||
+      birthDate.getMonth() !== m - 1 ||
+      birthDate.getDate() !== d
+    ) {
+      return;
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - y;
+    const monthDiff = today.getMonth() - (m - 1);
+
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d)) {
+      age--;
+    }
+
+    const badge = document.createElement('div');
+    badge.className = 'tm-paciente-age-badge-110';
+    badge.textContent = age + 'a';
+
+    holder.appendChild(badge);
+
+    holder.style.setProperty('position', 'relative', 'important');
+    holder.style.setProperty('overflow', 'hidden', 'important');
+    input.style.setProperty('padding-right', '48px', 'important');
+
+    if (!input.dataset.tmPaciente110AgeListener) {
+      const refresh = () => setTimeout(tmPaciente110ApplyBirthAgeBadge, 0);
+      input.addEventListener('input', refresh);
+      input.addEventListener('keyup', refresh);
+      input.addEventListener('change', refresh);
+      input.addEventListener('blur', refresh);
+      input.dataset.tmPaciente110AgeListener = '1';
+    }
+  }
+
 function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
 
     clearFirstVisitResidueFromPacienteModal();
     tmPaciente91Layout();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente103NormalizeBirthBadge();
     tmPaciente105ApplyBirthBadge();
     tmPaciente106ApplyFinalBirthBadge();
     tmPaciente107MirrorFirstVisitBirth();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente108AdjustProcedureMaterial();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
 
     const root = getSchedulingModalRoot();
 
@@ -4425,42 +4563,60 @@ function burstUpdateLite() {
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
         tmPaciente103NormalizeBirthBadge();
         tmPaciente105ApplyBirthBadge();
         tmPaciente106ApplyFinalBirthBadge();
     tmPaciente107MirrorFirstVisitBirth();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente108AdjustProcedureMaterial();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 60);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
         tmPaciente103NormalizeBirthBadge();
         tmPaciente105ApplyBirthBadge();
         tmPaciente106ApplyFinalBirthBadge();
     tmPaciente107MirrorFirstVisitBirth();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente108AdjustProcedureMaterial();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 160);
       setTimeout(() => {
         clearFirstVisitResidueFromPacienteModal();
         tmPaciente91Layout();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
         tmPaciente103NormalizeBirthBadge();
         tmPaciente105ApplyBirthBadge();
         tmPaciente106ApplyFinalBirthBadge();
     tmPaciente107MirrorFirstVisitBirth();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente108AdjustProcedureMaterial();
+    tmPaciente110ApplyBirthAgeBadge();
     tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 320);
@@ -4913,9 +5069,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '10.9';
+      : '11.0';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '10.9';
+    return match ? match[0] : '11.0';
   }
 
   function ensureScriptVersionIndicator() {
@@ -5251,6 +5407,13 @@ function setDateCalculatorOpen(isOpen) {
   setTimeout(tmPaciente109HardProcedureMaterialFix, 1000);
   setInterval(() => {
     if (getActivePacienteSchedulingModalRoot()) tmPaciente109HardProcedureMaterialFix();
+    tmPaciente110ApplyBirthAgeBadge();
   }, 700);
+
+
+  setTimeout(tmPaciente110ApplyBirthAgeBadge, 100);
+  setTimeout(tmPaciente110ApplyBirthAgeBadge, 300);
+  setTimeout(tmPaciente110ApplyBirthAgeBadge, 700);
+  setTimeout(tmPaciente110ApplyBirthAgeBadge, 1200);
 
 })();
