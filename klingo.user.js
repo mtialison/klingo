@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      10.7
+// @version      10.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2116,7 +2116,7 @@
 
 
       /* =========================
-         PACIENTE 10.7 - CORREÇÃO SEGURA DATA NASCIMENTO
+         PACIENTE 10.8 - CORREÇÃO SEGURA DATA NASCIMENTO
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
         position: relative !important;
@@ -2171,7 +2171,7 @@
 
 
       /* =========================
-         PACIENTE 10.7 - BADGE IDADE FINAL
+         PACIENTE 10.8 - BADGE IDADE FINAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline-final) {
         display: none !important;
@@ -2216,6 +2216,27 @@
         box-sizing: border-box !important;
         white-space: nowrap !important;
         text-align: center !important;
+      }
+
+
+
+      /* =========================
+         PACIENTE 10.8 - PROCEDIMENTO 509 / OCULTAR MATERIAL
+      ========================= */
+      .tm-paciente-v91-root .tm-paciente-procedimento-add,
+      .tm-paciente-v91-root .tm-paciente-procedimento-add .input-group,
+      .tm-paciente-v91-root .tm-paciente-procedimento-add input,
+      .tm-paciente-v91-root .tm-paciente-procedimento-add .form-control {
+        width: 509px !important;
+        max-width: 509px !important;
+        min-width: 509px !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-material-hidden {
+        display: none !important;
       }
 
 
@@ -4160,6 +4181,64 @@
     calc();
   }
 
+
+  function tmPaciente108AdjustProcedureMaterial() {
+    const root = getActivePacienteSchedulingModalRoot();
+    if (!root) return;
+
+    const groups = Array.from(root.querySelectorAll('.input-group'));
+
+    groups.forEach((group) => {
+      const text = norm(group.innerText || group.textContent || '');
+      const input = group.querySelector('input');
+      const placeholder = input ? norm(input.getAttribute('placeholder') || '') : '';
+
+      const isAddProcedure =
+        text.includes('Adicionar procedimento') ||
+        placeholder.includes('Adicionar procedimento');
+
+      const isMaterial =
+        text.includes('Incluir material') ||
+        text.includes('medicamento') ||
+        text.includes('taxa') ||
+        placeholder.includes('Incluir material') ||
+        placeholder.includes('medicamento') ||
+        placeholder.includes('taxa');
+
+      if (isAddProcedure) {
+        group.classList.add('tm-paciente-procedimento-add');
+
+        const wrapper =
+          group.closest('.form-group') ||
+          group.closest('.col') ||
+          group.closest('[class*="col-"]') ||
+          group.parentElement;
+
+        [group, wrapper].filter(Boolean).forEach((el) => {
+          el.style.setProperty('width', '509px', 'important');
+          el.style.setProperty('max-width', '509px', 'important');
+          el.style.setProperty('min-width', '509px', 'important');
+          el.style.setProperty('margin-left', '0', 'important');
+          el.style.setProperty('margin-right', '0', 'important');
+          el.style.setProperty('box-sizing', 'border-box', 'important');
+        });
+      }
+
+      if (isMaterial) {
+        const wrapper =
+          group.closest('.form-group') ||
+          group.closest('.col') ||
+          group.closest('[class*="col-"]') ||
+          group.parentElement;
+
+        [group, wrapper].filter(Boolean).forEach((el) => {
+          el.classList.add('tm-paciente-material-hidden');
+          el.style.setProperty('display', 'none', 'important');
+        });
+      }
+    });
+  }
+
 function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
 
@@ -4169,6 +4248,7 @@ function burstUpdateLite() {
     tmPaciente105ApplyBirthBadge();
     tmPaciente106ApplyFinalBirthBadge();
     tmPaciente107MirrorFirstVisitBirth();
+    tmPaciente108AdjustProcedureMaterial();
 
     const root = getSchedulingModalRoot();
 
@@ -4213,6 +4293,7 @@ function burstUpdateLite() {
         tmPaciente105ApplyBirthBadge();
         tmPaciente106ApplyFinalBirthBadge();
     tmPaciente107MirrorFirstVisitBirth();
+    tmPaciente108AdjustProcedureMaterial();
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 60);
@@ -4223,6 +4304,7 @@ function burstUpdateLite() {
         tmPaciente105ApplyBirthBadge();
         tmPaciente106ApplyFinalBirthBadge();
     tmPaciente107MirrorFirstVisitBirth();
+    tmPaciente108AdjustProcedureMaterial();
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 160);
@@ -4233,6 +4315,7 @@ function burstUpdateLite() {
         tmPaciente105ApplyBirthBadge();
         tmPaciente106ApplyFinalBirthBadge();
     tmPaciente107MirrorFirstVisitBirth();
+    tmPaciente108AdjustProcedureMaterial();
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
         setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
       }, 320);
@@ -4685,9 +4768,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '10.7';
+      : '10.8';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '10.7';
+    return match ? match[0] : '10.8';
   }
 
   function ensureScriptVersionIndicator() {
@@ -5015,4 +5098,6 @@ function setDateCalculatorOpen(isOpen) {
       burstUpdate();
     }
   }, 1500);
+  setTimeout(tmPaciente108AdjustProcedureMaterial, 300);
+  setTimeout(tmPaciente108AdjustProcedureMaterial, 800);
 })();
