@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      11.2
+// @version      11.3
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2116,7 +2116,7 @@
 
 
       /* =========================
-         PACIENTE 11.2 - CORREÇÃO SEGURA DATA NASCIMENTO
+         PACIENTE 11.3 - CORREÇÃO SEGURA DATA NASCIMENTO
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
         position: relative !important;
@@ -2171,7 +2171,7 @@
 
 
       /* =========================
-         PACIENTE 11.2 - BADGE IDADE FINAL
+         PACIENTE 11.3 - BADGE IDADE FINAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline-final) {
         display: none !important;
@@ -2221,7 +2221,7 @@
 
 
       /* =========================
-         PACIENTE 11.2 - PROCEDIMENTO 509 / OCULTAR MATERIAL
+         PACIENTE 11.3 - PROCEDIMENTO 509 / OCULTAR MATERIAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-procedimento-add,
       .tm-paciente-v91-root .tm-paciente-procedimento-add .input-group,
@@ -2242,7 +2242,7 @@
 
 
       /* =========================
-         PACIENTE 11.2 - AJUSTE DEFINITIVO PROCEDIMENTO / MATERIAL
+         PACIENTE 11.3 - AJUSTE DEFINITIVO PROCEDIMENTO / MATERIAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-proc-row-final,
       .tm-paciente-v91-root .tm-paciente-proc-row-final .input-group,
@@ -2285,7 +2285,7 @@
 
 
       /* =========================
-         PACIENTE 11.2 - BADGE IDADE DATA NASCIMENTO
+         PACIENTE 11.3 - BADGE IDADE DATA NASCIMENTO
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group,
       .tm-paciente-v91-root .tm-paciente-v91-birth {
@@ -5079,9 +5079,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '11.2';
+      : '11.3';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '11.2';
+    return match ? match[0] : '11.3';
   }
 
   function ensureScriptVersionIndicator() {
@@ -5433,4 +5433,151 @@ function setDateCalculatorOpen(isOpen) {
     } catch (e) {}
   }, 300);
 
+
+  function tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez() {
+    const removeBadge = () => {
+      document.querySelectorAll('.tm-paciente-birth-age-floating').forEach((el) => el.remove());
+    };
+
+    const root = getActivePacienteSchedulingModalRoot();
+    if (!root) {
+      removeBadge();
+      return;
+    }
+
+    const birthBlock =
+      root.querySelector('.tm-paciente-v91-birth') ||
+      tmPaciente91Field(root, 'Data de Nascimento');
+
+    if (!birthBlock) {
+      removeBadge();
+      return;
+    }
+
+    const input = birthBlock.querySelector('input');
+    if (!input) {
+      removeBadge();
+      return;
+    }
+
+    const value = String(input.value || '').trim();
+
+    let day;
+    let month;
+    let year;
+
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+      [day, month, year] = value.split('/');
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const parts = value.split('-');
+      year = parts[0];
+      month = parts[1];
+      day = parts[2];
+    } else {
+      removeBadge();
+      input.style.setProperty('padding-right', '48px', 'important');
+      return;
+    }
+
+    day = Number(day);
+    month = Number(month);
+    year = Number(year);
+
+    if (
+      !Number.isInteger(day) ||
+      !Number.isInteger(month) ||
+      !Number.isInteger(year) ||
+      day < 1 ||
+      day > 31 ||
+      month < 1 ||
+      month > 12 ||
+      year < 1900 ||
+      year > 2100
+    ) {
+      removeBadge();
+      return;
+    }
+
+    const birthDate = new Date(year, month - 1, day);
+
+    if (
+      birthDate.getFullYear() !== year ||
+      birthDate.getMonth() !== month - 1 ||
+      birthDate.getDate() !== day
+    ) {
+      removeBadge();
+      return;
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - year;
+
+    if (
+      today.getMonth() < month - 1 ||
+      (today.getMonth() === month - 1 && today.getDate() < day)
+    ) {
+      age--;
+    }
+
+    input.style.setProperty('padding-right', '48px', 'important');
+
+    let badge = document.querySelector('.tm-paciente-birth-age-floating');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'tm-paciente-birth-age-floating';
+      document.body.appendChild(badge);
+    }
+
+    const rect = input.getBoundingClientRect();
+    const style = window.getComputedStyle(input);
+
+    badge.textContent = age + 'a';
+    badge.style.setProperty('position', 'fixed', 'important');
+    badge.style.setProperty('left', Math.round(rect.right - 47) + 'px', 'important');
+    badge.style.setProperty('top', Math.round(rect.top + 1) + 'px', 'important');
+    badge.style.setProperty('width', '46px', 'important');
+    badge.style.setProperty('height', Math.max(0, Math.round(rect.height - 2)) + 'px', 'important');
+    badge.style.setProperty('z-index', '2147483647', 'important');
+    badge.style.setProperty('display', 'flex', 'important');
+    badge.style.setProperty('align-items', 'center', 'important');
+    badge.style.setProperty('justify-content', 'center', 'important');
+    badge.style.setProperty('background', '#d9d9d9', 'important');
+    badge.style.setProperty('color', '#666', 'important');
+    badge.style.setProperty('border-left', '1px solid #cfd4da', 'important');
+    badge.style.setProperty('border-top-right-radius', style.borderTopRightRadius || '.25rem', 'important');
+    badge.style.setProperty('border-bottom-right-radius', style.borderBottomRightRadius || '.25rem', 'important');
+    badge.style.setProperty('font-size', style.fontSize || '14px', 'important');
+    badge.style.setProperty('font-family', style.fontFamily || 'inherit', 'important');
+    badge.style.setProperty('font-weight', style.fontWeight || '400', 'important');
+    badge.style.setProperty('line-height', '1', 'important');
+    badge.style.setProperty('pointer-events', 'none', 'important');
+    badge.style.setProperty('box-sizing', 'border-box', 'important');
+    badge.style.setProperty('white-space', 'nowrap', 'important');
+
+    if (!input.dataset.tmPaciente113AgeListener) {
+      const refresh = () => setTimeout(tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez, 0);
+      input.addEventListener('input', refresh, true);
+      input.addEventListener('keyup', refresh, true);
+      input.addEventListener('change', refresh, true);
+      input.addEventListener('blur', refresh, true);
+      input.dataset.tmPaciente113AgeListener = '1';
+    }
+  }
+
+
+  setInterval(() => {
+    try {
+      tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
+    } catch (e) {}
+  }, 150);
+  window.addEventListener('scroll', () => {
+    try {
+      tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
+    } catch (e) {}
+  }, true);
+  window.addEventListener('resize', () => {
+    try {
+      tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
+    } catch (e) {}
+  }, true);
 })();
