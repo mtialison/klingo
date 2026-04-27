@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      11.5
+// @version      11.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -2116,7 +2116,7 @@
 
 
       /* =========================
-         PACIENTE 11.5 - CORREÇÃO SEGURA DATA NASCIMENTO
+         PACIENTE 11.6 - CORREÇÃO SEGURA DATA NASCIMENTO
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
         position: relative !important;
@@ -2171,7 +2171,7 @@
 
 
       /* =========================
-         PACIENTE 11.5 - BADGE IDADE FINAL
+         PACIENTE 11.6 - BADGE IDADE FINAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline-final) {
         display: none !important;
@@ -2221,7 +2221,7 @@
 
 
       /* =========================
-         PACIENTE 11.5 - PROCEDIMENTO 509 / OCULTAR MATERIAL
+         PACIENTE 11.6 - PROCEDIMENTO 509 / OCULTAR MATERIAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-procedimento-add,
       .tm-paciente-v91-root .tm-paciente-procedimento-add .input-group,
@@ -2242,7 +2242,7 @@
 
 
       /* =========================
-         PACIENTE 11.5 - AJUSTE DEFINITIVO PROCEDIMENTO / MATERIAL
+         PACIENTE 11.6 - AJUSTE DEFINITIVO PROCEDIMENTO / MATERIAL
       ========================= */
       .tm-paciente-v91-root .tm-paciente-proc-row-final,
       .tm-paciente-v91-root .tm-paciente-proc-row-final .input-group,
@@ -2285,7 +2285,7 @@
 
 
       /* =========================
-         PACIENTE 11.5 - BADGE IDADE DATA NASCIMENTO
+         PACIENTE 11.6 - BADGE IDADE DATA NASCIMENTO
       ========================= */
       .tm-paciente-v91-root .tm-paciente-v91-birth .input-group,
       .tm-paciente-v91-root .tm-paciente-v91-birth {
@@ -2324,7 +2324,7 @@
 
 
       /* =========================
-         PACIENTE 11.5 - BADGE IDADE PRESA AO CAMPO
+         PACIENTE 11.6 - BADGE IDADE PRESA AO CAMPO
       ========================= */
       .tm-paciente-v91-root .tm-paciente-birth-holder-115 {
         position: relative !important;
@@ -2362,6 +2362,44 @@
       .tm-age-floating,
       .tm-paciente-birth-age-floating {
         display: none !important;
+      }
+
+
+
+      /* =========================
+         PACIENTE 11.6 - BADGE IDADE FIXA NO CAMPO
+      ========================= */
+      .tm-paciente-v91-root .tm-paciente-birth-age-holder-116 {
+        position: relative !important;
+        overflow: hidden !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-birth-age-holder-116 input {
+        padding-right: 48px !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-paciente-v91-root .tm-paciente-age-badge-116 {
+        position: absolute !important;
+        top: 1px !important;
+        right: 1px !important;
+        bottom: 1px !important;
+        width: 46px !important;
+        height: auto !important;
+        z-index: 2147483647 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #d9d9d9 !important;
+        color: #555 !important;
+        border-left: 1px solid #cfd4da !important;
+        border-top-right-radius: .25rem !important;
+        border-bottom-right-radius: .25rem !important;
+        font-size: 14px !important;
+        line-height: 1 !important;
+        pointer-events: none !important;
+        box-sizing: border-box !important;
+        white-space: nowrap !important;
       }
 
 
@@ -5122,9 +5160,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '11.5';
+      : '11.6';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '11.5';
+    return match ? match[0] : '11.6';
   }
 
   function ensureScriptVersionIndicator() {
@@ -5630,7 +5668,7 @@ function setDateCalculatorOpen(isOpen) {
 
 
   // =========================
-  // PACIENTE 11.5 - BADGE IDADE INTERNA, SEM FLICKER
+  // PACIENTE 11.6 - BADGE IDADE INTERNA, SEM FLICKER
   // =========================
   (function tmPaciente115InternalBirthAgeBadge() {
     let lastInput = null;
@@ -5790,6 +5828,190 @@ function setDateCalculatorOpen(isOpen) {
     window.addEventListener('resize', () => {
       try {
         applyBadge();
+      } catch (e) {}
+    }, true);
+  })();
+
+
+
+  // =========================
+  // PACIENTE 11.6 - BADGE IDADE DEFINITIVA
+  // =========================
+  (function tmPaciente116BirthAgeStable() {
+    function onlyText(v) {
+      return String(v || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function findBirthInput() {
+      const root =
+        (typeof getActivePacienteSchedulingModalRoot === 'function' && getActivePacienteSchedulingModalRoot()) ||
+        document.querySelector('.modal.show .modal-content');
+
+      if (!root) return null;
+
+      const marked = root.querySelector('.tm-paciente-v91-birth input');
+      if (marked) return marked;
+
+      const blocks = Array.from(root.querySelectorAll('.form-group, .col, [class*="col-"], div'));
+      for (const block of blocks) {
+        const text = onlyText(block.innerText || block.textContent || '');
+        if (!text.includes('Data de Nascimento')) continue;
+
+        const input = block.querySelector('input');
+        if (input) return input;
+      }
+
+      const labels = Array.from(root.querySelectorAll('small, label'));
+      for (const label of labels) {
+        const text = onlyText(label.innerText || label.textContent || '');
+        if (!text.includes('Data de Nascimento')) continue;
+
+        let el = label.parentElement;
+        for (let i = 0; el && i < 5; i += 1, el = el.parentElement) {
+          const input = el.querySelector && el.querySelector('input');
+          if (input) return input;
+        }
+      }
+
+      return null;
+    }
+
+    function calcAge(value) {
+      const raw = String(value || '').trim();
+
+      let d;
+      let m;
+      let y;
+
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+        [d, m, y] = raw.split('/').map(Number);
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        const p = raw.split('-').map(Number);
+        y = p[0];
+        m = p[1];
+        d = p[2];
+      } else {
+        return null;
+      }
+
+      if (
+        !Number.isInteger(d) ||
+        !Number.isInteger(m) ||
+        !Number.isInteger(y) ||
+        d < 1 ||
+        d > 31 ||
+        m < 1 ||
+        m > 12 ||
+        y < 1900 ||
+        y > 2100
+      ) {
+        return null;
+      }
+
+      const birth = new Date(y, m - 1, d);
+      if (
+        birth.getFullYear() !== y ||
+        birth.getMonth() !== m - 1 ||
+        birth.getDate() !== d
+      ) {
+        return null;
+      }
+
+      const today = new Date();
+      let age = today.getFullYear() - y;
+
+      if (
+        today.getMonth() < m - 1 ||
+        (today.getMonth() === m - 1 && today.getDate() < d)
+      ) {
+        age -= 1;
+      }
+
+      return age;
+    }
+
+    function apply() {
+      const input = findBirthInput();
+
+      if (!input) {
+        document.querySelectorAll('.tm-paciente-age-badge-116').forEach((el) => el.remove());
+        return;
+      }
+
+      const holder = input.closest('.input-group') || input.parentElement;
+      if (!holder) return;
+
+      const age = calcAge(input.value);
+
+      holder.classList.add('tm-paciente-birth-age-holder-116');
+      holder.style.setProperty('position', 'relative', 'important');
+      holder.style.setProperty('overflow', 'hidden', 'important');
+      input.style.setProperty('padding-right', '48px', 'important');
+
+      let badge = holder.querySelector('.tm-paciente-age-badge-116');
+
+      if (age === null) {
+        if (badge) badge.remove();
+        return;
+      }
+
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'tm-paciente-age-badge-116';
+        holder.appendChild(badge);
+      }
+
+      badge.textContent = age + 'a';
+
+      badge.style.setProperty('position', 'absolute', 'important');
+      badge.style.setProperty('top', '1px', 'important');
+      badge.style.setProperty('right', '1px', 'important');
+      badge.style.setProperty('bottom', '1px', 'important');
+      badge.style.setProperty('width', '46px', 'important');
+      badge.style.setProperty('z-index', '2147483647', 'important');
+      badge.style.setProperty('display', 'flex', 'important');
+      badge.style.setProperty('align-items', 'center', 'important');
+      badge.style.setProperty('justify-content', 'center', 'important');
+      badge.style.setProperty('background', '#d9d9d9', 'important');
+      badge.style.setProperty('color', '#555', 'important');
+      badge.style.setProperty('border-left', '1px solid #cfd4da', 'important');
+      badge.style.setProperty('border-top-right-radius', '.25rem', 'important');
+      badge.style.setProperty('border-bottom-right-radius', '.25rem', 'important');
+      badge.style.setProperty('font-size', '14px', 'important');
+      badge.style.setProperty('line-height', '1', 'important');
+      badge.style.setProperty('pointer-events', 'none', 'important');
+      badge.style.setProperty('box-sizing', 'border-box', 'important');
+      badge.style.setProperty('white-space', 'nowrap', 'important');
+
+      if (!input.dataset.tmPaciente116AgeListener) {
+        const refresh = () => {
+          requestAnimationFrame(apply);
+          setTimeout(apply, 60);
+        };
+
+        input.addEventListener('input', refresh, true);
+        input.addEventListener('keyup', refresh, true);
+        input.addEventListener('change', refresh, true);
+        input.addEventListener('blur', refresh, true);
+        input.dataset.tmPaciente116AgeListener = '1';
+      }
+    }
+
+    setInterval(() => {
+      try {
+        apply();
+      } catch (e) {}
+    }, 100);
+
+    window.addEventListener('scroll', () => {
+      try {
+        requestAnimationFrame(apply);
+      } catch (e) {}
+    }, true);
+
+    window.addEventListener('resize', () => {
+      try {
+        requestAnimationFrame(apply);
       } catch (e) {}
     }, true);
   })();
