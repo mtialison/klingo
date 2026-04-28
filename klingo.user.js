@@ -4912,39 +4912,94 @@ function burstUpdateLite() {
       }
 
       .tm-datecalc-header-trigger-item {
-        display: flex !important;
+        display: inline-flex !important;
         align-items: center !important;
+        justify-content: center !important;
+        align-self: center !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        line-height: 1 !important;
       }
 
       .tm-datecalc-header-trigger {
-        display: flex !important;
+        position: relative !important;
+        display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        align-self: stretch !important;
-        height: 100% !important;
-        min-height: 48px !important;
-        padding: 0 12px !important;
+        align-self: center !important;
+        width: 36px !important;
+        height: 36px !important;
+        min-width: 36px !important;
+        min-height: 36px !important;
+        padding: 0 !important;
         margin: 0 14px 0 0 !important;
+        border-radius: 12px !important;
+        border: 1px solid rgba(255,255,255,0.34) !important;
+        background: rgba(255,255,255,0.12) !important;
         color: #ffffff !important;
-        font-size: 28px !important;
         line-height: 1 !important;
         text-decoration: none !important;
         cursor: pointer !important;
         user-select: none !important;
         flex: 0 0 auto !important;
+        overflow: hidden !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.10) !important;
+        transform: translateY(2px) !important;
+        transition:
+          transform 0.16s ease,
+          background 0.16s ease,
+          border-color 0.16s ease,
+          box-shadow 0.16s ease,
+          opacity 0.16s ease !important;
+      }
+
+      .tm-datecalc-header-trigger::before {
+        content: '' !important;
+        position: absolute !important;
+        inset: 0 !important;
+        border-radius: inherit !important;
+        background: linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0.05)) !important;
+        opacity: 0 !important;
+        transition: opacity 0.16s ease !important;
+        pointer-events: none !important;
       }
 
       .tm-datecalc-header-trigger img {
+        position: relative !important;
+        z-index: 1 !important;
         display: block !important;
-        width: 22px !important;
-        height: 22px !important;
+        width: 19px !important;
+        height: 19px !important;
+        object-fit: contain !important;
+        filter: drop-shadow(0 1px 1px rgba(0,0,0,0.22)) !important;
+        transition: transform 0.16s ease, filter 0.16s ease !important;
       }
 
       .tm-datecalc-header-trigger:hover,
       .tm-datecalc-header-trigger:focus {
         color: #ffffff !important;
         text-decoration: none !important;
-        opacity: 0.92 !important;
+        opacity: 1 !important;
+        background: rgba(255,255,255,0.22) !important;
+        border-color: rgba(255,255,255,0.58) !important;
+        box-shadow: 0 7px 16px rgba(0,0,0,0.18) !important;
+        transform: translateY(1px) !important;
+      }
+
+      .tm-datecalc-header-trigger:hover::before,
+      .tm-datecalc-header-trigger:focus::before {
+        opacity: 1 !important;
+      }
+
+      .tm-datecalc-header-trigger:hover img,
+      .tm-datecalc-header-trigger:focus img {
+        transform: scale(1.08) !important;
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,0.26)) !important;
+      }
+
+      .tm-datecalc-header-trigger:active {
+        transform: translateY(2px) scale(0.97) !important;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.12) !important;
       }
 
       .tm-script-version-indicator {
@@ -5160,9 +5215,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '11.6';
+      : '11.7';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '11.6';
+    return match ? match[0] : '11.7';
   }
 
   function ensureScriptVersionIndicator() {
@@ -5240,7 +5295,7 @@ function setDateCalculatorOpen(isOpen) {
     trigger.setAttribute('data-tm-datecalc-header-trigger', '1');
     trigger.setAttribute('title', 'Calculadora de datas');
     trigger.setAttribute('aria-label', 'Calculadora de datas');
-    trigger.innerHTML = '<img src="https://i.imgur.com/GU5gE57.png" style="width:22px;height:22px;">';
+    trigger.innerHTML = '<img src="https://i.imgur.com/GU5gE57.png">';
 
     triggerLi.appendChild(trigger);
 
@@ -6018,20 +6073,3 @@ function setDateCalculatorOpen(isOpen) {
 
 
 })();
-
-/* FIX VERTICAL BUTTON CALCULATOR */
-.tm-datecalc-header-trigger-item {
-  display: flex !important;
-  align-items: center !important;
-  height: 100% !important;
-}
-
-.tm-datecalc-header-trigger {
-  align-self: center !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  height: 36px !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
