@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         klingo 11.7
+// @name         klingo
 // @namespace    http://tampermonkey.net/
 // @version      11.7
 // @match        *://*.klingo.app/*
