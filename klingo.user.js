@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      11.7
+// @version      11.8
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
@@ -14,7 +14,29 @@
 (function () {
   'use strict';
 
-  // v11.7: limpeza conservadora: sem MutationObserver contínuo, reaplicação centralizada e menos agressiva para SPA.
+  /* =========================
+     HELPERS GERAIS 11.8
+  ========================= */
+  const TM_LOG_PREFIX = '[TM KLINGO]';
+
+  function tmLogError(context, error) {
+    try {
+      console.error(`${TM_LOG_PREFIX} ${context}`, error);
+    } catch (_) {
+      // fallback intencional: console pode estar indisponível em ambientes restritos
+    }
+  }
+
+  function tmSafeRemove(el) {
+    try {
+      if (!el || !el.parentNode) return;
+      el.parentNode.removeChild(el);
+    } catch (e) {
+      tmLogError('erro ao remover elemento com segurança', e);
+    }
+  }
+
+  // v11.8: limpeza estrutural conservadora: remoções seguras, logs úteis, badge de idade unificado e reaplicação menos agressiva.
 
   /* =========================
      CONFIGURAÇÃO HEADER (FONTE)
@@ -307,7 +329,7 @@
     if (!targetEl) return;
 
     const oldTip = document.querySelector('#tm-copy-bubble');
-    if (oldTip) oldTip.remove();
+    if (oldTip) tmSafeRemove(oldTip);
 
     const bubble = document.createElement('div');
     bubble.id = 'tm-copy-bubble';
@@ -357,7 +379,7 @@
     clearTimeout(bubble._hideTimer);
     bubble._hideTimer = setTimeout(() => {
       bubble.style.opacity = '0';
-      setTimeout(() => bubble.remove(), 180);
+      setTimeout(() => tmSafeRemove(bubble), 180);
     }, 1000);
   }
 
@@ -373,7 +395,7 @@
       document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');
-      ta.remove();
+      tmSafeRemove(ta);
       showCopyFeedback(targetEl, 'Copiado');
     }
   }
@@ -2522,7 +2544,7 @@
     });
 
     root.querySelectorAll('#tm-top-layout-host, #tm-observation-layout-host, .tm-layout-host, .tm-top-layout, .tm-left-panel').forEach((el) => {
-      el.remove();
+      tmSafeRemove(el);
     });
 
     root.querySelectorAll('.tm-hidden-original-row').forEach((el) => {
@@ -2537,7 +2559,7 @@
     });
 
     root.querySelectorAll('.tm-observation-textarea').forEach((el) => {
-      el.remove();
+      tmSafeRemove(el);
     });
 
     root.querySelectorAll('[data-slot]').forEach((el) => {
@@ -2784,7 +2806,7 @@
       if (dateNode) line3.appendChild(dateNode);
       if (timeNode) line3.appendChild(timeNode);
 
-      metaRow.remove();
+      tmSafeRemove(metaRow);
 
       if (infosWrap) {
         infosWrap.classList.add('tm-header-infos');
@@ -3752,7 +3774,7 @@
     }
 
     if (originalInfo && originalInfo.parentElement) {
-      originalInfo.remove();
+      tmSafeRemove(originalInfo);
     }
 
     tmPaciente91CleanEmptyHeaderNote(root);
@@ -3926,7 +3948,7 @@
     } else {
       basicRow?.classList.add('tm-paciente-v91-row-basic-no-cpf');
       basicRow?.classList.remove('tm-paciente-v91-row-basic-has-cpf');
-      host.querySelector('[data-v91-slot="cpf"]')?.remove();
+      tmSafeRemove(host.querySelector('[data-v91-slot="cpf"]'));
     }
 
     tmPaciente91Move(host.querySelector('[data-v91-slot="sexo"]'), sexo, 'tm-paciente-v91-sex');
@@ -3989,7 +4011,7 @@
     }
 
     appends.forEach((append) => {
-      if (append !== badge) append.remove();
+      if (append !== badge) tmSafeRemove(append);
     });
 
     const ageText = badge.querySelector('.input-group-text');
@@ -4075,7 +4097,7 @@
     if (!inputGroup || !input) return;
 
     Array.from(birthBlock.querySelectorAll('.input-group-append')).forEach((append) => {
-      if (!append.classList.contains('tm-birth-age-inline-final')) append.remove();
+      if (!append.classList.contains('tm-birth-age-inline-final')) tmSafeRemove(append);
     });
 
     let badge = inputGroup.querySelector('.tm-birth-age-inline-final');
@@ -4172,7 +4194,7 @@
 
     // Remove qualquer badge anterior do sistema ou das versões anteriores.
     birthBlock.querySelectorAll('.input-group-append, .tm-birth-age-inline, .tm-birth-age-inline-final, .tm-paciente-age-badge-final')
-      .forEach((el) => el.remove());
+      .forEach((el) => tmSafeRemove(el));
 
     const rawValue = String(input.value || '').trim();
     const digits = rawValue.replace(/[^0-9]/g, '');
@@ -4294,7 +4316,7 @@
     // remove qualquer overlay quebrado
     const group = pacienteBirth.closest('.input-group');
     if (group) {
-      group.querySelectorAll('.input-group-append').forEach(e => e.remove());
+      group.querySelectorAll('.input-group-append').forEach((e) => tmSafeRemove(e));
     }
 
     // reaplica badge exatamente igual Primeira Vez
@@ -4495,6 +4517,8 @@
 
 
   function tmPaciente110ApplyBirthAgeBadge() {
+    // v11.8: módulo legado desativado; a aplicação ativa fica no tmPaciente116BirthAgeStable.
+    return;
   const root = getActivePacienteSchedulingModalRoot();
   if (!root) return;
 
@@ -4516,7 +4540,7 @@
 
   holder.querySelectorAll(
     '.tm-paciente-age-badge-110, .tm-paciente-age-badge-final, .tm-birth-age-inline, .tm-birth-age-inline-final, .input-group-append'
-  ).forEach((el) => el.remove());
+  ).forEach((el) => tmSafeRemove(el));
 
   const raw = String(input.value || '').trim();
 
@@ -5420,7 +5444,7 @@ function setDateCalculatorOpen(isOpen) {
     startHeaderToolsInitialRenderSafe();
   }
 
-  // v11.7: removido MutationObserver contínuo.
+  // v11.8: sem MutationObserver contínuo.
   // A reaplicação agora é feita por eventos de rota/foco e por loop controlado abaixo.
   let tmKlingoRefreshLocked = false;
 
@@ -5496,7 +5520,7 @@ function setDateCalculatorOpen(isOpen) {
     if (location.hostname.endsWith('klingo.app')) {
       tmKlingoControlledRefresh('interval');
     }
-  }, 1800);
+  }, 2500);
   setTimeout(tmPaciente108AdjustProcedureMaterial, 300);
   setTimeout(tmPaciente108AdjustProcedureMaterial, 800);
 
@@ -5527,8 +5551,10 @@ function setDateCalculatorOpen(isOpen) {
 
 
   function tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez() {
+    // v11.8: módulo legado desativado; evita badge flutuante e conflito visual.
+    return;
     const removeBadge = () => {
-      document.querySelectorAll('.tm-paciente-birth-age-floating').forEach((el) => el.remove());
+      document.querySelectorAll('.tm-paciente-birth-age-floating').forEach((el) => tmSafeRemove(el));
     };
 
     const root = getActivePacienteSchedulingModalRoot();
@@ -5667,12 +5693,16 @@ function setDateCalculatorOpen(isOpen) {
   window.addEventListener('scroll', () => {
     try {
       tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
-    } catch (e) {}
+    } catch (e) {
+      tmLogError('erro tratado em listener leve', e);
+    }
   }, true);
   window.addEventListener('resize', () => {
     try {
       tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
-    } catch (e) {}
+    } catch (e) {
+      tmLogError('erro tratado em listener leve', e);
+    }
   }, true);
 
 
@@ -5684,6 +5714,8 @@ function setDateCalculatorOpen(isOpen) {
   // PACIENTE 11.6 - BADGE IDADE INTERNA, SEM FLICKER
   // =========================
   (function tmPaciente115InternalBirthAgeBadge() {
+    // v11.8: módulo legado desativado; evita múltiplos badges simultâneos.
+    return;
     let lastInput = null;
 
     function getBirthInput() {
@@ -5775,7 +5807,7 @@ function setDateCalculatorOpen(isOpen) {
     function removeOldBadges() {
       document.querySelectorAll(
         '.tm-age-floating, .tm-paciente-birth-age-floating, .tm-paciente-age-badge-110, .tm-paciente-age-badge-final, .tm-birth-age-inline, .tm-birth-age-inline-final'
-      ).forEach((el) => el.remove());
+      ).forEach((el) => tmSafeRemove(el));
     }
 
     function applyBadge() {
@@ -5804,7 +5836,7 @@ function setDateCalculatorOpen(isOpen) {
       let badge = holder.querySelector('.tm-paciente-age-badge-115');
 
       if (age === null) {
-        if (badge) badge.remove();
+        if (badge) tmSafeRemove(badge);
         return;
       }
 
@@ -5837,13 +5869,17 @@ function setDateCalculatorOpen(isOpen) {
     window.addEventListener('scroll', () => {
       try {
         applyBadge();
-      } catch (e) {}
+      } catch (e) {
+      tmLogError('erro tratado em listener leve', e);
+    }
     }, true);
 
     window.addEventListener('resize', () => {
       try {
         applyBadge();
-      } catch (e) {}
+      } catch (e) {
+      tmLogError('erro tratado em listener leve', e);
+    }
     }, true);
   })();
 
@@ -5945,11 +5981,11 @@ function setDateCalculatorOpen(isOpen) {
       return age;
     }
 
-    function apply() {
+    function tmPaciente116BirthAgeStableApply() {
       const input = findBirthInput();
 
       if (!input) {
-        document.querySelectorAll('.tm-paciente-age-badge-116').forEach((el) => el.remove());
+        document.querySelectorAll('.tm-paciente-age-badge-116').forEach((el) => tmSafeRemove(el));
         return;
       }
 
@@ -5966,7 +6002,7 @@ function setDateCalculatorOpen(isOpen) {
       let badge = holder.querySelector('.tm-paciente-age-badge-116');
 
       if (age === null) {
-        if (badge) badge.remove();
+        if (badge) tmSafeRemove(badge);
         return;
       }
 
@@ -6000,8 +6036,8 @@ function setDateCalculatorOpen(isOpen) {
 
       if (!input.dataset.tmPaciente116AgeListener) {
         const refresh = () => {
-          requestAnimationFrame(apply);
-          setTimeout(apply, 60);
+          requestAnimationFrame(tmPaciente116BirthAgeStableApply);
+          setTimeout(tmPaciente116BirthAgeStableApply, 60);
         };
 
         input.addEventListener('input', refresh, true);
@@ -6014,7 +6050,7 @@ function setDateCalculatorOpen(isOpen) {
 
     setInterval(() => {
       try {
-        apply();
+        tmPaciente116BirthAgeStableApply();
       } catch (e) {
         console.error('[TM] erro no badge 116', e);
       }
@@ -6022,14 +6058,18 @@ function setDateCalculatorOpen(isOpen) {
 
     window.addEventListener('scroll', () => {
       try {
-        requestAnimationFrame(apply);
-      } catch (e) {}
+        requestAnimationFrame(tmPaciente116BirthAgeStableApply);
+      } catch (e) {
+      tmLogError('erro tratado em listener leve', e);
+    }
     }, true);
 
     window.addEventListener('resize', () => {
       try {
-        requestAnimationFrame(apply);
-      } catch (e) {}
+        requestAnimationFrame(tmPaciente116BirthAgeStableApply);
+      } catch (e) {
+      tmLogError('erro tratado em listener leve', e);
+    }
     }, true);
   })();
 
