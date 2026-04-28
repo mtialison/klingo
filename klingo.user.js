@@ -1,8 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      11.6
-// @description  envenenado
+// @version      11.7
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
@@ -14,6 +13,8 @@
 
 (function () {
   'use strict';
+
+  // v11.7: limpeza conservadora: sem MutationObserver contínuo, reaplicação centralizada e menos agressiva para SPA.
 
   /* =========================
      CONFIGURAÇÃO HEADER (FONTE)
@@ -4598,49 +4599,46 @@
 function burstUpdateLite() {
     if (!isCallCenterRoute()) return;
 
-    clearFirstVisitResidueFromPacienteModal();
-    tmPaciente91Layout();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente103NormalizeBirthBadge();
-    tmPaciente105ApplyBirthBadge();
-    tmPaciente106ApplyFinalBirthBadge();
-    tmPaciente107MirrorFirstVisitBirth();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente108AdjustProcedureMaterial();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
+    try {
+      clearFirstVisitResidueFromPacienteModal();
+      tmPaciente91Layout();
+      tmPaciente108AdjustProcedureMaterial();
+      tmPaciente109HardProcedureMaterialFix();
 
-    const root = getSchedulingModalRoot();
+      // v11.7: mantém compatibilidade com as gerações antigas de badge,
+      // mas executa cada correção apenas uma vez por ciclo controlado.
+      tmPaciente103NormalizeBirthBadge();
+      tmPaciente105ApplyBirthBadge();
+      tmPaciente106ApplyFinalBirthBadge();
+      tmPaciente107MirrorFirstVisitBirth();
+      tmPaciente110ApplyBirthAgeBadge();
 
-    updateModalTitle();
-    enableBirthDatePaste();
-    injectLayoutCSS();
-    injectFontFix();
+      const root = getSchedulingModalRoot();
 
-    if (root) {
-      hideAppointmentModalFields();
-      reorganizeSchedulingModalLayout();
-      enableBirthAgeBadgeSafe();
-      resizeSchedulingModal();
-      reorganizeHeaderStructure(root);
+      updateModalTitle();
+      enableBirthDatePaste();
+      injectLayoutCSS();
+      injectFontFix();
+
+      if (root) {
+        hideAppointmentModalFields();
+        reorganizeSchedulingModalLayout();
+        enableBirthAgeBadgeSafe();
+        resizeSchedulingModal();
+        reorganizeHeaderStructure(root);
+      }
+
+      simplifyUnitsSafe();
+    } catch (e) {
+      console.error('[TM] erro no burstUpdateLite', e);
     }
-
-    simplifyUnitsSafe();
   }
 
   function burstUpdate() {
     if (!isCallCenterRoute()) return;
     burstUpdateLite();
-    setTimeout(burstUpdateLite, 100);
-    setTimeout(burstUpdateLite, 250);
-    setTimeout(burstUpdateLite, 500);
-    setTimeout(burstUpdateLite, 900);
-    setTimeout(burstUpdateLite, 1400);
+    setTimeout(burstUpdateLite, 180);
+    setTimeout(burstUpdateLite, 650);
   }
 
   document.addEventListener('click', (e) => {
@@ -5422,18 +5420,30 @@ function setDateCalculatorOpen(isOpen) {
     startHeaderToolsInitialRenderSafe();
   }
 
-  const observer = new MutationObserver(() => {
-    applyLoginIndicator();
-    enableBirthDatePaste();
-    burstUpdateLite();
-    scheduleDateCalculatorMenuRefresh();
-  });
+  // v11.7: removido MutationObserver contínuo.
+  // A reaplicação agora é feita por eventos de rota/foco e por loop controlado abaixo.
+  let tmKlingoRefreshLocked = false;
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-    characterData: true
-  });
+  function tmKlingoControlledRefresh(reason = 'loop') {
+    if (tmKlingoRefreshLocked) return;
+    tmKlingoRefreshLocked = true;
+
+    setTimeout(() => {
+      try {
+        applyLoginIndicator();
+        scheduleDateCalculatorMenuRefresh();
+
+        if (isCallCenterRoute()) {
+          enableBirthDatePaste();
+          burstUpdateLite();
+        }
+      } catch (e) {
+        console.error('[TM] erro na reaplicação controlada', reason, e);
+      } finally {
+        tmKlingoRefreshLocked = false;
+      }
+    }, 120);
+  }
 
   function initScript() {
     applyLoginIndicator();
@@ -5484,12 +5494,9 @@ function setDateCalculatorOpen(isOpen) {
 
   setInterval(() => {
     if (location.hostname.endsWith('klingo.app')) {
-      applyLoginIndicator();
-      if (!isCallCenterRoute()) return;
-      enableBirthDatePaste();
-      burstUpdate();
+      tmKlingoControlledRefresh('interval');
     }
-  }, 1500);
+  }, 1800);
   setTimeout(tmPaciente108AdjustProcedureMaterial, 300);
   setTimeout(tmPaciente108AdjustProcedureMaterial, 800);
 
@@ -5497,9 +5504,11 @@ function setDateCalculatorOpen(isOpen) {
   setTimeout(tmPaciente109HardProcedureMaterialFix, 500);
   setTimeout(tmPaciente109HardProcedureMaterialFix, 1000);
   setInterval(() => {
-    if (getActivePacienteSchedulingModalRoot()) tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-  }, 700);
+    if (getActivePacienteSchedulingModalRoot()) {
+      tmPaciente109HardProcedureMaterialFix();
+      tmPaciente110ApplyBirthAgeBadge();
+    }
+  }, 1200);
 
 
   setTimeout(tmPaciente110ApplyBirthAgeBadge, 100);
@@ -5511,8 +5520,10 @@ function setDateCalculatorOpen(isOpen) {
   setInterval(() => {
     try {
       if (getActivePacienteSchedulingModalRoot()) tmPaciente110ApplyBirthAgeBadge();
-    } catch (e) {}
-  }, 300);
+    } catch (e) {
+      console.error('[TM] erro no badge 110', e);
+    }
+  }, 1200);
 
 
   function tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez() {
@@ -5648,9 +5659,11 @@ function setDateCalculatorOpen(isOpen) {
 
   setInterval(() => {
     try {
-      tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
-    } catch (e) {}
-  }, 150);
+      if (getActivePacienteSchedulingModalRoot()) tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
+    } catch (e) {
+      console.error('[TM] erro no badge 113', e);
+    }
+  }, 1200);
   window.addEventListener('scroll', () => {
     try {
       tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
@@ -5816,8 +5829,10 @@ function setDateCalculatorOpen(isOpen) {
     setInterval(() => {
       try {
         applyBadge();
-      } catch (e) {}
-    }, 200);
+      } catch (e) {
+        console.error('[TM] erro no badge 115', e);
+      }
+    }, 1200);
 
     window.addEventListener('scroll', () => {
       try {
@@ -6000,8 +6015,10 @@ function setDateCalculatorOpen(isOpen) {
     setInterval(() => {
       try {
         apply();
-      } catch (e) {}
-    }, 100);
+      } catch (e) {
+        console.error('[TM] erro no badge 116', e);
+      }
+    }, 1200);
 
     window.addEventListener('scroll', () => {
       try {
