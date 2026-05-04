@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      12.1
+// @version      12.2
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -5188,7 +5188,7 @@ function setDateCalculatorOpen(isOpen) {
       navbar.appendChild(indicator);
     }
 
-    const expected = `🧪 V${getCurrentScriptVersion()}`;
+    const expected = `V${getCurrentScriptVersion()}`;
     if (indicator.textContent !== expected) {
       indicator.textContent = expected;
     }
