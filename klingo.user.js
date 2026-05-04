@@ -4998,19 +4998,41 @@ function burstUpdateLite() {
         cursor: pointer !important;
         user-select: none !important;
         flex: 0 0 auto !important;
+        transition:
+          transform 0.16s ease,
+          background 0.16s ease,
+          border-color 0.16s ease,
+          box-shadow 0.16s ease,
+          opacity 0.16s ease !important;
       }
 
       .tm-datecalc-header-trigger img {
         display: block !important;
         width: 22px !important;
         height: 22px !important;
+        transition: transform 0.16s ease, filter 0.16s ease !important;
       }
 
       .tm-datecalc-header-trigger:hover,
       .tm-datecalc-header-trigger:focus {
         color: #ffffff !important;
         text-decoration: none !important;
-        opacity: 0.92 !important;
+        opacity: 1 !important;
+        background: rgba(255,255,255,0.22) !important;
+        border-color: rgba(255,255,255,0.58) !important;
+        box-shadow: 0 6px 14px rgba(0,0,0,0.18) !important;
+        transform: translateY(-1px) !important;
+      }
+
+      .tm-datecalc-header-trigger:hover img,
+      .tm-datecalc-header-trigger:focus img {
+        transform: scale(1.08) !important;
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,0.26)) !important;
+      }
+
+      .tm-datecalc-header-trigger:active {
+        transform: translateY(0) scale(0.97) !important;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.12) !important;
       }
 
       .tm-script-version-indicator {
@@ -6279,16 +6301,3 @@ function setDateCalculatorOpen(isOpen) {
 })();
 
 })();
-
-
-/* TM FIX 12.4 - hover calculadora */
-.tm-datecalc-header-trigger:hover {
-  transform: translateY(-1px) !important;
-  background: rgba(255,255,255,0.22) !important;
-  border-color: rgba(255,255,255,0.6) !important;
-  box-shadow: 0 6px 14px rgba(0,0,0,0.18) !important;
-}
-
-.tm-datecalc-header-trigger:hover img {
-  transform: scale(1.08) !important;
-}
