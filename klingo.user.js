@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      12.9
+// @version      13.0
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -4835,8 +4835,7 @@ function burstUpdateLite() {
         top: 0;
         left: 0;
         width: 360px;
-        box-sizing: border-box;
-        max-width: 360px;
+        max-width: calc(100vw - 24px);
         background: #ffffff;
         border: 1px solid #d7dbe2;
         border-radius: 10px;
@@ -5064,52 +5063,6 @@ function burstUpdateLite() {
         box-shadow: 0 3px 8px rgba(0,0,0,0.12) !important;
       }
 
-
-      .tm-datecalc-panel {
-          top: 76px;
-          right: 10px;
-          left: 10px;
-          width: auto;
-          max-width: none;
-        }
-
-        .tm-datecalc-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      /* TM FIX 12.9 - restaurar largura compacta real da calculadora */
-      .tm-datecalc-panel {
-        width: 360px !important;
-        min-width: 360px !important;
-        max-width: 360px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-datecalc-panel *,
-      .tm-datecalc-body,
-      .tm-datecalc-section,
-      .tm-datecalc-field,
-      .tm-datecalc-grid,
-      .tm-datecalc-result-box {
-        box-sizing: border-box !important;
-        max-width: 100% !important;
-      }
-
-      .tm-datecalc-panel input,
-      .tm-datecalc-panel button,
-      .tm-datecalc-panel .form-control,
-      .tm-datecalc-panel .input-group,
-      .tm-datecalc-panel .tm-datecalc-field,
-      .tm-datecalc-panel .tm-datecalc-result-box {
-        min-width: 0 !important;
-      }
-
-      .tm-datecalc-panel input,
-      .tm-datecalc-panel .form-control {
-        width: 100% !important;
-      }
-
 `;
     document.head.appendChild(style);
   }
@@ -5294,9 +5247,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '12.9';
+      : '13.0';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '12.9';
+    return match ? match[0] : '13.0';
   }
 
   function ensureScriptVersionIndicator() {
