@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      12.7
+// @version      12.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -4835,7 +4835,8 @@ function burstUpdateLite() {
         top: 0;
         left: 0;
         width: 360px;
-        max-width: calc(100vw - 24px);
+        box-sizing: border-box;
+        max-width: 360px;
         background: #ffffff;
         border: 1px solid #d7dbe2;
         border-radius: 10px;
@@ -5076,7 +5077,15 @@ function burstUpdateLite() {
           grid-template-columns: 1fr;
         }
       }
-    `;
+    
+      /* TM FIX 12.8 - largura popup calculadora */
+      .tm-datecalc-panel {
+        width: 360px !important;
+        max-width: 360px !important;
+        box-sizing: border-box !important;
+      }
+
+`;
     document.head.appendChild(style);
   }
 
@@ -5260,9 +5269,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '12.7';
+      : '12.8';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '12.7';
+    return match ? match[0] : '12.8';
   }
 
   function ensureScriptVersionIndicator() {
