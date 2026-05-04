@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      12.4
+// @version      12.5
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -4983,21 +4983,29 @@ function burstUpdateLite() {
       }
 
       .tm-datecalc-header-trigger {
-        display: flex !important;
+        position: relative !important;
+        display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        align-self: stretch !important;
-        height: 100% !important;
-        min-height: 48px !important;
-        padding: 0 12px !important;
+        width: 38px !important;
+        height: 38px !important;
+        min-width: 38px !important;
+        min-height: 38px !important;
+        padding: 0 !important;
         margin: 0 14px 0 0 !important;
+        border-radius: 13px !important;
+        border: 1px solid rgba(255,255,255,0.34) !important;
+        background: rgba(255,255,255,0.12) !important;
         color: #ffffff !important;
-        font-size: 28px !important;
         line-height: 1 !important;
         text-decoration: none !important;
         cursor: pointer !important;
         user-select: none !important;
         flex: 0 0 auto !important;
+        overflow: hidden !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.10) !important;
+        backdrop-filter: blur(5px) !important;
+        -webkit-backdrop-filter: blur(5px) !important;
         transition:
           transform 0.16s ease,
           background 0.16s ease,
@@ -5006,10 +5014,25 @@ function burstUpdateLite() {
           opacity 0.16s ease !important;
       }
 
+      .tm-datecalc-header-trigger::before {
+        content: '' !important;
+        position: absolute !important;
+        inset: 0 !important;
+        border-radius: inherit !important;
+        background: linear-gradient(135deg, rgba(255,255,255,0.24), rgba(255,255,255,0.06)) !important;
+        opacity: 0 !important;
+        transition: opacity 0.16s ease !important;
+        pointer-events: none !important;
+      }
+
       .tm-datecalc-header-trigger img {
+        position: relative !important;
+        z-index: 1 !important;
         display: block !important;
-        width: 22px !important;
-        height: 22px !important;
+        width: 20px !important;
+        height: 20px !important;
+        object-fit: contain !important;
+        filter: drop-shadow(0 1px 1px rgba(0,0,0,0.22)) !important;
         transition: transform 0.16s ease, filter 0.16s ease !important;
       }
 
@@ -5020,8 +5043,13 @@ function burstUpdateLite() {
         opacity: 1 !important;
         background: rgba(255,255,255,0.22) !important;
         border-color: rgba(255,255,255,0.58) !important;
-        box-shadow: 0 6px 14px rgba(0,0,0,0.18) !important;
+        box-shadow: 0 7px 16px rgba(0,0,0,0.18) !important;
         transform: translateY(-1px) !important;
+      }
+
+      .tm-datecalc-header-trigger:hover::before,
+      .tm-datecalc-header-trigger:focus::before {
+        opacity: 1 !important;
       }
 
       .tm-datecalc-header-trigger:hover img,
@@ -5035,24 +5063,7 @@ function burstUpdateLite() {
         box-shadow: 0 3px 8px rgba(0,0,0,0.12) !important;
       }
 
-      .tm-script-version-indicator {
-        position: absolute !important;
-        left: 50% !important;
-        top: 50% !important;
-        transform: translate(-50%, -50%) !important;
-        color: #ffffff !important;
-        font-size: inherit !important;
-        line-height: inherit !important;
-        font-weight: inherit !important;
-        font-family: inherit !important;
-        white-space: nowrap !important;
-        pointer-events: none !important;
-        user-select: none !important;
-        z-index: 2 !important;
-      }
-
-      @media (max-width: 640px) {
-        .tm-datecalc-panel {
+      .tm-datecalc-panel {
           top: 76px;
           right: 10px;
           left: 10px;
@@ -5328,7 +5339,7 @@ function setDateCalculatorOpen(isOpen) {
     trigger.setAttribute('data-tm-datecalc-header-trigger', '1');
     trigger.setAttribute('title', 'Calculadora de datas');
     trigger.setAttribute('aria-label', 'Calculadora de datas');
-    trigger.innerHTML = '<img src="https://i.imgur.com/GU5gE57.png" style="width:22px;height:22px;">';
+    trigger.innerHTML = '<img src="https://i.imgur.com/GU5gE57.png">';
 
     triggerLi.appendChild(trigger);
 
