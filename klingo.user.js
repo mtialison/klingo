@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      12.3
+// @version      12.4
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -6279,3 +6279,16 @@ function setDateCalculatorOpen(isOpen) {
 })();
 
 })();
+
+
+/* TM FIX 12.4 - hover calculadora */
+.tm-datecalc-header-trigger:hover {
+  transform: translateY(-1px) !important;
+  background: rgba(255,255,255,0.22) !important;
+  border-color: rgba(255,255,255,0.6) !important;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.18) !important;
+}
+
+.tm-datecalc-header-trigger:hover img {
+  transform: scale(1.08) !important;
+}
