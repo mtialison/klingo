@@ -423,8 +423,8 @@
     ratIcon.setAttribute('aria-hidden', 'true');
 
     ratIcon.style.position = 'absolute';
-    ratIcon.style.width = '72px';
-    ratIcon.style.height = '72px';
+    ratIcon.style.width = '48px';
+    ratIcon.style.height = '48px';
     ratIcon.style.objectFit = 'contain';
     ratIcon.style.right = '46px';
     ratIcon.style.top = '300px';
