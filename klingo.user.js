@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      12.8
+// @version      12.9
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -5077,12 +5077,37 @@ function burstUpdateLite() {
           grid-template-columns: 1fr;
         }
       }
-    
-      /* TM FIX 12.8 - largura popup calculadora */
+
+      /* TM FIX 12.9 - restaurar largura compacta real da calculadora */
       .tm-datecalc-panel {
         width: 360px !important;
+        min-width: 360px !important;
         max-width: 360px !important;
         box-sizing: border-box !important;
+      }
+
+      .tm-datecalc-panel *,
+      .tm-datecalc-body,
+      .tm-datecalc-section,
+      .tm-datecalc-field,
+      .tm-datecalc-grid,
+      .tm-datecalc-result-box {
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+      }
+
+      .tm-datecalc-panel input,
+      .tm-datecalc-panel button,
+      .tm-datecalc-panel .form-control,
+      .tm-datecalc-panel .input-group,
+      .tm-datecalc-panel .tm-datecalc-field,
+      .tm-datecalc-panel .tm-datecalc-result-box {
+        min-width: 0 !important;
+      }
+
+      .tm-datecalc-panel input,
+      .tm-datecalc-panel .form-control {
+        width: 100% !important;
       }
 
 `;
@@ -5269,9 +5294,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '12.8';
+      : '12.9';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '12.8';
+    return match ? match[0] : '12.9';
   }
 
   function ensureScriptVersionIndicator() {
