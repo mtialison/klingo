@@ -426,7 +426,7 @@
     ratIcon.style.width = '48px';
     ratIcon.style.height = '48px';
     ratIcon.style.objectFit = 'contain';
-    ratIcon.style.right = '46px';
+    ratIcon.style.right = '20px';
     ratIcon.style.top = '300px';
     ratIcon.style.zIndex = '5';
     ratIcon.style.pointerEvents = 'none';
