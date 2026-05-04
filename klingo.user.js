@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      13.1
+// @version      13.2
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -357,7 +357,7 @@
     return `👨‍⚕️ ${doctorName}\n${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
   }
 
-  function showCopyFeedback(targetEl, message = 'Copiado') {
+  function showCopyFeedback(targetEl, message = '') {
     if (!targetEl) return;
 
     const oldTip = document.querySelector('#tm-copy-bubble');
@@ -420,7 +420,7 @@
 
     try {
       await navigator.clipboard.writeText(text);
-      showCopyFeedback(targetEl, 'Copiado');
+      showCopyFeedback(targetEl, '');
     } catch (err) {
       const ta = document.createElement('textarea');
       ta.value = text;
@@ -428,7 +428,7 @@
       ta.select();
       document.execCommand('copy');
       ta.remove();
-      showCopyFeedback(targetEl, 'Copiado');
+      showCopyFeedback(targetEl, '');
     }
   }
 
@@ -4860,7 +4860,7 @@ function burstUpdateLite() {
 
       .tm-datecalc-title {
         font-size: 16px;
-        font-weight: 600;
+        font-weight: 400;
         line-height: 1.2;
       }
 
@@ -4954,7 +4954,7 @@ function burstUpdateLite() {
         box-sizing: border-box;
         color: #212529;
         font-size: 16px;
-        font-weight: 700;
+        font-weight: 400;
         line-height: 1.35;
       }
 
