@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      12.5
+// @version      12.6
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -5062,6 +5062,7 @@ function burstUpdateLite() {
         transform: translateY(0) scale(0.97) !important;
         box-shadow: 0 3px 8px rgba(0,0,0,0.12) !important;
       }
+
 
       .tm-datecalc-panel {
           top: 76px;
