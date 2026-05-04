@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      13.3
+// @version      13.4
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -420,7 +420,7 @@
 
     try {
       await navigator.clipboard.writeText(text);
-      showCopyFeedback(targetEl, '');
+      tmDateCalcMarkCopied(targetEl);
     } catch (err) {
       const ta = document.createElement('textarea');
       ta.value = text;
@@ -428,7 +428,7 @@
       ta.select();
       document.execCommand('copy');
       ta.remove();
-      showCopyFeedback(targetEl, '');
+      tmDateCalcMarkCopied(targetEl);
     }
   }
 
@@ -5098,6 +5098,29 @@ function burstUpdateLite() {
         box-shadow: 0 3px 8px rgba(0,0,0,0.12) !important;
       }
 
+
+      /* TM FIX 13.4 - remover tooltip do botão copiar calculadora */
+      .tm-datecalc-copy-btn,
+      .tm-datecalc-copy-result,
+      [data-tm-datecalc-copy="1"] {
+        position: relative !important;
+      }
+
+      .tm-datecalc-copy-btn::before,
+      .tm-datecalc-copy-btn::after,
+      .tm-datecalc-copy-result::before,
+      .tm-datecalc-copy-result::after,
+      [data-tm-datecalc-copy="1"]::before,
+      [data-tm-datecalc-copy="1"]::after {
+        display: none !important;
+        content: none !important;
+      }
+
+      .tooltip:empty,
+      .tooltip .tooltip-inner:empty {
+        display: none !important;
+      }
+
 `;
     document.head.appendChild(style);
   }
@@ -5447,6 +5470,8 @@ function setDateCalculatorOpen(isOpen) {
   }
 
   function bindDateCalculatorEvents() {
+    document.querySelectorAll('.tm-datecalc-copy-btn, .tm-datecalc-copy-result, [data-tm-datecalc-copy="1"]').forEach(tmDateCalcDisableCopyTooltip);
+
     if (document.body.dataset.tmDatecalcBound === '1') return;
     document.body.dataset.tmDatecalcBound = '1';
 
@@ -5553,6 +5578,51 @@ function setDateCalculatorOpen(isOpen) {
       startHeaderToolsInitialRenderSafe();
     }, true);
   }
+
+
+  function tmDateCalcDisableCopyTooltip(btn) {
+    if (!btn) return;
+
+    btn.removeAttribute('title');
+    btn.removeAttribute('data-title');
+    btn.removeAttribute('data-toggle');
+    btn.removeAttribute('data-placement');
+    btn.removeAttribute('data-original-title');
+    btn.removeAttribute('aria-describedby');
+    btn.dataset.tmDatecalcCopy = '1';
+
+    try {
+      if (window.jQuery) {
+        window.jQuery(btn).tooltip('dispose');
+        window.jQuery(btn).popover('dispose');
+      }
+    } catch (e) {}
+
+    document.querySelectorAll('.tooltip, .popover').forEach((el) => {
+      const inner = el.querySelector('.tooltip-inner, .popover-body');
+      const raw = (inner ? inner.textContent : el.textContent || '').trim();
+
+      if (!raw || raw === 'Copiado' || raw === 'Copiar') {
+        el.remove();
+      }
+    });
+  }
+
+  function tmDateCalcMarkCopied(btn) {
+    if (!btn) return;
+    tmDateCalcDisableCopyTooltip(btn);
+
+    btn.textContent = '✅';
+    btn.setAttribute('aria-label', 'Copiado');
+
+    clearTimeout(btn._tmDatecalcCopiedTimer);
+    btn._tmDatecalcCopiedTimer = setTimeout(() => {
+      btn.textContent = '📋';
+      btn.setAttribute('aria-label', 'Copiar');
+      tmDateCalcDisableCopyTooltip(btn);
+    }, 1200);
+  }
+
 
   function initDateCalculatorFeature() {
     if (!isKlingoHost()) return;
@@ -6368,5 +6438,20 @@ function setDateCalculatorOpen(isOpen) {
 
   setInterval(checkMessages, 1500);
 })();
+
+  document.addEventListener('click', function tmDateCalcGlobalCopyCleanup13_4(event) {
+    const btn = event.target && event.target.closest
+      ? event.target.closest('.tm-datecalc-copy-btn, .tm-datecalc-copy-result, [data-tm-datecalc-copy="1"]')
+      : null;
+
+    if (!btn) return;
+
+    tmDateCalcDisableCopyTooltip(btn);
+
+    setTimeout(() => {
+      tmDateCalcDisableCopyTooltip(btn);
+    }, 0);
+  }, true);
+
 
 })();
