@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      12.2
+// @version      12.3
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -44,6 +44,7 @@
     selectedWeekday: '',
     selectedTime: '',
     selectedDoctor: '',
+    selectedDoctorFromCopy: false,
   };
 
   const WEEKDAYS = [
@@ -191,8 +192,53 @@
     return toTitleCase(cleaned);
   }
 
+  function getDoctorInfoFromContainer(container) {
+    if (!container) return { name: '', hasCRM: false };
+
+    const text = norm(container.innerText || container.textContent || '');
+    const hasCRM = /\bCRM\b/i.test(text);
+    if (!hasCRM) return { name: '', hasCRM: false };
+
+    const name = extractDoctorNameFromContainer(container);
+    if (!name) return { name: '', hasCRM: false };
+
+    return { name, hasCRM: true };
+  }
+
+  function getModalDoctorCandidates() {
+    const modal = document.querySelector('#minutoModal');
+    if (!modal) return [];
+
+    const map = new Map();
+    const timeButtons = Array.from(modal.querySelectorAll('button, a, div, span')).filter(isTimeButton);
+
+    timeButtons.forEach((btn) => {
+      const container = findDoctorContainerFromTimeButton(btn);
+      const info = getDoctorInfoFromContainer(container);
+
+      if (!info.name || !info.hasCRM) return;
+
+      const key = norm(info.name).toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, info.name);
+      }
+    });
+
+    return Array.from(map.values());
+  }
+
   function getSelectedDoctorName() {
-    return state.selectedDoctor || getDoctorNameFromModal();
+    if (state.selectedDoctorFromCopy && state.selectedDoctor) {
+      return state.selectedDoctor;
+    }
+
+    const modalDoctors = getModalDoctorCandidates();
+
+    if (modalDoctors.length === 1) {
+      return modalDoctors[0];
+    }
+
+    return '';
   }
   function getModalDateContext() {
     const modal = document.querySelector('#minutoModal');
@@ -214,14 +260,14 @@
 
     const time = normalizeHour(btn.textContent);
     const doctorContainer = findDoctorContainerFromTimeButton(btn);
-    const doctorName = extractDoctorNameFromContainer(doctorContainer);
+    const doctorInfo = getDoctorInfoFromContainer(doctorContainer);
     const modalContext = getModalDateContext();
 
-    if (!doctorName || !modalContext.dateText || !modalContext.weekdayText || !time) {
+    if (!doctorInfo.name || !doctorInfo.hasCRM || !modalContext.dateText || !modalContext.weekdayText || !time) {
       return '';
     }
 
-    return `👨‍⚕️ ${doctorName}\n${modalContext.dateText} | ${modalContext.weekdayText} | ${time}`;
+    return `👨‍⚕️ ${doctorInfo.name}\n${modalContext.dateText} | ${modalContext.weekdayText} | ${time}`;
   }
 
 
@@ -239,9 +285,14 @@
       state.selectedTime = time;
 
       const doctorContainer = findDoctorContainerFromTimeButton(btn);
-      const doctorName = extractDoctorNameFromContainer(doctorContainer);
-      if (doctorName) {
-        state.selectedDoctor = doctorName;
+      const doctorInfo = getDoctorInfoFromContainer(doctorContainer);
+
+      if (doctorInfo.name && doctorInfo.hasCRM) {
+        state.selectedDoctor = doctorInfo.name;
+        state.selectedDoctorFromCopy = true;
+      } else {
+        state.selectedDoctor = '';
+        state.selectedDoctorFromCopy = false;
       }
 
       return true;
@@ -259,17 +310,19 @@
     state.selectedDate = formatDatePtBr(dateMatch[0]);
     state.selectedWeekday = weekday;
     state.selectedTime = time;
+    state.selectedDoctor = '';
+    state.selectedDoctorFromCopy = false;
     return true;
   }
 
   function getDoctorNameFromModal() {
-    const doctorEl = document.querySelector('#minutoModal .col.col-12.col-md-6 > div:first-child');
-    if (!doctorEl) return '';
+    const modalDoctors = getModalDoctorCandidates();
 
-    const text = norm(doctorEl.textContent);
-    if (!text) return '';
+    if (modalDoctors.length === 1) {
+      return modalDoctors[0];
+    }
 
-    return toTitleCase(text);
+    return '';
   }
 
   function getSubtitleHtml(titleEl) {
@@ -278,16 +331,18 @@
   }
 
   function buildTitleHtml(doctorName) {
-    if (!state.selectedDate || !state.selectedWeekday || !state.selectedTime || !doctorName) {
+    if (!state.selectedDate || !state.selectedWeekday || !state.selectedTime) {
       return '';
     }
 
-    const line1 = `👨‍⚕️ ${doctorName}`;
     const line2 = `${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
+    const doctorLine = doctorName
+      ? `<span class="tm-doctor-line" style="display:block;">👨‍⚕️ ${doctorName}</span>`
+      : '';
 
     return `
       <span class="tm-main-title" style="display:block; line-height:1.35;">
-        <span class="tm-doctor-line" style="display:block;">${line1}</span>
+        ${doctorLine}
         <span class="tm-date-line" style="display:block;">${line2}</span>
       </span>
     `;
@@ -390,7 +445,9 @@
 
     const subtitleHtml = getSubtitleHtml(titleEl);
     const currentMain = titleEl.querySelector('.tm-main-title');
-    const expectedText = `👨‍⚕️ ${doctorName} ${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
+    const expectedText = doctorName
+      ? `👨‍⚕️ ${doctorName} ${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`
+      : `${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
 
     if (currentMain && norm(currentMain.textContent) === norm(expectedText)) return;
 
