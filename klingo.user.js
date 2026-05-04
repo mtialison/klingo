@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      13.0
+// @version      13.1
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -4952,12 +4952,53 @@ function burstUpdateLite() {
         background: #f7f9fb;
         text-align: center;
         box-sizing: border-box;
+        color: #212529;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.35;
       }
 
       .tm-datecalc-result-box {
-        color: #212529;
-        font-weight: 600;
-        line-height: 1.35;
+        position: relative;
+        padding-right: 46px;
+      }
+
+      .tm-datecalc-result-value {
+        flex: 1 1 auto;
+        min-width: 0;
+        text-align: center;
+      }
+
+      .tm-datecalc-copy-result {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 30px;
+        height: 30px;
+        border: 1px solid #ced4da;
+        border-radius: 7px;
+        background: #ffffff;
+        color: #495057;
+        font-size: 15px;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        opacity: 0.88;
+      }
+
+      .tm-datecalc-copy-result:hover,
+      .tm-datecalc-copy-result:focus {
+        opacity: 1;
+        background: #eef5ff;
+        border-color: #80bdff;
+      }
+
+      .tm-datecalc-copy-result:disabled {
+        cursor: default;
+        opacity: 0.35;
       }
 
       .tm-datecalc-result-box small {
@@ -4965,12 +5006,6 @@ function burstUpdateLite() {
         margin-top: 2px;
         color: #6c757d;
         font-weight: 500;
-      }
-
-      .tm-datecalc-days-box {
-        color: #212529;
-        font-size: 16px;
-        font-weight: 700;
       }
 
       [data-tm-datecalc-item="1"] {
@@ -5054,12 +5089,12 @@ function burstUpdateLite() {
 
       .tm-datecalc-header-trigger:hover img,
       .tm-datecalc-header-trigger:focus img {
-        transform: scale(1.08) !important;
+        transform: none !important;
         filter: drop-shadow(0 2px 2px rgba(0,0,0,0.26)) !important;
       }
 
       .tm-datecalc-header-trigger:active {
-        transform: translateY(0) scale(0.97) !important;
+        transform: translateY(0) !important;
         box-shadow: 0 3px 8px rgba(0,0,0,0.12) !important;
       }
 
@@ -5093,7 +5128,7 @@ function burstUpdateLite() {
               <input id="tm-datecalc-days" type="number" step="1" placeholder="">
             </div>
           </div>
-          <div class="tm-datecalc-result-box" id="tm-datecalc-result-date"></div>
+          <div class="tm-datecalc-result-box"><span class="tm-datecalc-result-value" id="tm-datecalc-result-date"></span><button type="button" class="tm-datecalc-copy-result" data-tm-copy-date-result="1" title="Copiar resultado" aria-label="Copiar resultado" disabled>📋</button></div>
         </div>
 
         <div class="tm-datecalc-section">
@@ -5200,10 +5235,10 @@ function setDateCalculatorOpen(isOpen) {
 
   function formatDatePtBrShort(date) {
     if (!(date instanceof Date)) return '';
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate());
+    const month = monthNameFromNumber(String(date.getMonth() + 1).padStart(2, '0'));
     const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return `${day} de ${month} de ${year}`;
   }
 
   function refreshDateCalculatorResults() {
@@ -5215,6 +5250,7 @@ function setDateCalculatorOpen(isOpen) {
     const endInput = panel.querySelector('#tm-datecalc-end');
     const resultDate = panel.querySelector('#tm-datecalc-result-date');
     const resultDays = panel.querySelector('#tm-datecalc-result-days');
+    const copyDateBtn = panel.querySelector('[data-tm-copy-date-result="1"]');
 
     if (!startInput || !daysInput || !endInput || !resultDate || !resultDays) return;
 
@@ -5229,6 +5265,10 @@ function setDateCalculatorOpen(isOpen) {
         : 'Não foi possível calcular a data.';
     } else {
       resultDate.textContent = '';
+    }
+
+    if (copyDateBtn) {
+      copyDateBtn.disabled = !norm(resultDate.textContent);
     }
 
     if (startDate && endDate) {
@@ -5247,9 +5287,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '13.0';
+      : '13.1';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '13.0';
+    return match ? match[0] : '13.1';
   }
 
   function ensureScriptVersionIndicator() {
@@ -5424,6 +5464,19 @@ function setDateCalculatorOpen(isOpen) {
         e.preventDefault();
         e.stopPropagation();
         toggleDateCalculatorPanel();
+        return;
+      }
+
+      const copyDateResultBtn = e.target.closest('[data-tm-copy-date-result="1"]');
+      if (copyDateResultBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const resultDate = document.getElementById('tm-datecalc-result-date');
+        const textToCopy = norm(resultDate ? resultDate.textContent : '');
+        if (textToCopy) {
+          copyText(textToCopy, copyDateResultBtn);
+        }
         return;
       }
 
