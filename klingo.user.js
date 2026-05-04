@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      12.6
+// @version      12.7
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -5260,9 +5260,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '11.8';
+      : '12.7';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '11.8';
+    return match ? match[0] : '12.7';
   }
 
   function ensureScriptVersionIndicator() {
@@ -5276,21 +5276,38 @@ function setDateCalculatorOpen(isOpen) {
       indicator = document.createElement('div');
       indicator.id = 'tm-script-version-indicator';
       indicator.className = 'tm-script-version-indicator';
-      navbar.appendChild(indicator);
     }
 
-    const expected = `V${getCurrentScriptVersion()}`;
+    const expected = `🧪 V${getCurrentScriptVersion()}`;
     if (indicator.textContent !== expected) {
       indicator.textContent = expected;
     }
 
     const companyText = navbar.querySelector('.text-white');
+
+    indicator.style.setProperty('position', 'absolute', 'important');
+    indicator.style.setProperty('left', '50%', 'important');
+    indicator.style.setProperty('top', '50%', 'important');
+    indicator.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
+    indicator.style.setProperty('z-index', '4', 'important');
+    indicator.style.setProperty('color', '#ffffff', 'important');
+    indicator.style.setProperty('white-space', 'nowrap', 'important');
+    indicator.style.setProperty('pointer-events', 'none', 'important');
+
     if (companyText) {
       const cs = window.getComputedStyle(companyText);
       indicator.style.setProperty('font-size', cs.fontSize, 'important');
       indicator.style.setProperty('line-height', cs.lineHeight, 'important');
       indicator.style.setProperty('font-weight', cs.fontWeight, 'important');
       indicator.style.setProperty('font-family', cs.fontFamily, 'important');
+    } else {
+      indicator.style.setProperty('font-size', '14px', 'important');
+      indicator.style.setProperty('line-height', '1', 'important');
+      indicator.style.setProperty('font-weight', '500', 'important');
+    }
+
+    if (indicator.parentElement !== navbar) {
+      navbar.appendChild(indicator);
     }
   }
 
