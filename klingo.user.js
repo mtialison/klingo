@@ -419,7 +419,7 @@
 
     const logo = document.querySelector('img');
     if (logo) {
-      logo.src = 'https://i.imgur.com/bY57pai.png';
+      logo.src = 'https://i.imgur.com/8n5QWZk.png';
       logo.style.maxWidth = '180px';
       logo.style.display = 'block';
       logo.style.margin = '0 auto';
