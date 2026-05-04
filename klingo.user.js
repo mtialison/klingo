@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      11.7
+// @version      11.8
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -401,29 +401,38 @@
     const passwordInput = document.querySelector('input[type="password"]');
     if (!passwordInput) return;
 
-    if (document.body.dataset.tmLoginStyled === '1') return;
-    document.body.dataset.tmLoginStyled = '1';
+    const card =
+      passwordInput.closest('.card') ||
+      passwordInput.closest('.panel') ||
+      passwordInput.closest('form')?.parentElement;
 
-    document.body.style.backgroundColor = '#a98787';
+    if (!card) return;
 
-    const btnEntrar =
-      document.querySelector('button[type="submit"]') ||
-      document.querySelector('input[type="submit"]') ||
-      [...document.querySelectorAll('button')].find(btn => /entrar/i.test((btn.textContent || '').trim()));
+    const logo = card.querySelector('img');
+    if (!logo) return;
 
-    if (btnEntrar) {
-      btnEntrar.style.backgroundColor = '#8b0000';
-      btnEntrar.style.color = '#fff';
-      btnEntrar.style.border = 'none';
-    }
+    if (card.dataset.tmLoginRatIcon === '1') return;
+    card.dataset.tmLoginRatIcon = '1';
 
-    const logo = document.querySelector('img');
-    if (logo) {
-      logo.src = 'https://i.imgur.com/8n5QWZk.png';
-      logo.style.maxWidth = '180px';
-      logo.style.display = 'block';
-      logo.style.margin = '0 auto';
-    }
+    card.style.position = card.style.position || 'relative';
+
+    const ratIcon = document.createElement('img');
+    ratIcon.id = 'tm-login-rat-icon';
+    ratIcon.src = 'https://i.imgur.com/8n5QWZk.png';
+    ratIcon.alt = '';
+    ratIcon.setAttribute('aria-hidden', 'true');
+
+    ratIcon.style.position = 'absolute';
+    ratIcon.style.width = '72px';
+    ratIcon.style.height = '72px';
+    ratIcon.style.objectFit = 'contain';
+    ratIcon.style.right = '46px';
+    ratIcon.style.top = '300px';
+    ratIcon.style.zIndex = '5';
+    ratIcon.style.pointerEvents = 'none';
+    ratIcon.style.userSelect = 'none';
+
+    card.appendChild(ratIcon);
   }
 
   function parsePastedBirthDate(text) {
@@ -5160,9 +5169,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '11.6';
+      : '11.8';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '11.6';
+    return match ? match[0] : '11.8';
   }
 
   function ensureScriptVersionIndicator() {
