@@ -1,6075 +1,3967 @@
 // ==UserScript==
-// @name         klingo
+// @name         effinity
 // @namespace    http://tampermonkey.net/
-// @version      11.7
-// @description  envenenado
-// @match        *://*.klingo.app/*
-// @match        *://samec.klingo.app/*
-// @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
-// @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
+// @version      10.0
 // @author       alison
-// @grant        GM_info
-// @run-at       document-idle
+// @match        https://pulse.sono.effinity.com.br/
+// @match        https://pulse.sono.effinity.com.br/whatsapp/agent*
+// @updateURL    https://raw.githubusercontent.com/mtialison/effinity/main/effinity.user.js
+// @downloadURL  https://raw.githubusercontent.com/mtialison/effinity/main/effinity.user.js
+// @grant        none
+// @run-at       document-start
 // ==/UserScript==
 
 (function () {
   'use strict';
 
-  /* =========================
-     CONFIGURAÇÃO HEADER (FONTE)
-  ========================= */
-  const TM_HEADER_CONFIG = {
-    titulo: '16px',
-    linha: '12px',
-    detalhes: '11px'
-  };
+  if (!location.pathname.startsWith('/whatsapp/agent')) {
+    return;
+  }
 
+  /* ========================================================================
+   * CONFIGURAÇÕES GERAIS
+   * ====================================================================== */
+  const SCRIPT_NAME = 'TM effinity';
+  const SCRIPT_VERSION = '10.0';
 
+  const STYLE_ID = 'tm-effinity-style';
+  const HIDDEN_ATTR = 'data-tm-effinity-hidden';
+  const DATE_APPLIED_ATTR = 'data-tm-date-applied';
+  const UPPERCASE_NAME_ATTR = 'data-tm-uppercase-name';
+  const BIRTH_AGE_ATTR = 'data-tm-birth-age';
+  const PHONE_FORMATTED_ATTR = 'data-tm-phone-formatted';
 
-  function isCallCenterRoute() {
-    if (location.hostname !== 'samec.klingo.app') return false;
-    if (typeof location.hash !== 'string') return false;
+  const AGENT_AREA_ATTR = 'data-tm-agent-area';
+  const AGENT_TOP_ATTR = 'data-tm-agent-top-row';
+  const AGENT_BOTTOM_ATTR = 'data-tm-agent-bottom-row';
+  const AGENT_ACTIONS_ATTR = 'data-tm-agent-actions-row';
+  const AGENT_ACTIONS_MIRROR_ATTR = 'data-tm-agent-actions-mirror';
+  const AGENT_PROXY_ATTR = 'data-tm-agent-proxy';
+  const AGENT_VERSION_ATTR = 'data-tm-agent-version';
+  const FAVORITE_STORAGE_KEY = 'tm-effinity-favorites';
+  const FAVORITE_ATTR = 'data-tm-favorite';
+  const FAVORITE_ACTIVE_ATTR = 'data-tm-favorite-active';
+  const FAVORITE_STAR_ATTR = 'data-tm-favorite-star';
 
-    const hash = location.hash.trim();
+  const TICKET_HEADER_ATTR = 'data-tm-ticket-header';
+  const TICKET_INFO_ROW_HIDDEN_ATTR = 'data-tm-ticket-info-row-hidden';
+  const TICKET_CREATED_HOST_ATTR = 'data-tm-ticket-created-host';
+  const TICKET_CREATED_MOVED_ATTR = 'data-tm-ticket-created-moved';
+  const TICKET_CONTACT_BLOCK_ATTR = 'data-tm-ticket-contact-block';
 
+  const COPY_CARD_ATTR = 'data-tm-copy-card';
+  const COPY_VALUE_ATTR = 'data-tm-copy-value';
+  const COPY_TOAST_ATTR = 'data-tm-copy-toast';
+  const COPY_TOAST_VISIBLE_ATTR = 'data-tm-copy-toast-visible';
+
+  const QUEUE_TAG_ATTR = 'data-tm-queue-tag';
+  const QUEUE_TAG_TYPE_ATTR = 'data-tm-queue-type';
+
+  const COPY_ICON_URL = 'https://i.imgur.com/0SJagfY.png';
+  const UNREAD_ICON_URL = 'https://i.imgur.com/ZmW0yoP.png';
+  const UNREAD_CARD_ATTR = 'data-tm-unread-card';
+  const UNREAD_ICON_ATTR = 'data-tm-unread-icon';
+
+  const SIDEBAR_BOOT_STYLE_ID = 'tm-effinity-sidebar-boot-style';
+  const SIDEBAR_BOOT_ATTR = 'data-tm-sidebar-booting';
+  const SIDEBAR_COLLAPSED_READY_ATTR = 'data-tm-sidebar-collapsed-ready';
+
+  const CARD_BOOT_STYLE_ID = 'tm-effinity-card-boot-style';
+  const CARD_BOOT_ATTR = 'data-tm-card-booting';
+  const AGENT_BOOT_STYLE_ID = 'tm-effinity-agent-boot-style';
+  const AGENT_BOOT_ATTR = 'data-tm-agent-booting';
+
+  const MESSAGE_API_CACHE = new Map();
+  const MESSAGE_API_CACHE_LIMIT = 1200;
+
+  let PASTE_IMAGE_ACTIVE_TICKET_ID = '';
+  let PASTE_IMAGE_ACTIVE_USER_NAME = 'Alison';
+  let PASTE_IMAGE_ACTIVE_CUSTOMER_ID = '';
+  let PASTE_IMAGE_UPLOAD_LOCK = false;
+
+  function normalizeApiMessageText(value) {
+    return String(value || '')
+      .replace(/\r/g, '\n')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+\|\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  function getMessageTimestamp(message) {
     return (
-      hash === '#/call-center' ||
-      hash === '#/call-center/' ||
-      hash === '#/call-center/marcacao'
+      message?.sentAt ||
+      message?.receivedAt ||
+      message?.createdAt ||
+      message?.deliveredAt ||
+      message?.updatedAt ||
+      null
     );
   }
 
-  const state = {
-    selectedDate: '',
-    selectedWeekday: '',
-    selectedTime: '',
-    selectedDoctor: '',
-  };
+  function parseApiDate(value) {
+    if (!value) return null;
+    const normalized = String(value).includes('T') ? String(value) : String(value).replace(' ', 'T');
+    const date = new Date(normalized);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
 
-  const WEEKDAYS = [
-    'Segunda-feira',
-    'Terça-feira',
-    'Quarta-feira',
-    'Quinta-feira',
-    'Sexta-feira',
-    'Sábado',
-    'Domingo'
-  ];
+  function formatApiTime(date) {
+    return date.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  }
 
-  function norm(text) {
+  function getApiDateLabel(date) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const target = new Date(date);
+    target.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.round((today.getTime() - target.getTime()) / 86400000);
+
+    if (diffDays === 0) return 'Hoje';
+    if (diffDays === 1) return 'Ontem';
+
+    return target.toLocaleDateString('pt-BR');
+  }
+
+  function compactForMatch(value) {
+    return normalizeApiMessageText(value)
+      .replace(/^alison:\s*/i, '')
+      .replace(/[^\p{L}\p{N}@._-]+/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function cacheApiMessage(message) {
+    if (!message || typeof message !== 'object') return;
+
+    const timestampValue = getMessageTimestamp(message);
+    const date = parseApiDate(timestampValue);
+    if (!date) return;
+
+    const content = message.content || message.mediaCaption || '';
+    const id = message.id || message.gupshupMessageId || `${message.ticketId || ''}-${timestampValue}-${content}`;
+
+    MESSAGE_API_CACHE.set(String(id), {
+      id: String(id),
+      ticketId: message.ticketId || null,
+      direction: String(message.direction || '').toUpperCase(),
+      content: String(content || ''),
+      contentNorm: compactForMatch(content || ''),
+      time: formatApiTime(date),
+      dateLabel: getApiDateLabel(date),
+      timestamp: date.getTime()
+    });
+
+    if (MESSAGE_API_CACHE.size > MESSAGE_API_CACHE_LIMIT) {
+      const overflow = MESSAGE_API_CACHE.size - MESSAGE_API_CACHE_LIMIT;
+      const keys = Array.from(MESSAGE_API_CACHE.keys()).slice(0, overflow);
+      keys.forEach(key => MESSAGE_API_CACHE.delete(key));
+    }
+  }
+
+  function extractApiMessages(payload) {
+    if (!payload) return;
+
+    if (Array.isArray(payload)) {
+      payload.forEach(extractApiMessages);
+      return;
+    }
+
+    if (typeof payload !== 'object') return;
+
+    if (
+      payload.createdAt &&
+      payload.direction &&
+      (
+        Object.prototype.hasOwnProperty.call(payload, 'content') ||
+        Object.prototype.hasOwnProperty.call(payload, 'mediaCaption') ||
+        Object.prototype.hasOwnProperty.call(payload, 'messageType')
+      )
+    ) {
+      cacheApiMessage(payload);
+    }
+
+    if (Array.isArray(payload.content)) payload.content.forEach(extractApiMessages);
+    if (Array.isArray(payload.data)) payload.data.forEach(extractApiMessages);
+    if (payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) extractApiMessages(payload.data);
+    if (payload.result && typeof payload.result === 'object') extractApiMessages(payload.result);
+  }
+
+  function processApiPayload(payload, requestUrl = '') {
+    try {
+      updatePasteImageActiveTicketFromPayload(payload, requestUrl);
+      extractApiMessages(payload);
+      window.setTimeout(() => {
+        try {
+          applyDateToMessages();
+        } catch (error) {
+          console.error(`[${SCRIPT_NAME}] falha ao reaplicar datas das mensagens`, error);
+        }
+      }, 80);
+    } catch (error) {
+      console.error(`[${SCRIPT_NAME}] falha ao processar cache de mensagens`, error);
+    }
+  }
+
+  function installMessageApiInterceptors() {
+    if (window.__tmEffinityMessageInterceptorsInstalled) return;
+    window.__tmEffinityMessageInterceptorsInstalled = true;
+
+    const nativeFetch = window.fetch;
+    if (typeof nativeFetch === 'function') {
+      window.fetch = async function tmEffinityFetchProxy(...args) {
+        const response = await nativeFetch.apply(this, args);
+
+        try {
+          const clone = response.clone();
+          const contentType = clone.headers?.get?.('content-type') || '';
+          if (contentType.includes('application/json')) {
+            clone.json().then(payload => {
+              const requestUrl = String(response?.url || args?.[0]?.url || args?.[0] || '');
+              processApiPayload(payload, requestUrl);
+            }).catch(() => {});
+          }
+        } catch (_) {}
+
+        return response;
+      };
+    }
+
+    const NativeXHR = window.XMLHttpRequest;
+    if (typeof NativeXHR === 'function') {
+      const nativeOpen = NativeXHR.prototype.open;
+      const nativeSend = NativeXHR.prototype.send;
+
+      NativeXHR.prototype.open = function tmEffinityXhrOpen(...args) {
+        this.__tmEffinityUrl = args[1];
+        return nativeOpen.apply(this, args);
+      };
+
+      NativeXHR.prototype.send = function tmEffinityXhrSend(...args) {
+        this.addEventListener('load', function tmEffinityXhrLoad() {
+          try {
+            const contentType = this.getResponseHeader?.('content-type') || '';
+            if (!contentType.includes('application/json')) return;
+
+            const payload = JSON.parse(this.responseText);
+            processApiPayload(payload, String(this.__tmEffinityUrl || ''));
+          } catch (_) {}
+        });
+
+        return nativeSend.apply(this, args);
+      };
+    }
+  }
+
+
+
+  function updatePasteImageActiveTicketFromPayload(payload, requestUrl = '') {
+    try {
+      const url = String(requestUrl || '');
+      const match = url.match(/\/api\/whatsapp\/tickets\/(\d+)\/messages(?:\?|$)/);
+      if (match?.[1]) {
+        PASTE_IMAGE_ACTIVE_TICKET_ID = match[1];
+      }
+
+      const list =
+        Array.isArray(payload?.messages) ? payload.messages :
+        Array.isArray(payload?.content) ? payload.content :
+        Array.isArray(payload?.data?.messages) ? payload.data.messages :
+        Array.isArray(payload?.data?.content) ? payload.data.content :
+        [];
+
+      for (const message of list) {
+        const ticketId = String(message?.ticketId || '').trim();
+        if (/^\d{4,8}$/.test(ticketId)) {
+          PASTE_IMAGE_ACTIVE_TICKET_ID = ticketId;
+        }
+
+        const customerId = String(message?.customerId || '').trim();
+        if (/^\d+$/.test(customerId)) {
+          PASTE_IMAGE_ACTIVE_CUSTOMER_ID = customerId;
+        }
+
+        const userName = String(message?.createdByUser?.name || message?.userName || '').trim();
+        if (userName) {
+          PASTE_IMAGE_ACTIVE_USER_NAME = userName;
+        }
+      }
+    } catch (_) {}
+  }
+
+  function findMessageTextarea() {
+    try {
+      return document.querySelector('textarea[placeholder*="Digite sua mensagem"]') ||
+        document.querySelector('textarea[maxlength="4096"]');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function getClipboardImageFile(event) {
+    try {
+      const items = Array.from(event.clipboardData?.items || []);
+      for (const item of items) {
+        if (String(item.type || '').startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) return file;
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  function buildPastedImageFile(file) {
+    try {
+      const mime = String(file?.type || 'image/png').toLowerCase();
+      const ext =
+        mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' :
+        mime.includes('webp') ? 'webp' :
+        mime.includes('gif') ? 'gif' :
+        'png';
+
+      const name = `whatsapp_media_${Date.now()}.${ext}`;
+      return new File([file], name, { type: file.type || 'image/png' });
+    } catch (_) {
+      return file;
+    }
+  }
+
+
+  function getStoredJsonValue(key, field) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return '';
+      const parsed = JSON.parse(raw);
+      return String(parsed?.[field] || '').trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function getEffinitySecurityToken() {
+    return String(localStorage.getItem('security_token') || '').trim();
+  }
+
+  function getEffinityUserEmail() {
+    return String(localStorage.getItem('temp_login_email') || '').trim() ||
+      getStoredJsonValue('user', 'email');
+  }
+
+  async function uploadPastedImage(file) {
+    const imageFile = buildPastedImageFile(file);
+    const formData = new FormData();
+
+    formData.append('file', imageFile);
+    formData.append('description', 'WhatsApp image upload');
+    formData.append('accessLevel', 'COMPANY');
+    formData.append('suggestedPath', `whatsapp/company_3/customer_${PASTE_IMAGE_ACTIVE_CUSTOMER_ID || 'unknown'}`);
+    formData.append('category', 'WHATSAPP_MEDIA');
+
+    const securityToken = getEffinitySecurityToken();
+    const userEmail = getEffinityUserEmail();
+
+    const headers = {
+      'Accept': 'application/json, text/plain, */*'
+    };
+
+    if (securityToken) {
+      headers.Authorization = `Bearer ${securityToken}`;
+    }
+
+    if (userEmail) {
+      headers['X-User-Email'] = userEmail;
+    }
+
+    const response = await fetch('https://api.sono.effinity.com.br/api/files/upload', {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload falhou: HTTP ${response.status}`);
+    }
+
+    const payload = await response.json();
+    if (!payload?.publicUrl) {
+      throw new Error('Upload não retornou publicUrl');
+    }
+
+    return payload;
+  }
+
+  async function sendPastedImageMessage(ticketId, mediaUrl) {
+    const id = String(ticketId || '').trim();
+    if (!id) throw new Error('TicketId não encontrado');
+
+    const securityToken = getEffinitySecurityToken();
+    const userEmail = getEffinityUserEmail();
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/plain, */*'
+    };
+
+    if (securityToken) {
+      headers.Authorization = `Bearer ${securityToken}`;
+    }
+
+    if (userEmail) {
+      headers['X-User-Email'] = userEmail;
+    }
+
+    const response = await fetch(`https://webhook.sono.effinity.com.br/api/whatsapp/tickets/${id}/messages`, {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      body: JSON.stringify({
+        content: '',
+        type: 'IMAGE',
+        mediaUrl,
+        userName: PASTE_IMAGE_ACTIVE_USER_NAME || 'Alison'
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Envio falhou: HTTP ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  function showPasteImageToast(message, isError = false) {
+    try {
+      let toast = document.querySelector('[data-tm-paste-image-toast="true"]');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.setAttribute('data-tm-paste-image-toast', 'true');
+        toast.style.position = 'fixed';
+        toast.style.right = '18px';
+        toast.style.bottom = '18px';
+        toast.style.zIndex = '999999';
+        toast.style.padding = '10px 14px';
+        toast.style.borderRadius = '10px';
+        toast.style.fontSize = '13px';
+        toast.style.fontWeight = '600';
+        toast.style.boxShadow = '0 10px 25px rgba(0,0,0,0.25)';
+        toast.style.transition = 'opacity 0.18s ease';
+        document.body.appendChild(toast);
+      }
+
+      toast.textContent = message;
+      toast.style.background = isError ? '#7f1d1d' : '#14532d';
+      toast.style.color = '#fff';
+      toast.style.opacity = '1';
+
+      window.clearTimeout(toast.__tmTimer);
+      toast.__tmTimer = window.setTimeout(() => {
+        try {
+          toast.style.opacity = '0';
+        } catch (_) {}
+      }, 2600);
+    } catch (_) {}
+  }
+
+  async function handlePasteImage(event) {
+    try {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const textarea = target.closest?.('textarea') || (target.tagName === 'TEXTAREA' ? target : null);
+      if (!textarea || textarea !== findMessageTextarea()) return;
+
+      const imageFile = getClipboardImageFile(event);
+      if (!imageFile) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (PASTE_IMAGE_UPLOAD_LOCK) return;
+      PASTE_IMAGE_UPLOAD_LOCK = true;
+
+      showPasteImageToast('Enviando imagem...');
+
+      const upload = await uploadPastedImage(imageFile);
+      await sendPastedImageMessage(PASTE_IMAGE_ACTIVE_TICKET_ID, upload.publicUrl);
+
+      showPasteImageToast('Imagem enviada');
+      window.setTimeout(() => {
+        try {
+          if (PASTE_IMAGE_ACTIVE_TICKET_ID) {
+            fetch(`https://webhook.sono.effinity.com.br/api/whatsapp/tickets/${PASTE_IMAGE_ACTIVE_TICKET_ID}/messages?page=0&size=20`, {
+              credentials: 'include',
+              headers: { 'Accept': 'application/json' }
+            }).catch(() => {});
+          }
+        } catch (_) {}
+      }, 250);
+    } catch (error) {
+      console.error(`[${SCRIPT_NAME}] falha ao enviar imagem colada`, error);
+      showPasteImageToast(error?.message || 'Falha ao enviar imagem', true);
+    } finally {
+      PASTE_IMAGE_UPLOAD_LOCK = false;
+    }
+  }
+
+  function installPasteImageSender() {
+    if (window.__tmEffinityPasteImageSenderInstalled) return;
+    window.__tmEffinityPasteImageSenderInstalled = true;
+
+    document.addEventListener('paste', handlePasteImage, true);
+  }
+
+
+  /* ========================================================================
+   * SEÇÃO: ESTILOS / ELEMENTOS OCULTOS / AJUSTES VISUAIS
+   * Mantém: 2, 3, 4, 5, 7, 9, 10+11, 19, 21, 22
+   * ====================================================================== */
+  const css = `
+    /* ── 2. Layout geral ───────────────────────────────────────────────── */
+    .h-\\[calc\\(100vh-100px\\)\\] {
+      height: 100vh !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+    }
+
+    .grid.grid-cols-1.lg\\:grid-cols-2.xl\\:grid-cols-4.gap-3.flex-1.min-h-0.overflow-hidden {
+      flex: 1 !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+    }
+
+    /* ── 3. Ocultar header principal ───────────────────────────────────── */
+    header.glass.sticky.top-0.z-50 {
+      display: none !important;
+    }
+
+    /* ── 4. Ocultar bloco Gestão de Tickets / Tempo Real ───────────────── */
+    .flex.flex-col.space-y-1\\.5.pb-3:has(.lucide-clock) {
+      display: none !important;
+    }
+
+    /* ── 5. Ocultar botão Meta ─────────────────────────────────────────── */
+    button:has(.lucide-database) {
+      display: none !important;
+    }
+
+    /* ── 7. Ocultações dos cards da fila (anti-flicker via CSS) ────────── */
+    div.p-2.border.rounded.cursor-pointer
+      div.flex.items-center.gap-1
+      > span.text-xs:first-child {
+      display: none !important;
+    }
+
+    div.p-2.border.rounded.cursor-pointer
+      div.flex.items-center.gap-1
+      > span.font-medium.text-sm.truncate {
+      display: none !important;
+    }
+
+    div.p-2.border.rounded.cursor-pointer
+      div.flex.items-center.gap-1
+      > div.inline-flex:has(.lucide-minus) {
+      display: none !important;
+    }
+
+    div.p-2.border.rounded.cursor-pointer
+      div.flex.items-center.gap-1
+      > div.inline-flex.h-4 {
+      display: none !important;
+    }
+
+    div.p-2.border.rounded.cursor-pointer
+      span.flex.items-center.gap-1.text-xs.text-muted-foreground:has(.lucide-phone) {
+      display: none !important;
+    }
+
+    div.p-2.border.rounded.cursor-pointer
+      div.inline-flex.items-center.rounded-full:not([data-tm-queue-tag]):has(+ *),
+    div.p-2.border.rounded.cursor-pointer
+      div.flex.items-center.gap-1.mb-1
+      > div.inline-flex.items-center.rounded-full:not([data-tm-queue-tag]) {
+      display: none !important;
+    }
+
+    div.p-2.border.rounded.cursor-pointer
+      div.inline-flex.items-center.rounded-full:has(.lucide-check-circle2) {
+      display: none !important;
+    }
+
+    div.p-2.border.rounded.cursor-pointer
+      span.inline-flex.items-center.gap-1.rounded-full.px-1\\.5.py-0\\.5.text-\\[10px\\].border.bg-blue-50 {
+      display: none !important;
+    }
+
+    /* ── Remover bolinha azul do ticket selecionado ───────────────────── */
+    div.w-2.h-2.rounded-full.bg-blue-500.flex-shrink-0 {
+      display: none !important;
+    }
+
+    /* ── Indicador de mensagem não lida no canto do card ──────────────── */
+    [${UNREAD_CARD_ATTR}="true"] {
+      position: relative !important;
+    }
+
+    [${UNREAD_ICON_ATTR}="true"] {
+      position: absolute !important;
+      right: 8px !important;
+      bottom: 8px !important;
+      width: 22px !important;
+      height: 22px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      pointer-events: none !important;
+      user-select: none !important;
+      z-index: 3 !important;
+    }
+
+    [${UNREAD_ICON_ATTR}="true"] img {
+      display: block !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain !important;
+      pointer-events: none !important;
+      user-select: none !important;
+    }
+
+
+    /* ── Badge de idade ao lado da data de nascimento ─────────────────── */
+    span.text-sm.text-card-foreground.break-words.min-w-0[data-tm-birth-age]::after {
+      content: attr(data-tm-birth-age);
+      display: inline-flex !important;
+      align-items: center !important;
+      margin-left: 6px !important;
+      padding: 2px 8px !important;
+      border-radius: 999px !important;
+      font-size: 0.875rem !important; line-height: inherit !important;
+      line-height: 1.1 !important;
+      font-weight: 600 !important;
+      background-color: #dbeafe !important;
+      color: #1d4ed8 !important;
+      border: 1px solid #93c5fd !important;
+      white-space: nowrap !important;
+      vertical-align: middle !important;
+    }
+
+    /* ── Favoritos (estrela) ───────────────────────────────────────────── */
+    div.p-2.border.rounded.cursor-pointer {
+      position: relative !important;
+    }
+
+    [${FAVORITE_STAR_ATTR}="true"] {
+      position: absolute !important;
+      top: 8px !important;
+      right: 8px !important;
+      width: 22px !important;
+      height: 22px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: transparent !important;
+      border: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      color: #facc15 !important;
+      font-size: 18px !important;
+      line-height: 1 !important;
+      font-weight: 700 !important;
+      opacity: 0 !important;
+      cursor: pointer !important;
+      z-index: 8 !important;
+      transition: opacity 0.16s ease, transform 0.16s ease !important;
+      transform: scale(1) !important;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+    }
+
+    div.p-2.border.rounded.cursor-pointer:hover [${FAVORITE_STAR_ATTR}="true"] {
+      opacity: 0.55 !important;
+      transform: scale(0.95) !important;
+    }
+
+    [${FAVORITE_ACTIVE_ATTR}="true"] [${FAVORITE_STAR_ATTR}="true"],
+    div.p-2.border.rounded.cursor-pointer[${FAVORITE_ACTIVE_ATTR}="true"]:hover [${FAVORITE_STAR_ATTR}="true"] {
+      opacity: 1 !important;
+      transform: scale(1) !important;
+    }
+
+    
+    /* ── Ajuste fino badge idade ─────────────────────────────────────── */
+    [data-tm-birthdate] {
+      display: flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+    }
+
+    [data-tm-birthdate] span:last-child {
+      display: inline-flex !important;
+      align-items: center !important;
+      line-height: 1 !important;
+      transform: translateY(-1px) !important;
+    }
+
+    
+    [data-tm-hide-notas-internas="true"] {
+      display: none !important;
+    }
+
+    /* ── Sistema interno de ocultação ──────────────────────────────────── */
+    [${HIDDEN_ATTR}="true"] {
+      display: none !important;
+    }
+
+    /* ── 9. Uppercase controlado por atributo ──────────────────────────── */
+    [${UPPERCASE_NAME_ATTR}="true"] {
+      text-transform: uppercase !important;
+    }
+
+    /* ── Telefone formatado em Dados do Atendimento ───────────────────── */
+    [${PHONE_FORMATTED_ATTR}="true"] {
+      white-space: normal !important;
+    }
+
+    /* ── 10 + 11. Área do Agente reorganizada e ações enxutas ─────────── */
+    [${AGENT_AREA_ATTR}="true"] {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 0 !important;
+    }
+
+    [${AGENT_TOP_ATTR}="true"] {
+      display: none !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      flex-wrap: nowrap !important;
+      gap: 24px !important;
+      min-height: 40px !important;
+      margin: 0 !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] > span.text-xs.text-muted-foreground.mr-2 {
+      margin-right: 4px !important;
+      flex-shrink: 0 !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] > div:not([${AGENT_ACTIONS_MIRROR_ATTR}="true"]) {
+      flex-shrink: 0 !important;
+    }
+
+    [${AGENT_ACTIONS_MIRROR_ATTR}="true"] {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-end !important;
+      gap: 16px !important;
+      flex: 0 0 auto !important;
+      margin-left: auto !important;
+      white-space: nowrap !important;
+    }
+
+    [${AGENT_ACTIONS_MIRROR_ATTR}="true"] > * {
+      flex-shrink: 0 !important;
+    }
+
+
+    /* ── Área do Agente: ordem visual fixa sem mover nós do app ───────── */
+    [${AGENT_BOTTOM_ATTR}="true"] > span.text-xs.text-muted-foreground.mr-2 {
+      order: 0 !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] > div:not([${AGENT_ACTIONS_MIRROR_ATTR}="true"]) {
+      order: 1 !important;
+    }
+
+    [${AGENT_ACTIONS_MIRROR_ATTR}="true"] {
+      order: 99 !important;
+      margin-left: auto !important;
+    }
+
+    [${AGENT_VERSION_ATTR}="true"] {
+      order: 50 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      font-size: 0.75rem !important;
+      line-height: 1rem !important;
+      font-weight: 600 !important;
+      color: rgb(134 239 172) !important;
+      white-space: nowrap !important;
+      flex: 0 0 auto !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      pointer-events: none !important;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+    }
+
+    [${AGENT_PROXY_ATTR}="true"] {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      flex-wrap: nowrap !important;
+      gap: 24px !important;
+      min-height: 40px !important;
+      margin: 0 !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] > .tm-agent-left {
+      display: flex !important;
+      align-items: center !important;
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+    }
+
+    [${AGENT_ACTIONS_ATTR}="true"] {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-end !important;
+      gap: 16px !important;
+      flex: 0 0 auto !important;
+      margin-left: auto !important;
+      white-space: nowrap !important;
+    }
+
+    [${AGENT_ACTIONS_ATTR}="true"] button,
+    [${AGENT_ACTIONS_ATTR}="true"] > div,
+    [${AGENT_ACTIONS_ATTR}="true"] > span {
+      flex-shrink: 0 !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] .flex.items-center.gap-3.flex-wrap {
+      display: flex !important;
+      align-items: center !important;
+      gap: 12px !important;
+      flex-wrap: nowrap !important;
+      min-width: 0 !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] .flex.items-center.gap-3.flex-wrap > span.text-xs.text-muted-foreground.mr-2 {
+      margin-right: 4px !important;
+      flex-shrink: 0 !important;
+    }
+
+    .tm-agent-hidden {
+      display: none !important;
+    }
+
+    /* ── Header do ticket: anti-flicker da versão sem script ──────────── */
+    div.px-4.py-3.flex.items-center.justify-between.gap-4
+      div.w-10.h-10.flex-shrink-0.rounded-full {
+      display: none !important;
+    }
+
+    div.px-4.py-3.flex.items-center.justify-between.gap-4
+      div.min-w-0.flex-1 {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      justify-content: center !important;
+      gap: 2px !important;
+      min-width: 0 !important;
+    }
+
+    div.px-4.py-3.flex.items-center.justify-between.gap-4
+      div.min-w-0.flex-1
+      > h2.font-semibold.text-card-foreground.truncate {
+      text-transform: uppercase !important;
+      margin: 0 !important;
+    }
+
+    div.px-4.py-3.flex.items-center.justify-between.gap-4 + div.px-4.py-2.border-t.border-border.bg-muted\/30 {
+      display: none !important;
+    }
+
+    /* ── Header do ticket: mover "Criado há" e ocultar linha inferior ── */
+    [${TICKET_INFO_ROW_HIDDEN_ATTR}="true"] {
+      display: none !important;
+    }
+
+    [${TICKET_CONTACT_BLOCK_ATTR}="true"] {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      justify-content: center !important;
+      gap: 2px !important;
+      min-width: 0 !important;
+    }
+
+    [${TICKET_CONTACT_BLOCK_ATTR}="true"] > h2,
+    [${TICKET_CONTACT_BLOCK_ATTR}="true"] > a,
+    [${TICKET_CONTACT_BLOCK_ATTR}="true"] > div {
+      margin: 0 !important;
+    }
+
+    [${TICKET_CONTACT_BLOCK_ATTR}="true"] > a {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      width: fit-content !important;
+      max-width: 100% !important;
+    }
+
+    [${TICKET_CREATED_HOST_ATTR}="true"] {
+      display: flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      margin-top: 0 !important;
+      min-height: 14px !important;
+      color: hsl(var(--muted-foreground)) !important;
+      font-size: 11px !important;
+      line-height: 1.2 !important;
+      width: fit-content !important;
+      max-width: 100% !important;
+    }
+
+    [${TICKET_CREATED_MOVED_ATTR}="true"] {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      margin: 0 !important;
+      color: inherit !important;
+      font-size: 0.875rem !important; line-height: inherit !important;
+      line-height: inherit !important;
+      white-space: nowrap !important;
+    }
+
+    [${TICKET_CREATED_MOVED_ATTR}="true"] svg {
+      width: 12px !important;
+      height: 12px !important;
+      flex-shrink: 0 !important;
+    }
+
+    [${TICKET_CREATED_HOST_ATTR}="true"] span.flex.items-center.gap-1 {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      margin: 0 !important;
+      color: inherit !important;
+      font-size: inherit !important;
+      line-height: inherit !important;
+      white-space: nowrap !important;
+    }
+
+    [${TICKET_CREATED_HOST_ATTR}="true"] svg {
+      width: 12px !important;
+      height: 12px !important;
+      flex-shrink: 0 !important;
+    }
+
+    /* ── 19. Feedback visual de cópia ──────────────────────────────────── */
+    [${COPY_CARD_ATTR}="true"] {
+      position: relative !important;
+    }
+
+    [${COPY_VALUE_ATTR}="true"] {
+      cursor: pointer !important;
+      user-select: none !important;
+      transition: opacity 0.18s ease, transform 0.18s ease !important;
+    }
+
+    [${COPY_VALUE_ATTR}="true"]:hover {
+      opacity: 0.88 !important;
+    }
+
+    [${COPY_VALUE_ATTR}="true"]:active {
+      transform: scale(0.985) !important;
+    }
+
+    [${COPY_TOAST_ATTR}="true"] {
+      position: absolute !important;
+      top: 12px !important;
+      right: 12px !important;
+      width: 40px !important;
+      height: 40px !important;
+      opacity: 0 !important;
+      transform: scale(0.96) !important;
+      transition: opacity 0.18s ease, transform 0.18s ease !important;
+      pointer-events: none !important;
+      z-index: 30 !important;
+    }
+
+    [${COPY_TOAST_VISIBLE_ATTR}="true"] {
+      opacity: 1 !important;
+      transform: scale(1) !important;
+    }
+
+    [${COPY_TOAST_ATTR}="true"] img {
+      display: block !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain !important;
+      pointer-events: none !important;
+      user-select: none !important;
+    }
+
+/* ── Visualizador flutuante de imagens dos arquivos ──────────────── */
+    [data-tm-image-popup="true"] {
+      position: fixed !important;
+      width: 420px !important;
+      height: 520px !important;
+      max-width: calc(100vw - 40px) !important;
+      max-height: calc(100vh - 40px) !important;
+      background: #111827 !important;
+      border: 1px solid rgba(148, 163, 184, 0.35) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45) !important;
+      overflow: hidden !important;
+      z-index: 99990 !important;
+      color: #f9fafb !important;
+    }
+
+    [data-tm-image-popup="true"][data-tm-maximized="true"] {
+      width: min(920px, calc(100vw - 48px)) !important;
+      height: min(720px, calc(100vh - 48px)) !important;
+      transform: none !important;
+    }
+
+    [data-tm-image-popup="true"][data-tm-maximized="true"] [data-tm-image-popup-header="true"] {
+      cursor: move !important;
+    }
+
+    [data-tm-image-popup="true"][data-tm-maximized="true"] [data-tm-image-popup-resize="true"] {
+      display: block !important;
+      pointer-events: auto !important;
+    }
+
+    [data-tm-image-popup-header="true"] {
+      height: 42px !important;
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr) auto auto !important;
+      align-items: center !important;
+      gap: 10px !important;
+      padding: 0 10px 0 12px !important;
+      background: rgba(15, 23, 42, 0.98) !important;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;
+      user-select: none !important;
+      cursor: move !important;
+    }
+
+    [data-tm-image-popup-title="true"] {
+      min-width: 0 !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      color: #e5e7eb !important;
+    }
+
+    [data-tm-image-popup-actions-center="true"],
+    [data-tm-image-popup-actions-right="true"] {
+      display: flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+    }
+
+    [data-tm-image-popup-actions-right="true"] {
+      justify-content: flex-end !important;
+    }
+
+    [data-tm-image-popup-icon="true"],
+    [data-tm-image-popup-download="true"] {
+      width: 30px !important;
+      height: 30px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      border: 0 !important;
+      background: transparent !important;
+      cursor: pointer !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border-radius: 7px !important;
+      line-height: 1 !important;
+      transition: background 0.12s ease, opacity 0.12s ease, transform 0.08s ease !important;
+      vertical-align: middle !important;
+      flex: 0 0 30px !important;
+    }
+
+    [data-tm-image-popup-icon="true"]:hover,
+    [data-tm-image-popup-download="true"]:hover {
+      background: rgba(148, 163, 184, 0.12) !important;
+      opacity: 0.95 !important;
+    }
+
+    [data-tm-image-popup-icon="true"]:active,
+    [data-tm-image-popup-download="true"]:active {
+      transform: scale(0.96) !important;
+    }
+
+    [data-tm-image-popup-icon-svg="true"] {
+      width: 21px !important;
+      height: 21px !important;
+      display: block !important;
+      flex: 0 0 21px !important;
+      color: currentColor !important;
+      stroke: currentColor !important;
+      fill: none !important;
+      stroke-width: 2 !important;
+      stroke-linecap: round !important;
+      stroke-linejoin: round !important;
+      pointer-events: none !important;
+    }
+
+    [data-tm-image-popup-download="true"] {
+      color: #22c55e !important;
+    }
+
+    [data-tm-image-popup-maximize="true"] {
+      color: #f8fafc !important;
+    }
+    [data-tm-image-popup-rotate="true"] {
+      color: #f8fafc !important;
+    }
+
+
+    [data-tm-image-popup-close="true"] {
+      color: #ef4444 !important;
+    }
+
+    [data-tm-image-popup-close="true"]:hover {
+      background: rgba(239, 68, 68, 0.12) !important;
+    }
+
+    [data-tm-image-popup-body="true"] {
+      height: calc(100% - 42px) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: #020617 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      cursor: default !important;
+      touch-action: none !important;
+    }
+
+    [data-tm-image-popup="true"][data-tm-maximized="true"] [data-tm-image-popup-body="true"] {
+      padding: 10px !important;
+    }
+
+    [data-tm-image-popup-body="true"][data-tm-pannable="true"] {
+      cursor: grab !important;
+    }
+
+    [data-tm-image-popup-body="true"][data-tm-panning="true"] {
+      cursor: grabbing !important;
+    }
+
+    [data-tm-image-popup-body="true"] img {
+      max-width: none !important;
+      max-height: none !important;
+      width: auto !important;
+      height: auto !important;
+      object-fit: contain !important;
+      border-radius: 6px !important;
+      transform-origin: center center !important;
+      user-select: none !important;
+      -webkit-user-drag: none !important;
+      will-change: transform !important;
+      transition: none !important;
+    }
+
+    [data-tm-image-popup-resize="true"] {
+      position: absolute !important;
+      z-index: 4 !important;
+      background: transparent !important;
+    }
+
+    [data-tm-image-popup-resize-dir="n"] {
+      top: 0 !important;
+      left: 10px !important;
+      right: 10px !important;
+      height: 8px !important;
+      cursor: ns-resize !important;
+    }
+
+    [data-tm-image-popup-resize-dir="s"] {
+      bottom: 0 !important;
+      left: 10px !important;
+      right: 10px !important;
+      height: 8px !important;
+      cursor: ns-resize !important;
+    }
+
+    [data-tm-image-popup-resize-dir="e"] {
+      top: 10px !important;
+      right: 0 !important;
+      bottom: 10px !important;
+      width: 8px !important;
+      cursor: ew-resize !important;
+    }
+
+    [data-tm-image-popup-resize-dir="w"] {
+      top: 10px !important;
+      left: 0 !important;
+      bottom: 10px !important;
+      width: 8px !important;
+      cursor: ew-resize !important;
+    }
+
+    [data-tm-image-popup-resize-dir="ne"],
+    [data-tm-image-popup-resize-dir="nw"],
+    [data-tm-image-popup-resize-dir="se"],
+    [data-tm-image-popup-resize-dir="sw"] {
+      width: 12px !important;
+      height: 12px !important;
+    }
+
+    [data-tm-image-popup-resize-dir="ne"] {
+      top: 0 !important;
+      right: 0 !important;
+      cursor: nesw-resize !important;
+    }
+
+    [data-tm-image-popup-resize-dir="nw"] {
+      top: 0 !important;
+      left: 0 !important;
+      cursor: nwse-resize !important;
+    }
+
+    [data-tm-image-popup-resize-dir="se"] {
+      right: 0 !important;
+      bottom: 0 !important;
+      cursor: nwse-resize !important;
+    }
+
+    [data-tm-image-popup-resize-dir="sw"] {
+      left: 0 !important;
+      bottom: 0 !important;
+      cursor: nesw-resize !important;
+    }
+
+    /* ── 9. Uppercase controlado por atributo ──────────────────────────── */
+    [${UPPERCASE_NAME_ATTR}="true"] {
+      text-transform: uppercase !important;
+    }
+
+    /* ── Telefone formatado em Dados do Atendimento ───────────────────── */
+    [${PHONE_FORMATTED_ATTR}="true"] {
+      white-space: normal !important;
+    }
+
+    /* ── 10 + 11. Área do Agente reorganizada e ações enxutas ─────────── */
+    [${AGENT_AREA_ATTR}="true"] {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 0 !important;
+    }
+
+    [${AGENT_TOP_ATTR}="true"] {
+      display: none !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      flex-wrap: nowrap !important;
+      gap: 24px !important;
+      min-height: 40px !important;
+      margin: 0 !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] > span.text-xs.text-muted-foreground.mr-2 {
+      margin-right: 4px !important;
+      flex-shrink: 0 !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] > div:not([${AGENT_ACTIONS_MIRROR_ATTR}="true"]) {
+      flex-shrink: 0 !important;
+    }
+
+    [${AGENT_ACTIONS_MIRROR_ATTR}="true"] {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-end !important;
+      gap: 16px !important;
+      flex: 0 0 auto !important;
+      margin-left: auto !important;
+      white-space: nowrap !important;
+    }
+
+    [${AGENT_ACTIONS_MIRROR_ATTR}="true"] > * {
+      flex-shrink: 0 !important;
+    }
+
+
+    /* ── Área do Agente: ordem visual fixa sem mover nós do app ───────── */
+    [${AGENT_BOTTOM_ATTR}="true"] > span.text-xs.text-muted-foreground.mr-2 {
+      order: 0 !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] > div:not([${AGENT_ACTIONS_MIRROR_ATTR}="true"]) {
+      order: 1 !important;
+    }
+
+    [${AGENT_ACTIONS_MIRROR_ATTR}="true"] {
+      order: 99 !important;
+      margin-left: auto !important;
+    }
+
+    [${AGENT_VERSION_ATTR}="true"] {
+      order: 50 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      font-size: 0.75rem !important;
+      line-height: 1rem !important;
+      font-weight: 600 !important;
+      color: rgb(134 239 172) !important;
+      white-space: nowrap !important;
+      flex: 0 0 auto !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      pointer-events: none !important;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+    }
+
+    [${AGENT_PROXY_ATTR}="true"] {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      flex-wrap: nowrap !important;
+      gap: 24px !important;
+      min-height: 40px !important;
+      margin: 0 !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] > .tm-agent-left {
+      display: flex !important;
+      align-items: center !important;
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+    }
+
+    [${AGENT_ACTIONS_ATTR}="true"] {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-end !important;
+      gap: 16px !important;
+      flex: 0 0 auto !important;
+      margin-left: auto !important;
+      white-space: nowrap !important;
+    }
+
+    [${AGENT_ACTIONS_ATTR}="true"] button,
+    [${AGENT_ACTIONS_ATTR}="true"] > div,
+    [${AGENT_ACTIONS_ATTR}="true"] > span {
+      flex-shrink: 0 !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] .flex.items-center.gap-3.flex-wrap {
+      display: flex !important;
+      align-items: center !important;
+      gap: 12px !important;
+      flex-wrap: nowrap !important;
+      min-width: 0 !important;
+    }
+
+    [${AGENT_BOTTOM_ATTR}="true"] .flex.items-center.gap-3.flex-wrap > span.text-xs.text-muted-foreground.mr-2 {
+      margin-right: 4px !important;
+      flex-shrink: 0 !important;
+    }
+
+    .tm-agent-hidden {
+      display: none !important;
+    }
+
+    /* ── Header do ticket: anti-flicker da versão sem script ──────────── */
+    div.px-4.py-3.flex.items-center.justify-between.gap-4
+      div.w-10.h-10.flex-shrink-0.rounded-full {
+      display: none !important;
+    }
+
+    div.px-4.py-3.flex.items-center.justify-between.gap-4
+      div.min-w-0.flex-1 {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      justify-content: center !important;
+      gap: 2px !important;
+      min-width: 0 !important;
+    }
+
+    div.px-4.py-3.flex.items-center.justify-between.gap-4
+      div.min-w-0.flex-1
+      > h2.font-semibold.text-card-foreground.truncate {
+      text-transform: uppercase !important;
+      margin: 0 !important;
+    }
+
+    div.px-4.py-3.flex.items-center.justify-between.gap-4 + div.px-4.py-2.border-t.border-border.bg-muted\/30 {
+      display: none !important;
+    }
+
+    /* ── Header do ticket: mover "Criado há" e ocultar linha inferior ── */
+    [${TICKET_INFO_ROW_HIDDEN_ATTR}="true"] {
+      display: none !important;
+    }
+
+    [${TICKET_CONTACT_BLOCK_ATTR}="true"] {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      justify-content: center !important;
+      gap: 2px !important;
+      min-width: 0 !important;
+    }
+
+    [${TICKET_CONTACT_BLOCK_ATTR}="true"] > h2,
+    [${TICKET_CONTACT_BLOCK_ATTR}="true"] > a,
+    [${TICKET_CONTACT_BLOCK_ATTR}="true"] > div {
+      margin: 0 !important;
+    }
+
+    [${TICKET_CONTACT_BLOCK_ATTR}="true"] > a {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      width: fit-content !important;
+      max-width: 100% !important;
+    }
+
+    [${TICKET_CREATED_HOST_ATTR}="true"] {
+      display: flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      margin-top: 0 !important;
+      min-height: 14px !important;
+      color: hsl(var(--muted-foreground)) !important;
+      font-size: 11px !important;
+      line-height: 1.2 !important;
+      width: fit-content !important;
+      max-width: 100% !important;
+    }
+
+    [${TICKET_CREATED_MOVED_ATTR}="true"] {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      margin: 0 !important;
+      color: inherit !important;
+      font-size: 0.875rem !important; line-height: inherit !important;
+      line-height: inherit !important;
+      white-space: nowrap !important;
+    }
+
+    [${TICKET_CREATED_MOVED_ATTR}="true"] svg {
+      width: 12px !important;
+      height: 12px !important;
+      flex-shrink: 0 !important;
+    }
+
+    [${TICKET_CREATED_HOST_ATTR}="true"] span.flex.items-center.gap-1 {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      margin: 0 !important;
+      color: inherit !important;
+      font-size: inherit !important;
+      line-height: inherit !important;
+      white-space: nowrap !important;
+    }
+
+    [${TICKET_CREATED_HOST_ATTR}="true"] svg {
+      width: 12px !important;
+      height: 12px !important;
+      flex-shrink: 0 !important;
+    }
+
+    /* ── 19. Feedback visual de cópia ──────────────────────────────────── */
+    [${COPY_CARD_ATTR}="true"] {
+      position: relative !important;
+    }
+
+    [${COPY_VALUE_ATTR}="true"] {
+      cursor: pointer !important;
+      user-select: none !important;
+      transition: opacity 0.18s ease, transform 0.18s ease !important;
+    }
+
+    [${COPY_VALUE_ATTR}="true"]:hover {
+      opacity: 0.88 !important;
+    }
+
+    [${COPY_VALUE_ATTR}="true"]:active {
+      transform: scale(0.985) !important;
+    }
+
+    [${COPY_TOAST_ATTR}="true"] {
+      position: absolute !important;
+      top: 12px !important;
+      right: 12px !important;
+      width: 40px !important;
+      height: 40px !important;
+      opacity: 0 !important;
+      transform: scale(0.96) !important;
+      transition: opacity 0.18s ease, transform 0.18s ease !important;
+      pointer-events: none !important;
+      z-index: 30 !important;
+    }
+
+    [${COPY_TOAST_VISIBLE_ATTR}="true"] {
+      opacity: 1 !important;
+      transform: scale(1) !important;
+    }
+
+    [${COPY_TOAST_ATTR}="true"] img {
+      display: block !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain !important;
+      pointer-events: none !important;
+      user-select: none !important;
+    }
+
+
+
+        /* ── 21. Tags de fila com cor por tipo ─────────────────────────────── */
+    [${QUEUE_TAG_ATTR}="true"] {
+      background-image: none !important;
+      box-shadow: none !important;
+      border-width: 1px !important;
+      border-style: solid !important;
+      font-weight: 600 !important;
+      line-height: 1.1 !important;
+    }
+
+    [${QUEUE_TAG_TYPE_ATTR}="clinica_do_sono"] {
+      background-color: #dbeafe !important;
+      color: #1d4ed8 !important;
+      border-color: #93c5fd !important;
+    }
+
+    [${QUEUE_TAG_TYPE_ATTR}="samec"] {
+      background-color: #fef3c7 !important;
+      color: #b45309 !important;
+      border-color: #fcd34d !important;
+    }
+
+    [${QUEUE_TAG_TYPE_ATTR}="confirmacao"] {
+      background-color: #fee2e2 !important;
+      color: #b91c1c !important;
+      border-color: #fca5a5 !important;
+    }
+  `;
+
+
+
+  /* ========================================================================
+   * SEÇÃO: ANTI-FLICKER INICIAL DOS CARDS DE TICKET
+   * Objetivo: ao trocar entre Espera / Atribuído / Atendimento, os elementos
+   * ocultados pelo script já nascem invisíveis no primeiro paint.
+   * ====================================================================== */
+  const cardBootCSS = `
+    html[${CARD_BOOT_ATTR}="true"] div.p-2.border.rounded.cursor-pointer
+      div.flex.items-center.gap-1
+      > span.text-xs:first-child {
+      display: none !important;
+    }
+
+    html[${CARD_BOOT_ATTR}="true"] div.p-2.border.rounded.cursor-pointer
+      div.flex.items-center.gap-1
+      > span.font-medium.text-sm.truncate {
+      display: none !important;
+    }
+
+    html[${CARD_BOOT_ATTR}="true"] div.p-2.border.rounded.cursor-pointer
+      div.flex.items-center.gap-1
+      > div.inline-flex:has(.lucide-minus) {
+      display: none !important;
+    }
+
+    html[${CARD_BOOT_ATTR}="true"] div.p-2.border.rounded.cursor-pointer
+      div.flex.items-center.gap-1
+      > div.inline-flex.h-4 {
+      display: none !important;
+    }
+
+    html[${CARD_BOOT_ATTR}="true"] div.p-2.border.rounded.cursor-pointer
+      span.flex.items-center.gap-1.text-xs.text-muted-foreground:has(.lucide-phone) {
+      display: none !important;
+    }
+
+    html[${CARD_BOOT_ATTR}="true"] div.p-2.border.rounded.cursor-pointer
+      div.inline-flex.items-center.rounded-full:not([data-tm-queue-tag]):has(+ *),
+    html[${CARD_BOOT_ATTR}="true"] div.p-2.border.rounded.cursor-pointer
+      div.flex.items-center.gap-1.mb-1
+      > div.inline-flex.items-center.rounded-full:not([data-tm-queue-tag]) {
+      display: none !important;
+    }
+
+    html[${CARD_BOOT_ATTR}="true"] div.p-2.border.rounded.cursor-pointer
+      div.inline-flex.items-center.rounded-full:has(.lucide-check-circle2) {
+      display: none !important;
+    }
+
+    html[${CARD_BOOT_ATTR}="true"] div.p-2.border.rounded.cursor-pointer
+      span.inline-flex.items-center.gap-1.rounded-full.px-1\.5.py-0\.5.text-\[10px\].border.bg-blue-50 {
+      display: none !important;
+    }
+  `;
+
+
+  /* ========================================================================
+   * SEÇÃO: SIDEBAR INICIANDO RECOLHIDA
+   * Objetivo: a sidebar nasce visualmente recolhida sem remover o modo expandido.
+   * ====================================================================== */
+  const sidebarBootCSS = `
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) {
+      width: 4rem !important;
+      min-width: 4rem !important;
+      max-width: 4rem !important;
+      overflow: hidden !important;
+    }
+
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) > div:first-child {
+      justify-content: center !important;
+      padding-left: 0.75rem !important;
+      padding-right: 0.75rem !important;
+    }
+
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) > div:first-child > div {
+      display: none !important;
+    }
+
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) > div:first-child > button {
+      margin: 0 auto !important;
+    }
+
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) nav h3,
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) nav span,
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) nav .lucide-chevron-right,
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) nav button:not([aria-label]),
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) nav a > span,
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) nav button > span {
+      display: none !important;
+    }
+
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) nav a,
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) nav button {
+      justify-content: center !important;
+      padding-left: 0.625rem !important;
+      padding-right: 0.625rem !important;
+      min-height: 2.5rem !important;
+    }
+
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) nav .space-y-3,
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) nav .space-y-1,
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) nav .mb-8,
+    html[${SIDEBAR_BOOT_ATTR}="true"] aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg:has(button[aria-label="Fechar menu"]) nav .mt-8 {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+  `;
+
+  const agentBootCSS = `
+    html[${AGENT_BOOT_ATTR}="true"] .bg-card.border.border-border.rounded-lg:has(> div):has(> div + div) > div:first-child:has(button):has(.lucide-users),
+    html[${AGENT_BOOT_ATTR}="true"] .bg-card.border.border-border.rounded-lg:has(> div):has(> div + div) > div:first-child:has(button):has(.lucide-headphones),
+    html[${AGENT_BOOT_ATTR}="true"] .bg-card.border.border-border.rounded-lg:has(> div):has(> div + div) > div:first-child:has(button):has(.lucide-send),
+    html[${AGENT_BOOT_ATTR}="true"] .bg-card.border.border-border.rounded-lg:has(> div):has(> div + div) > div:first-child:has(button):has(.lucide-message-square) {
+      visibility: hidden !important;
+      opacity: 0 !important;
+      max-height: 0 !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+      margin: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      border: 0 !important;
+      pointer-events: none !important;
+    }
+  `;
+
+
+  /* ========================================================================
+   * SEÇÃO: UTILITÁRIOS
+   * ====================================================================== */
+  function log(...args) {
+    console.log(`[${SCRIPT_NAME}]`, ...args);
+  }
+
+  function normalizeText(text) {
     return (text || '').replace(/\s+/g, ' ').trim();
   }
 
-  function toTitleCase(text) {
-    const lowerWords = ['de', 'da', 'do', 'das', 'dos', 'e'];
-    return norm(text)
-      .toLowerCase()
-      .split(' ')
-      .map((word, i) =>
-        i > 0 && lowerWords.includes(word)
-          ? word
-          : word.charAt(0).toUpperCase() + word.slice(1)
-      )
-      .join(' ');
+  function applyCSS() {
+    ensureStyleTag(STYLE_ID, css);
   }
 
-  function monthNameFromNumber(mm) {
-    const months = {
-      '01': 'Janeiro',
-      '02': 'Fevereiro',
-      '03': 'Março',
-      '04': 'Abril',
-      '05': 'Maio',
-      '06': 'Junho',
-      '07': 'Julho',
-      '08': 'Agosto',
-      '09': 'Setembro',
-      '10': 'Outubro',
-      '11': 'Novembro',
-      '12': 'Dezembro'
-    };
-    return months[mm] || mm;
-  }
 
-  function formatDatePtBr(ddmm) {
-    const m = norm(ddmm).match(/^(\d{2})\/(\d{2})$/);
-    if (!m) return norm(ddmm);
-    const dd = String(parseInt(m[1], 10));
-    const mm = m[2];
-    return `${dd} de ${monthNameFromNumber(mm)}`;
-  }
 
-  function normalizeHour(text) {
-    const t = norm(text);
-    if (/^\d{1,2}h$/i.test(t)) {
-      const hour = t.replace(/h/i, '');
-      return `${String(parseInt(hour, 10)).padStart(2, '0')}h`;
+  function ensureStyleTag(id, cssText) {
+    const parent = document.head || document.documentElement;
+    if (!parent) return null;
+
+    let style = document.getElementById(id);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = id;
+      parent.appendChild(style);
     }
-    if (/^\d{1,2}:\d{2}$/.test(t)) return t;
-    return t;
-  }
 
-  function isTimeButton(el) {
-    if (!el) return false;
-    const text = norm(el.textContent);
-    return /^\d{1,2}h$/i.test(text) || /^\d{1,2}:\d{2}$/.test(text);
-  }
-
-  function findRowContainer(el) {
-    let current = el;
-    while (current && current !== document.body) {
-      const text = norm(current.innerText || current.textContent || '');
-      const hasDate = /\b\d{2}\/\d{2}\b/.test(text);
-      const hasWeekday = WEEKDAYS.some(day => text.includes(day));
-      if (hasDate && hasWeekday) return current;
-      current = current.parentElement;
+    if (style.textContent !== cssText) {
+      style.textContent = cssText;
     }
-    return null;
+
+    return style;
   }
 
-  function findDoctorContainerFromTimeButton(el) {
-    let current = el;
-    while (current && current !== document.body) {
-      const text = norm(current.innerText || current.textContent || '');
-      const hasCRM = /\bCRM\b/i.test(text);
-      const hasTime = Array.from(current.querySelectorAll('button, a, div, span')).some(isTimeButton);
-      if (hasCRM && hasTime) return current;
-      current = current.parentElement;
+  function startCardBootMask() {
+    document.documentElement.setAttribute(CARD_BOOT_ATTR, 'true');
+    ensureStyleTag(CARD_BOOT_STYLE_ID, cardBootCSS);
+  }
+
+  function stopCardBootMask() {
+    document.documentElement.removeAttribute(CARD_BOOT_ATTR);
+    document.getElementById(CARD_BOOT_STYLE_ID)?.remove();
+  }
+
+  function startSidebarBootMask() {
+    document.documentElement.setAttribute(SIDEBAR_BOOT_ATTR, 'true');
+    ensureStyleTag(SIDEBAR_BOOT_STYLE_ID, sidebarBootCSS);
+  }
+
+  function stopSidebarBootMask() {
+    document.documentElement.removeAttribute(SIDEBAR_BOOT_ATTR);
+    document.documentElement.setAttribute(SIDEBAR_COLLAPSED_READY_ATTR, 'true');
+    document.getElementById(SIDEBAR_BOOT_STYLE_ID)?.remove();
+  }
+
+  function startAgentBootMask() {
+    document.documentElement.setAttribute(AGENT_BOOT_ATTR, 'true');
+    ensureStyleTag(AGENT_BOOT_STYLE_ID, agentBootCSS);
+  }
+
+  function stopAgentBootMask() {
+    document.documentElement.removeAttribute(AGENT_BOOT_ATTR);
+    document.getElementById(AGENT_BOOT_STYLE_ID)?.remove();
+  }
+
+
+  function scheduleAgentBootFailsafe() {
+    window.setTimeout(() => {
+      if (!agentBootDone) {
+        stopAgentBootMask();
+      }
+    }, 4000);
+  }
+
+  function getSidebarElement() {
+    return document.querySelector('aside.fixed.left-0.top-0.h-full.transition-all.duration-300.z-40.border-r.shadow-lg');
+  }
+
+  function isSidebarCollapsed(sidebar) {
+    if (!sidebar) return false;
+    const openButton = sidebar.querySelector('button[aria-label="Abrir menu"]');
+    return sidebar.classList.contains('w-16') || !!openButton;
+  }
+
+  function isSidebarExpanded(sidebar) {
+    if (!sidebar) return false;
+    const closeButton = sidebar.querySelector('button[aria-label="Fechar menu"]');
+    return sidebar.classList.contains('w-64') || !!closeButton;
+  }
+
+  let sidebarBootDone = false;
+  let sidebarBootFrame = 0;
+  function ensureSidebarStartsCollapsed() {
+    if (sidebarBootDone) return;
+
+    const sidebar = getSidebarElement();
+    if (!sidebar) {
+      sidebarBootFrame = window.requestAnimationFrame(ensureSidebarStartsCollapsed);
+      return;
     }
-    return null;
-  }
 
-  function extractDoctorNameFromContainer(container) {
-    if (!container) return '';
+    if (isSidebarCollapsed(sidebar)) {
+      sidebarBootDone = true;
+      stopSidebarBootMask();
+      return;
+    }
 
-    const crmNode = Array.from(container.querySelectorAll('div, span, label, strong, b, p, h1, h2, h3, h4, h5, h6, small'))
-      .find((node) => /\bCRM\b/i.test(norm(node.textContent || '')));
-
-    if (crmNode) {
-      let current = crmNode.previousElementSibling;
-      while (current) {
-        const text = norm(current.textContent || '');
-        if (
-          text &&
-          text.length >= 8 &&
-          text.length <= 90 &&
-          !/\bCRM\b/i.test(text) &&
-          !isTimeButton(current) &&
-          /[A-Za-zÀ-ÿ]{2}/.test(text) &&
-          !/^[A-Z]{2,6}$/.test(text)
-        ) {
-          return toTitleCase(text);
-        }
-        current = current.previousElementSibling;
+    if (isSidebarExpanded(sidebar)) {
+      const closeButton = sidebar.querySelector('button[aria-label="Fechar menu"]');
+      if (closeButton) {
+        closeButton.click();
       }
     }
 
-    const candidates = Array.from(
-      container.querySelectorAll('div, span, label, strong, b, p, h1, h2, h3, h4, h5, h6, small')
-    );
-
-    for (const node of candidates) {
-      const text = norm(node.textContent || '');
-      if (!text) continue;
-      if (text.length < 8 || text.length > 90) continue;
-      if (/\bCRM\b/i.test(text)) continue;
-      if (isTimeButton(node)) continue;
-      if (!/[A-Za-zÀ-ÿ]{2}/.test(text)) continue;
-      if (/^[A-Z]{2,6}$/.test(text)) continue;
-
-      const parentText = norm(node.parentElement?.textContent || '');
-      if (/\bCRM\b/i.test(parentText)) {
-        return toTitleCase(text);
+    sidebarBootFrame = window.requestAnimationFrame(() => {
+      const currentSidebar = getSidebarElement();
+      if (isSidebarCollapsed(currentSidebar)) {
+        sidebarBootDone = true;
+        stopSidebarBootMask();
+        return;
       }
-    }
-
-    const raw = norm(container.innerText || container.textContent || '');
-    const match = raw.match(/([A-ZÀ-Ý][A-ZÀ-Ýa-zà-ÿ'´`^~\- ]{8,}?)\s+CRM\b/i);
-    if (!match) return '';
-
-    const cleaned = norm(match[1]).replace(/^[A-Z]{2,6}\s+/, '');
-    return toTitleCase(cleaned);
-  }
-
-  function getSelectedDoctorName() {
-    return state.selectedDoctor || getDoctorNameFromModal();
-  }
-  function getModalDateContext() {
-    const modal = document.querySelector('#minutoModal');
-    if (!modal) return { dateText: '', weekdayText: '' };
-
-    const text = norm(modal.innerText || modal.textContent || '');
-    const dateMatch = text.match(/\b\d{2}\/\d{2}\b/);
-    const weekday = WEEKDAYS.find((day) => text.includes(day)) || '';
-
-    return {
-      dateText: dateMatch ? formatDatePtBr(dateMatch[0]) : '',
-      weekdayText: weekday
-    };
-  }
-
-  function buildCopyTextFromTarget(target) {
-    const btn = target ? target.closest('button, a, div, span') : null;
-    if (!btn || !isTimeButton(btn)) return '';
-
-    const time = normalizeHour(btn.textContent);
-    const doctorContainer = findDoctorContainerFromTimeButton(btn);
-    const doctorName = extractDoctorNameFromContainer(doctorContainer);
-    const modalContext = getModalDateContext();
-
-    if (!doctorName || !modalContext.dateText || !modalContext.weekdayText || !time) {
-      return '';
-    }
-
-    return `👨‍⚕️ ${doctorName}\n${modalContext.dateText} | ${modalContext.weekdayText} | ${time}`;
-  }
-
-
-  function captureSelectionFromClick(target, allowModalTime = false) {
-    const insideModal = !!target.closest('#minutoModal');
-
-    if (insideModal && !allowModalTime) return false;
-
-    const btn = target.closest('button, a, div, span');
-    if (!btn || !isTimeButton(btn)) return false;
-
-    const time = normalizeHour(btn.textContent);
-
-    if (insideModal && allowModalTime) {
-      state.selectedTime = time;
-
-      const doctorContainer = findDoctorContainerFromTimeButton(btn);
-      const doctorName = extractDoctorNameFromContainer(doctorContainer);
-      if (doctorName) {
-        state.selectedDoctor = doctorName;
-      }
-
-      return true;
-    }
-
-    const row = findRowContainer(btn);
-    if (!row) return false;
-
-    const rowText = norm(row.innerText || row.textContent || '');
-    const dateMatch = rowText.match(/\b\d{2}\/\d{2}\b/);
-    const weekday = WEEKDAYS.find(day => rowText.includes(day)) || '';
-
-    if (!dateMatch || !weekday) return false;
-
-    state.selectedDate = formatDatePtBr(dateMatch[0]);
-    state.selectedWeekday = weekday;
-    state.selectedTime = time;
-    return true;
-  }
-
-  function getDoctorNameFromModal() {
-    const doctorEl = document.querySelector('#minutoModal .col.col-12.col-md-6 > div:first-child');
-    if (!doctorEl) return '';
-
-    const text = norm(doctorEl.textContent);
-    if (!text) return '';
-
-    return toTitleCase(text);
-  }
-
-  function getSubtitleHtml(titleEl) {
-    const subtitleEl = titleEl.querySelector('.small.text-muted');
-    return subtitleEl ? subtitleEl.outerHTML : '';
-  }
-
-  function buildTitleHtml(doctorName) {
-    if (!state.selectedDate || !state.selectedWeekday || !state.selectedTime || !doctorName) {
-      return '';
-    }
-
-    const line1 = `👨‍⚕️ ${doctorName}`;
-    const line2 = `${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
-
-    return `
-      <span class="tm-main-title" style="display:block; line-height:1.35;">
-        <span class="tm-doctor-line" style="display:block;">${line1}</span>
-        <span class="tm-date-line" style="display:block;">${line2}</span>
-      </span>
-    `;
-  }
-
-  function getCopyText() {
-    const doctorName = getSelectedDoctorName();
-    if (!doctorName || !state.selectedDate || !state.selectedWeekday || !state.selectedTime) {
-      return '';
-    }
-
-    return `👨‍⚕️ ${doctorName}\n${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
-  }
-
-  function showCopyFeedback(targetEl, message = 'Copiado') {
-    if (!targetEl) return;
-
-    const oldTip = document.querySelector('#tm-copy-bubble');
-    if (oldTip) oldTip.remove();
-
-    const bubble = document.createElement('div');
-    bubble.id = 'tm-copy-bubble';
-    bubble.textContent = message;
-
-    bubble.style.position = 'fixed';
-    bubble.style.zIndex = '999999';
-    bubble.style.background = '#fff';
-    bubble.style.color = '#222';
-    bubble.style.border = '1px solid #111';
-    bubble.style.borderRadius = '10px';
-    bubble.style.padding = '8px 14px';
-    bubble.style.fontSize = '14px';
-    bubble.style.fontWeight = '600';
-    bubble.style.boxShadow = '0 4px 10px rgba(0,0,0,0.12)';
-    bubble.style.pointerEvents = 'none';
-    bubble.style.opacity = '0';
-    bubble.style.transition = 'opacity 0.15s ease';
-
-    document.body.appendChild(bubble);
-
-    const rect = targetEl.getBoundingClientRect();
-    const bubbleRect = bubble.getBoundingClientRect();
-
-    const top = rect.top - bubbleRect.height - 10;
-    const left = rect.left + (rect.width / 2) - (bubbleRect.width / 2);
-
-    bubble.style.top = `${Math.max(8, top)}px`;
-    bubble.style.left = `${Math.max(8, left)}px`;
-
-    const arrow = document.createElement('div');
-    arrow.style.position = 'absolute';
-    arrow.style.left = '50%';
-    arrow.style.bottom = '-7px';
-    arrow.style.width = '12px';
-    arrow.style.height = '12px';
-    arrow.style.background = '#fff';
-    arrow.style.borderRight = '1px solid #111';
-    arrow.style.borderBottom = '1px solid #111';
-    arrow.style.transform = 'translateX(-50%) rotate(45deg)';
-    bubble.appendChild(arrow);
-
-    requestAnimationFrame(() => {
-      bubble.style.opacity = '1';
+      ensureSidebarStartsCollapsed();
     });
-
-    clearTimeout(bubble._hideTimer);
-    bubble._hideTimer = setTimeout(() => {
-      bubble.style.opacity = '0';
-      setTimeout(() => bubble.remove(), 180);
-    }, 1000);
   }
 
-  async function copyText(text, targetEl) {
-    if (!text) return;
+  let debounceTimer = null;
+  function debounce(fn, delay) {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(fn, delay);
+  }
 
+  function hideElement(el) {
+    if (!el || !(el instanceof HTMLElement)) return;
+    if (el.getAttribute(HIDDEN_ATTR) !== 'true') {
+      el.setAttribute(HIDDEN_ATTR, 'true');
+    }
+  }
+
+  function markUppercase(el) {
+    if (!el || !(el instanceof HTMLElement)) return;
+    el.setAttribute(UPPERCASE_NAME_ATTR, 'true');
+  }
+
+  async function copyTextToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
-      showCopyFeedback(targetEl, 'Copiado');
-    } catch (err) {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-      showCopyFeedback(targetEl, 'Copiado');
-    }
-  }
-
-  function updateModalTitle() {
-    const modal = document.querySelector('#minutoModal');
-    const titleEl = document.querySelector('#minutoModal h5.modal-title');
-
-    if (!modal || !titleEl) return;
-
-    const doctorName = getSelectedDoctorName();
-    const titleHtml = buildTitleHtml(doctorName);
-
-    if (!titleHtml) return;
-
-    const subtitleHtml = getSubtitleHtml(titleEl);
-    const currentMain = titleEl.querySelector('.tm-main-title');
-    const expectedText = `👨‍⚕️ ${doctorName} ${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
-
-    if (currentMain && norm(currentMain.textContent) === norm(expectedText)) return;
-
-    titleEl.innerHTML = `${titleHtml}${subtitleHtml}`;
-  }
-
-  function applyLoginIndicator() {
-    const passwordInput = document.querySelector('input[type="password"]');
-    if (!passwordInput) return;
-
-    if (document.body.dataset.tmLoginStyled === '1') return;
-    document.body.dataset.tmLoginStyled = '1';
-
-    document.body.style.backgroundColor = '#a98787';
-
-    const btnEntrar =
-      document.querySelector('button[type="submit"]') ||
-      document.querySelector('input[type="submit"]') ||
-      [...document.querySelectorAll('button')].find(btn => /entrar/i.test((btn.textContent || '').trim()));
-
-    if (btnEntrar) {
-      btnEntrar.style.backgroundColor = '#8b0000';
-      btnEntrar.style.color = '#fff';
-      btnEntrar.style.border = 'none';
-    }
-
-    const logo = document.querySelector('img');
-    if (logo) {
-      logo.src = 'https://i.imgur.com/bY57pai.png';
-      logo.style.maxWidth = '180px';
-      logo.style.display = 'block';
-      logo.style.margin = '0 auto';
-    }
-  }
-
-  function parsePastedBirthDate(text) {
-    const raw = norm(text);
-    if (!raw) return '';
-
-    const onlyDigits = raw.replace(/\D/g, '');
-
-    if (onlyDigits.length === 8) {
-      const dd = onlyDigits.slice(0, 2);
-      const mm = onlyDigits.slice(2, 4);
-      const yyyy = onlyDigits.slice(4, 8);
-
-      if (isValidDate(dd, mm, yyyy)) {
-        return `${yyyy}-${mm}-${dd}`;
-      }
-
-      const yyyy2 = onlyDigits.slice(0, 4);
-      const mm2 = onlyDigits.slice(4, 6);
-      const dd2 = onlyDigits.slice(6, 8);
-
-      if (isValidDate(dd2, mm2, yyyy2)) {
-        return `${yyyy2}-${mm2}-${dd2}`;
+      return true;
+    } catch (error) {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        textarea.style.pointerEvents = 'none';
+        document.body.appendChild(textarea);
+        textarea.select();
+        textarea.setSelectionRange(0, textarea.value.length);
+        const copied = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return copied;
+      } catch (fallbackError) {
+        console.error(`[${SCRIPT_NAME}] falha ao copiar`, fallbackError);
+        return false;
       }
     }
+  }
 
-    let m = raw.match(/^(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})$/);
-    if (m && isValidDate(m[1], m[2], m[3])) {
-      return `${m[3]}-${m[2]}-${m[1]}`;
+  function findCardContainerFromTitle(titleEl) {
+    let node = titleEl;
+    while (node && node !== document.body) {
+      if (
+        node.classList &&
+        node.classList.contains('rounded-xl') &&
+        node.classList.contains('bg-card')
+      ) {
+        return node;
+      }
+      node = node.parentElement;
     }
+    return null;
+  }
 
-    m = raw.match(/^(\d{4})[\/.\-](\d{2})[\/.\-](\d{2})$/);
-    if (m && isValidDate(m[3], m[2], m[1])) {
-      return `${m[1]}-${m[2]}-${m[3]}`;
+
+  let favoriteApplyTimer = null;
+  let favoriteIntervalId = null;
+
+  function loadFavoriteTickets() {
+    try {
+      const raw = localStorage.getItem(FAVORITE_STORAGE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (error) {
+      console.error(`[${SCRIPT_NAME}] falha ao ler favoritos`, error);
+      return {};
+    }
+  }
+
+  function saveFavoriteTickets(favorites) {
+    try {
+      localStorage.setItem(FAVORITE_STORAGE_KEY, JSON.stringify(favorites));
+    } catch (error) {
+      console.error(`[${SCRIPT_NAME}] falha ao salvar favoritos`, error);
+    }
+  }
+
+  function getTicketProtocol(card) {
+    if (!card) return '';
+
+    for (const el of card.querySelectorAll('span')) {
+      const value = normalizeText(el.textContent);
+      if (/^CS\d+/i.test(value)) return value;
     }
 
     return '';
   }
 
-  function isValidDate(dd, mm, yyyy) {
-    const day = Number(dd);
-    const month = Number(mm);
-    const year = Number(yyyy);
-
-    if (!day || !month || !year) return false;
-    if (year < 1900 || year > 2100) return false;
-
-    const date = new Date(year, month - 1, day);
-    return (
-      date.getFullYear() === year &&
-      date.getMonth() === month - 1 &&
-      date.getDate() === day
-    );
+  function isFavoriteTicket(protocol) {
+    if (!protocol) return false;
+    const favorites = loadFavoriteTickets();
+    return !!favorites[protocol];
   }
 
-  function setNativeInputValue(el, value) {
-    const prototype = Object.getPrototypeOf(el);
-    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
-    const setter = descriptor && descriptor.set;
+  function setFavoriteTicket(protocol, isActive) {
+    if (!protocol) return;
+    const favorites = loadFavoriteTickets();
 
-    if (setter) {
-      setter.call(el, value);
+    if (isActive) {
+      favorites[protocol] = true;
     } else {
-      el.value = value;
-    }
-  }
-
-  function dispatchEvents(el, names) {
-    names.forEach((name) => {
-      const ev = new Event(name, { bubbles: true });
-      el.dispatchEvent(ev);
-    });
-  }
-
-  function dispatchBirthDateEvents(el) {
-    dispatchEvents(el, ['input', 'change', 'blur']);
-  }
-
-  function isBirthDateInput(input) {
-    if (!(input instanceof HTMLInputElement)) return false;
-    if (input.type !== 'date') return false;
-    if (input.name !== 'teste') return false;
-    return !!input.closest('.input-group.input-group-sm');
-  }
-
-  function handleBirthDatePaste(event) {
-    const input = event.target;
-    if (!isBirthDateInput(input)) return;
-
-    const pasted = event.clipboardData ? event.clipboardData.getData('text') : '';
-    const normalized = parsePastedBirthDate(pasted);
-    if (!normalized) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    setNativeInputValue(input, normalized);
-    dispatchBirthDateEvents(input);
-  }
-
-  function enableBirthDatePaste() {
-    const inputs = document.querySelectorAll('input[type="date"][name="teste"]');
-
-    inputs.forEach((input) => {
-      if (!isBirthDateInput(input)) return;
-      if (input.dataset.tmBirthPasteEnabled === '1') return;
-
-      input.dataset.tmBirthPasteEnabled = '1';
-      input.addEventListener('paste', handleBirthDatePaste, true);
-    });
-  }
-
-  /* =========================
-     OCULTAR ELEMENTOS (CSS)
-  ========================= */
-  
-  function injectFontFix() {
-    if (document.getElementById('tm-font-fix')) return;
-    const style = document.createElement('style');
-    style.id = 'tm-font-fix';
-    style.innerHTML = `
-.tm-klingo-root .list-group-item.list-group-item-success .tm-procedure-title,
-.tm-klingo-root .list-group-item.list-group-item-info .tm-procedure-title,
-.tm-klingo-root .list-group-item.list-group-item-warning .tm-procedure-title,
-.tm-klingo-root .list-group-item.list-group-item-secondary .tm-procedure-title,
-.tm-klingo-root .list-group-item.list-group-item-danger .tm-procedure-title {
-  font-size: 20px !important;
-  line-height: 1.25 !important;
-  font-weight: 400 !important;
-}
-
-.tm-klingo-root .list-group-item.list-group-item-success .tm-header-line,
-.tm-klingo-root .list-group-item.list-group-item-info .tm-header-line,
-.tm-klingo-root .list-group-item.list-group-item-warning .tm-header-line,
-.tm-klingo-root .list-group-item.list-group-item-secondary .tm-header-line,
-.tm-klingo-root .list-group-item.list-group-item-danger .tm-header-line {
-  font-size: inherit !important;
-  line-height: 1.3 !important;
-}
-
-.tm-klingo-root .list-group-item.list-group-item-success .tm-header-line small,
-.tm-klingo-root .list-group-item.list-group-item-success .tm-header-line .lead,
-.tm-klingo-root .list-group-item.list-group-item-info .tm-header-line small,
-.tm-klingo-root .list-group-item.list-group-item-info .tm-header-line .lead,
-.tm-klingo-root .list-group-item.list-group-item-warning .tm-header-line small,
-.tm-klingo-root .list-group-item.list-group-item-warning .tm-header-line .lead,
-.tm-klingo-root .list-group-item.list-group-item-secondary .tm-header-line small,
-.tm-klingo-root .list-group-item.list-group-item-secondary .tm-header-line .lead,
-.tm-klingo-root .list-group-item.list-group-item-danger .tm-header-line small,
-.tm-klingo-root .list-group-item.list-group-item-danger .tm-header-line .lead {
-  font-size: 14px !important;
-  line-height: 1.3 !important;
-  font-weight: 400 !important;
-}
-
-.tm-klingo-root .list-group-item.list-group-item-success .tm-header-line i,
-.tm-klingo-root .list-group-item.list-group-item-info .tm-header-line i,
-.tm-klingo-root .list-group-item.list-group-item-warning .tm-header-line i,
-.tm-klingo-root .list-group-item.list-group-item-secondary .tm-header-line i,
-.tm-klingo-root .list-group-item.list-group-item-danger .tm-header-line i {
-  font-size: 14px !important;
-}
-
-.tm-klingo-root .list-group-item.list-group-item-success .tm-header-line .text-muted,
-.tm-klingo-root .list-group-item.list-group-item-info .tm-header-line .text-muted,
-.tm-klingo-root .list-group-item.list-group-item-warning .tm-header-line .text-muted,
-.tm-klingo-root .list-group-item.list-group-item-secondary .tm-header-line .text-muted,
-.tm-klingo-root .list-group-item.list-group-item-danger .tm-header-line .text-muted {
-  font-size: 14px !important;
-}
-
-.tm-klingo-root .list-group-item.list-group-item-success .tm-header-infos footer,
-.tm-klingo-root .list-group-item.list-group-item-info .tm-header-infos footer,
-.tm-klingo-root .list-group-item.list-group-item-warning .tm-header-infos footer,
-.tm-klingo-root .list-group-item.list-group-item-secondary .tm-header-infos footer,
-.tm-klingo-root .list-group-item.list-group-item-danger .tm-header-infos footer {
-  font-size: 12px !important;
-  line-height: 1.35 !important;
-}
-
-.tm-klingo-root .tm-procedure-title {
-  font-size: 16px !important;
-}
-
-.tm-klingo-root .tm-header-line,
-.tm-klingo-root .tm-header-line small,
-.tm-klingo-root .tm-header-line .lead {
-  font-size: 12px !important;
-}
-
-.tm-klingo-root .tm-header-infos footer {
-  font-size: 12px !important;
-}
-
-
-/* FIX DEFINITIVO TAMANHO (override do H4 do bootstrap) */
-.tm-klingo-root .tm-procedure-title.h4,
-.tm-klingo-root .h4.tm-procedure-title {
-  font-size: 16px !important;
-  font-weight: 500 !important;
-}
-
-.tm-klingo-root .tm-header-line,
-.tm-klingo-root .tm-header-line * {
-  font-size: 12px !important;
-}
-
-/* garantir que não herde tamanho maior */
-.tm-klingo-root .list-group-item * {
-  font-size: 12px;
-}
-
-.tm-klingo-root .tm-procedure-title * {
-  font-size: 16px !important;
-}
-
-/* ocultar consultorio */
-.tm-klingo-root .tm-header-line small .text-muted {
-  display: none !important;
-}
-
-`;
-    document.head.appendChild(style);
-  }
-
-  function injectLayoutCSS() {
-    if (!isCallCenterRoute()) return;
-    if (document.getElementById('tm-klingo-layout-style')) return;
-
-    const style = document.createElement('style');
-    style.id = 'tm-klingo-layout-style';
-    style.textContent = `
-      .tm-hidden-by-script {
-        display: none !important;
-      }
-
-      .tm-layout-host {
-        margin-top: 8px;
-        margin-bottom: 8px;
-      }
-
-      .tm-top-layout {
-        display: grid;
-        grid-template-columns: 509px;
-        gap: 18px;
-        align-items: start;
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-left-panel {
-        min-width: 0;
-        width: 509px !important;
-        max-width: 509px !important;
-      }
-
-      .tm-grid-row {
-        display: grid;
-        gap: 10px 12px;
-        margin-bottom: 10px;
-        align-items: end;
-      }
-
-      .tm-row-name-birth {
-        grid-template-columns: 342px 155px;
-      }
-
-      .tm-row-cpf-sexo-origem {
-        grid-template-columns: 155px 175px 155px;
-      }
-
-      .tm-row-cel-email {
-        grid-template-columns: 155px 342px;
-      }
-
-      .tm-row-carteira-validade {
-        grid-template-columns: 342px 155px;
-      }
-
-      .tm-field-slot,
-      .tm-field-slot > .col,
-      .tm-field-slot > .form-group,
-      .tm-field-slot > [class*="col-"] {
-        min-width: 0;
-      }
-
-      .tm-field-slot > .col,
-      .tm-field-slot > [class*="col-"] {
-        flex: unset !important;
-        max-width: none !important;
-        width: 100% !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-      }
-
-      .tm-field-slot .form-group {
-        margin-bottom: 0 !important;
-      }
-
-      .tm-field-slot .input-group,
-      .tm-field-slot .form-control,
-      .tm-field-slot select,
-      .tm-field-slot input,
-      .tm-field-slot textarea {
-        width: 100% !important;
-      }
-
-      .tm-cell-input-group .input-group-prepend,
-      .tm-cell-input-group .dropdown {
-        display: none !important;
-      }
-
-      .tm-cell-input-group .form-control {
-        border-top-left-radius: .25rem !important;
-        border-bottom-left-radius: .25rem !important;
-      }
-
-      .tm-observation-layout {
-        display: grid;
-        grid-template-columns: 509px;
-        gap: 12px;
-        align-items: start;
-        margin-top: 6px;
-        margin-bottom: 10px;
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-observation-layout .tm-field-slot > .col,
-      .tm-observation-layout .tm-field-slot > [class*="col-"] {
-        width: 100% !important;
-      }
-
-      .tm-observation-textarea {
-        min-height: 68px !important;
-        height: 68px !important;
-        padding: 8px 10px !important;
-        line-height: 1.35 !important;
-        resize: none !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
-        white-space: pre-wrap !important;
-        overflow-y: auto !important;
-        vertical-align: top !important;
-      }
-
-      .tm-observation-layout .input-group {
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-      }
-
-      .tm-observation-layout .input-group-prepend {
-        display: flex !important;
-        margin-right: 0 !important;
-        flex: 0 0 auto !important;
-      }
-
-      .tm-observation-layout .input-group-text {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        height: 30px !important;
-        min-width: 38px !important;
-        border-top-right-radius: 0 !important;
-        border-bottom-right-radius: 0 !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-      }
-
-      .tm-observation-layout select.form-control {
-        height: 30px !important;
-        max-width: 188px !important;
-        width: 188px !important;
-        border-top-left-radius: 0 !important;
-        border-bottom-left-radius: 0 !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        line-height: 30px !important;
-      }
-
-      .tm-klingo-root .form-row.tm-hidden-original-row,
-      .tm-klingo-root .row.tm-hidden-original-row,
-      .tm-klingo-root .tm-hidden-original-row {
-        display: none !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success {
-        max-width: 509px !important;
-        width: 509px !important;
-        background: #d5edff !important;
-        color: #003358 !important;
-        border-color: #b7d9ee !important;
-        padding: 12px 14px !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group {
-        max-width: 509px !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success label,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success .h4,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success .lead,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success small,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success span,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success i {
-        color: #003358 !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success .badge.badge-light {
-        background: #ffffff !important;
-        color: #003358 !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success .text-muted,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success small.text-muted {
-        color: #4d7088 !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success i.fa-exclamation-triangle.text-warning {
-        color: #f4b400 !important;
-      }
-
-      
-      /* OCULTAR CONSULTÓRIO AO LADO DA UNIDADE (HEADER) */
-      /* =========================
-         HEADER - TAMANHO CONFIGURÁVEL
-      ========================= */
-
-      .tm-klingo-root .list-group-item.list-group-item-success .h4 {
-        font-size: ${TM_HEADER_CONFIG.titulo} !important;
-      }
-
-      .tm-klingo-root .list-group-item.list-group-item-success .lead {
-        font-size: ${TM_HEADER_CONFIG.linha} !important;
-      }
-
-      .tm-klingo-root .list-group-item.list-group-item-success small {
-        font-size: ${TM_HEADER_CONFIG.detalhes} !important;
-      }
-
-      .tm-klingo-root .list-group-item.list-group-item-success small.text-muted {
-        display: none !important;
-      }
-
-.tm-klingo-root .tm-procedure-title {
-        display: block !important;
-        margin-bottom: 8px !important;
-        font-size: 20px !important;
-        line-height: 1.25 !important;
-        white-space: normal !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
-      }
-
-      .tm-klingo-root .tm-header-line {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        align-items: center !important;
-        gap: 6px 10px !important;
-        margin-bottom: 6px !important;
-        line-height: 1.3 !important;
-      }
-
-      .tm-klingo-root .tm-header-line > * {
-        display: inline-flex !important;
-        align-items: center !important;
-        min-width: 0 !important;
-      }
-
-      .tm-klingo-root .tm-header-line small,
-      .tm-klingo-root .tm-header-line .lead {
-        margin-bottom: 0 !important;
-        white-space: normal !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
-      }
-
-      .tm-klingo-root .tm-header-infos {
-        margin-top: 6px !important;
-      }
-
-      .tm-klingo-root .tm-header-infos footer {
-        display: -webkit-box !important;
-        -webkit-box-orient: vertical !important;
-        -webkit-line-clamp: 3 !important;
-        line-clamp: 3 !important;
-        font-size: 12px !important;
-        line-height: 1.35 !important;
-        white-space: pre-wrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
-        margin: 0 !important;
-        max-height: calc(1.35em * 3) !important;
-        transition: max-height 0.15s ease !important;
-        cursor: default !important;
-      }
-
-      .tm-klingo-root .tm-header-infos:hover footer {
-        display: block !important;
-        -webkit-line-clamp: unset !important;
-        line-clamp: unset !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        max-height: 1000px !important;
-      }
-
-      .tm-klingo-root [data-slot="validade"] {
-        margin-top: 0 !important;
-      }
-
-      .tm-klingo-root [data-slot="validade"] .form-control {
-        max-width: 155px !important;
-        width: 155px !important;
-      }
-
-      .tm-klingo-root [data-slot="observacao-select"] {
-        max-width: 226px !important;
-        width: 226px !important;
-      }
-
-      .tm-klingo-root [data-slot="observacao-select"] .form-group {
-        width: 226px !important;
-      }
-
-      /* AJUSTE: largura do campo "Adicionar procedimento" igual ao header */
-      .tm-klingo-root .autocomplete,
-      .tm-klingo-root .autocomplete .input-group,
-      .tm-klingo-root input.az-autocomplete {
-        width: 509px !important;
-        max-width: 509px !important;
-      }
-
-      .tm-klingo-root input[placeholder="Adicionar procedimento..."] {
-        max-width: 1046px !important;
-        width: 1046px !important;
-      }
-
-
-      .tm-klingo-root {
-        width: 680px !important;
-        max-width: 680px !important;
-        overflow: hidden !important;
-      }
-
-      .tm-klingo-root .modal-body {
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        overflow-x: hidden !important;
-        overflow-y: auto !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-      }
-
-      .tm-klingo-root .modal-body > div,
-      .tm-klingo-root .mt-3,
-      .tm-klingo-root .tab-content,
-      .tm-klingo-root .tab-pane,
-      .tm-klingo-root #myTab,
-      .tm-klingo-root #cadTemp,
-      .tm-klingo-root #tm-top-layout-host,
-      .tm-klingo-root hr,
-      .tm-klingo-root .modal-footer {
-        width: 540px !important;
-        max-width: 540px !important;
-        box-sizing: border-box !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-klingo-root #tm-observation-layout-host,
-      .tm-klingo-root #myTab,
-      .tm-klingo-root .tab-content,
-      .tm-klingo-root .tab-pane,
-      .tm-klingo-root .modal-footer,
-      .tm-klingo-root .tab-pane .mt-3,
-      .tm-klingo-root .tab-pane .form-group.mb-1 {
-        width: 509px !important;
-        max-width: 509px !important;
-        box-sizing: border-box !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-klingo-root .tab-pane .autocomplete,
-      .tm-klingo-root .tab-pane .autocomplete .input-group,
-      .tm-klingo-root .tab-pane input.az-autocomplete {
-        width: 509px !important;
-        max-width: 509px !important;
-      }
-
-      .tm-klingo-root .tab-pane hr {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-klingo-root .modal-footer {
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-klingo-root .list-group,
-      .tm-klingo-root .list-group-item.list-group-item-success {
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-klingo-root .modal-footer {
-        justify-content: flex-start !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-      }
-
-
-      .tm-klingo-root .modal-body > *,
-      .tm-klingo-root #cadTemp,
-      .tm-klingo-root #tm-top-layout-host,
-      .tm-klingo-root #tm-observation-layout-host,
-      .tm-klingo-root .border-bottom,
-      .tm-klingo-root .nav-tabs,
-      .tm-klingo-root .tab-content,
-      .tm-klingo-root .tab-pane,
-      .tm-klingo-root hr,
-      .tm-klingo-root .modal-footer {
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-klingo-root #cadTemp,
-      .tm-klingo-root #tm-top-layout-host,
-      .tm-klingo-root #tm-observation-layout-host,
-      .tm-klingo-root .border-bottom,
-      .tm-klingo-root .nav-tabs,
-      .tm-klingo-root .tab-content,
-      .tm-klingo-root .tab-pane,
-      .tm-klingo-root hr {
-        width: 568px !important;
-        max-width: 568px !important;
-      }
-
-
-      /* AJUSTE TÍTULOS (Dados Pessoais / Observação) */
-      .tm-klingo-root .border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.text-primary,
-      .tm-klingo-root .border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.mt-1.text-primary {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        box-sizing: border-box !important;
-      }
-
-
-      /* OCULTAR ÍCONE NATIVO DO INPUT DATE NO CAMPO DATA DE NASCIMENTO */
-      .tm-klingo-root [data-slot="nascimento"] input[type="date"]::-webkit-calendar-picker-indicator {
-        opacity: 0 !important;
-        display: none !important;
-        -webkit-appearance: none !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] input[type="date"]::-webkit-inner-spin-button,
-      .tm-klingo-root [data-slot="nascimento"] input[type="date"]::-webkit-clear-button {
-        display: none !important;
-        -webkit-appearance: none !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] input[type="date"] {
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        background-image: none !important;
-        padding-right: 8px !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .input-group-append,
-      .tm-klingo-root [data-slot="nascimento"] .input-group-text,
-      .tm-klingo-root [data-slot="nascimento"] .btn,
-      .tm-klingo-root [data-slot="nascimento"] button {
-        display: none !important;
-      }
-
-
-      /* DATA DE NASCIMENTO: badge de idade inline */
-      .tm-klingo-root [data-slot="nascimento"] .input-group {
-        position: relative !important;
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] input[type="date"],
-      .tm-klingo-root [data-slot="nascimento"] input.form-control {
-        padding-right: 46px !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline {
-        position: absolute !important;
-        top: 1px !important;
-        bottom: 1px !important;
-        right: 1px !important;
-        width: 44px !important;
-        transform: none !important;
-        z-index: 3 !important;
-        display: flex !important;
-        align-items: stretch !important;
-        margin: 0 !important;
-        pointer-events: none !important;
-        overflow: hidden !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline .input-group-text {
-        width: 100% !important;
-        min-width: 0 !important;
-        height: 100% !important;
-        max-height: none !important;
-        padding: 0 !important;
-        border-radius: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #666 !important;
-        line-height: 1 !important;
-        border-top: 0 !important;
-        border-right: 0 !important;
-        border-bottom: 0 !important;
-        border-left: 1px solid #cfd4da !important;
-        box-shadow: none !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-        text-align: center !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .tm-age-hidden {
-        display: none !important;
-      }
-
-
-      /* =========================
-         PACIENTE 9.1 - MÓDULO LIMPO
-         Base 8.3 + host próprio, sem fases antigas
-      ========================= */
-      .tm-paciente-v91-root {
-        width: 580px !important;
-        max-width: 580px !important;
-        min-width: 580px !important;
-        overflow: hidden !important;
-      }
-
-      .tm-paciente-v91-root .modal-body {
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        overflow-x: hidden !important;
-        overflow-y: auto !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-header,
-      .tm-paciente-v91-root .tm-paciente-v91-title,
-      .tm-paciente-v91-root .tm-paciente-v91-host,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host,
-      .tm-paciente-v91-root .modal-footer {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .list-group,
-      .tm-paciente-v91-root .list-group-item.list-group-item-success {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-paciente-v91-root .list-group-item.list-group-item-success {
-        background: #d5edff !important;
-        color: #003358 !important;
-        border-color: #b7d9ee !important;
-        padding: 12px 14px !important;
-      }
-
-      .tm-paciente-v91-root .list-group-item.list-group-item-success,
-      .tm-paciente-v91-root .list-group-item.list-group-item-success * {
-        color: #003358 !important;
-      }
-
-      .tm-paciente-v91-row {
-        display: grid !important;
-        gap: 10px 12px !important;
-        margin-bottom: 10px !important;
-        align-items: end !important;
-      }
-
-      .tm-paciente-v91-row-name-birth {
-        grid-template-columns: 342px 155px !important;
-      }
-
-      .tm-paciente-v91-row-basic {
-        grid-template-columns: 155px 155px 187px !important;
-      }
-
-      .tm-paciente-v91-row-basic-has-cpf {
-        grid-template-columns: 155px 155px 187px !important;
-      }
-
-      .tm-paciente-v91-row-contact {
-        grid-template-columns: 155px 155px 187px !important;
-      }
-
-      .tm-paciente-v91-row-email {
-        display: none !important;
-      }
-
-      .tm-paciente-v91-row-card {
-        grid-template-columns: 342px 155px !important;
-      }
-
-      .tm-paciente-v91-slot,
-      .tm-paciente-v91-slot > .col,
-      .tm-paciente-v91-slot > [class*="col-"] {
-        width: 100% !important;
-        max-width: none !important;
-        min-width: 0 !important;
-        flex: unset !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-slot .form-group {
-        margin-bottom: 0 !important;
-      }
-
-      .tm-paciente-v91-slot .input-group,
-      .tm-paciente-v91-slot .form-control,
-      .tm-paciente-v91-slot input,
-      .tm-paciente-v91-slot select {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-hidden {
-        display: none !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
-        position: relative !important;
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"]::-webkit-calendar-picker-indicator {
-        opacity: 0 !important;
-        display: none !important;
-        -webkit-appearance: none !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"] {
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        background-image: none !important;
-        padding-right: 46px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline {
-        position: absolute !important;
-        top: 1px !important;
-        bottom: 1px !important;
-        right: 1px !important;
-        width: 44px !important;
-        transform: none !important;
-        z-index: 3 !important;
-        display: flex !important;
-        align-items: stretch !important;
-        margin: 0 !important;
-        pointer-events: none !important;
-        overflow: hidden !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
-        width: 100% !important;
-        height: 100% !important;
-        min-width: 0 !important;
-        padding: 0 !important;
-        border-radius: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #666 !important;
-        line-height: 1 !important;
-        border-top: 0 !important;
-        border-right: 0 !important;
-        border-bottom: 0 !important;
-        border-left: 1px solid #cfd4da !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-        text-align: center !important;
-      }
-
-      .tm-paciente-v91-observation-host {
-        margin-top: 10px !important;
-      }
-
-      .tm-paciente-v91-observation-title,
-      .tm-paciente-v91-observation-input {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-paciente-v91-observation-input textarea,
-      .tm-paciente-v91-observation-input .form-control,
-      .tm-paciente-v91-observation-textarea {
-        width: 509px !important;
-        max-width: 509px !important;
-        height: 84px !important;
-        min-height: 84px !important;
-        resize: none !important;
-        overflow-y: auto !important;
-        padding: 8px 10px !important;
-        line-height: 1.35 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-observation-select {
-        width: 240px !important;
-        max-width: 240px !important;
-        margin-top: 10px !important;
-      }
-
-      .tm-paciente-v91-observation-select .input-group,
-      .tm-paciente-v91-observation-select .form-control,
-      .tm-paciente-v91-observation-select select {
-        width: 240px !important;
-        max-width: 240px !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.2 - ORDEM E TAMANHO DOS INPUTS
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-host,
-      .tm-paciente-v91-root .tm-paciente-v91-title,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host,
-      .tm-paciente-v91-root .modal-footer {
-        width: 509px !important;
-        max-width: 509px !important;
-      }
-
-      .tm-paciente-v91-row-name-birth {
-        grid-template-columns: 342px 155px !important;
-      }
-
-      .tm-paciente-v91-row-basic {
-        grid-template-columns: 155px 155px 187px !important;
-      }
-
-      .tm-paciente-v91-row-contact {
-        grid-template-columns: 155px 155px 187px !important;
-      }
-
-      .tm-paciente-v91-row-card {
-        grid-template-columns: 342px 155px !important;
-      }
-
-      .tm-paciente-v91-row-email {
-        display: none !important;
-      }
-
-      .tm-paciente-v91-slot,
-      .tm-paciente-v91-slot > .col,
-      .tm-paciente-v91-slot > [class*="col-"] {
-        min-width: 0 !important;
-        max-width: none !important;
-      }
-
-      .tm-paciente-v91-slot .form-control,
-      .tm-paciente-v91-slot input,
-      .tm-paciente-v91-slot select {
-        height: 34px !important;
-        font-size: 14px !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.3 - HEADER IGUAL PRIMEIRA VEZ
-      ========================= */
-      .tm-paciente-v91-root .list-group,
-      .tm-paciente-v91-root .list-group-item.list-group-item-success {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-paciente-v91-root .list-group-item.list-group-item-success {
-        background: #d5edff !important;
-        border-color: #b7d9ee !important;
-        color: #003358 !important;
-        padding: 12px 14px !important;
-        min-height: 132px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .list-group-item.list-group-item-success,
-      .tm-paciente-v91-root .list-group-item.list-group-item-success * {
-        color: #003358 !important;
-      }
-
-      .tm-paciente-v91-header-title {
-        display: block !important;
-        margin-bottom: 8px !important;
-        font-size: 16px !important;
-        line-height: 1.25 !important;
-        font-weight: 400 !important;
-        white-space: normal !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
-      }
-
-      .tm-paciente-v91-header-line {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        align-items: center !important;
-        gap: 6px 12px !important;
-        margin-bottom: 6px !important;
-        line-height: 1.25 !important;
-        font-size: 12px !important;
-      }
-
-      .tm-paciente-v91-header-line,
-      .tm-paciente-v91-header-line * {
-        font-size: 12px !important;
-        line-height: 1.25 !important;
-      }
-
-      .tm-paciente-v91-header-line .lead,
-      .tm-paciente-v91-header-line small,
-      .tm-paciente-v91-header-line span {
-        font-size: 12px !important;
-      }
-
-      .tm-paciente-v91-header-note {
-        display: block !important;
-        margin-top: 8px !important;
-        font-size: 12px !important;
-        line-height: 1.3 !important;
-        text-align: center !important;
-        color: #6c757d !important;
-        white-space: normal !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-      }
-
-      .tm-paciente-v91-header-line small.text-muted,
-      .tm-paciente-v91-header-line small .text-muted,
-      .tm-paciente-v91-header-line .text-muted {
-        display: none !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.4 - AJUSTES EMAIL / NASCIMENTO / OBSERVAÇÃO
-      ========================= */
-      .tm-paciente-v91-row-basic.tm-paciente-v91-row-basic-no-cpf {
-        grid-template-columns: 155px 342px !important;
-      }
-
-      .tm-paciente-v91-row-basic.tm-paciente-v91-row-basic-no-cpf [data-v91-slot="email"] {
-        grid-column: auto !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-email,
-      .tm-paciente-v91-root .tm-paciente-v91-email .form-group,
-      .tm-paciente-v91-root .tm-paciente-v91-email .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-email input,
-      .tm-paciente-v91-root .tm-paciente-v91-email .form-control {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
-        position: relative !important;
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-        width: 100% !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"],
-      .tm-paciente-v91-root .tm-paciente-v91-birth input {
-        padding-right: 46px !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline {
-        position: absolute !important;
-        top: 1px !important;
-        bottom: 1px !important;
-        right: 1px !important;
-        width: 44px !important;
-        z-index: 4 !important;
-        margin: 0 !important;
-        pointer-events: none !important;
-        overflow: hidden !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline.tm-birth-age-waiting {
-        visibility: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
-        width: 100% !important;
-        height: 100% !important;
-        min-width: 0 !important;
-        padding: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-title,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input {
-        width: 509px !important;
-        max-width: 509px !important;
-        min-width: 509px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input > .col,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input > [class*="col-"],
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
-        width: 509px !important;
-        max-width: 509px !important;
-        min-width: 509px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
-        height: 84px !important;
-        min-height: 84px !important;
-        resize: none !important;
-        overflow-y: auto !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.5 - GRID UNIFICADO / ALINHAMENTO DEFINITIVO
-      ========================= */
-      .tm-paciente-v91-root {
-        --tm-paciente-width: 509px;
-        --tm-paciente-gap: 10px;
-      }
-
-      .tm-paciente-v91-root .modal-body {
-        overflow-x: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-title,
-      .tm-paciente-v91-root .tm-paciente-v91-host,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host,
-      .tm-paciente-v91-root .modal-footer {
-        width: var(--tm-paciente-width) !important;
-        max-width: var(--tm-paciente-width) !important;
-        min-width: var(--tm-paciente-width) !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-host,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host {
-        overflow: visible !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-host *,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host * {
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row {
-        width: var(--tm-paciente-width) !important;
-        max-width: var(--tm-paciente-width) !important;
-        min-width: var(--tm-paciente-width) !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        display: grid !important;
-        gap: 10px !important;
-        align-items: end !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row-name-birth {
-        grid-template-columns: 344px 155px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row-basic,
-      .tm-paciente-v91-root .tm-paciente-v91-row-basic-has-cpf {
-        grid-template-columns: 155px 155px 179px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row-basic-no-cpf {
-        grid-template-columns: 155px 344px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row-contact {
-        grid-template-columns: 155px 155px 179px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row-card {
-        grid-template-columns: 344px 155px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-slot,
-      .tm-paciente-v91-root .tm-paciente-v91-slot > .col,
-      .tm-paciente-v91-root .tm-paciente-v91-slot > [class*="col-"],
-      .tm-paciente-v91-root .tm-paciente-v91-field {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        flex: unset !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-slot .form-group,
-      .tm-paciente-v91-root .tm-paciente-v91-slot .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-slot .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-slot input,
-      .tm-paciente-v91-root .tm-paciente-v91-slot select {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-origin,
-      .tm-paciente-v91-root .tm-paciente-v91-origin .form-group,
-      .tm-paciente-v91-root .tm-paciente-v91-origin select,
-      .tm-paciente-v91-root .tm-paciente-v91-origin .form-control {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-title,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input > .col,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input > [class*="col-"],
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
-        width: var(--tm-paciente-width) !important;
-        max-width: var(--tm-paciente-width) !important;
-        min-width: var(--tm-paciente-width) !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
-        height: 84px !important;
-        min-height: 84px !important;
-        resize: none !important;
-        overflow-y: auto !important;
-        padding: 8px 10px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select {
-        width: 240px !important;
-        max-width: 240px !important;
-        min-width: 240px !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        margin-top: 10px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select > .col,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select > [class*="col-"],
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select select,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-control {
-        width: 240px !important;
-        max-width: 240px !important;
-        min-width: 0 !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-      }
-
-      .tm-paciente-v91-root #myTab,
-      .tm-paciente-v91-root #myTabContent,
-      .tm-paciente-v91-root .tab-content,
-      .tm-paciente-v91-root .tab-pane,
-      .tm-paciente-v91-root .tab-pane > .mt-3,
-      .tm-paciente-v91-root .input-group {
-        max-width: var(--tm-paciente-width) !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root #myTab,
-      .tm-paciente-v91-root #myTabContent,
-      .tm-paciente-v91-root .tab-content,
-      .tm-paciente-v91-root .tab-pane {
-        width: var(--tm-paciente-width) !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-paciente-v91-root .input-group:has([placeholder*="Adicionar procedimento"]),
-      .tm-paciente-v91-root .input-group:has([placeholder*="Incluir material"]) {
-        width: 240px !important;
-        max-width: 240px !important;
-        margin-left: 0 !important;
-        margin-right: auto !important;
-      }
-
-      .tm-paciente-v91-root .modal-footer {
-        justify-content: flex-start !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.6 - ? AO LADO DO SELECT
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select {
-        width: 240px !important;
-        max-width: 240px !important;
-        min-width: 240px !important;
-        margin-left: 0 !important;
-        margin-right: auto !important;
-        margin-top: 10px !important;
-        padding-left: 0 !important;
-        display: block !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select > .col,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select > [class*="col-"] {
-        width: 240px !important;
-        max-width: 240px !important;
-        min-width: 240px !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        flex: unset !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group {
-        width: 240px !important;
-        max-width: 240px !important;
-        min-width: 240px !important;
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-        justify-content: flex-start !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-prepend {
-        display: flex !important;
-        align-items: stretch !important;
-        flex: 0 0 auto !important;
-        margin-left: 0 !important;
-        margin-right: -1px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-prepend .input-group-text,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-text {
-        height: 34px !important;
-        min-height: 34px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select select,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-control {
-        flex: 1 1 auto !important;
-        width: 1% !important;
-        min-width: 0 !important;
-        max-width: none !important;
-        height: 34px !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.7 - COMPACTAÇÃO PROPORCIONAL
-      ========================= */
-      .tm-paciente-v91-root .list-group-item.list-group-item-success {
-        min-height: 132px !important;
-        padding: 10px 14px !important;
-        margin-bottom: 12px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-title {
-        margin-bottom: 6px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-host {
-        row-gap: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row {
-        gap: 7px 10px !important;
-        margin-bottom: 7px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-slot .form-group {
-        margin-bottom: 0 !important;
-      }
-
-      .tm-paciente-v91-root small.form-text,
-      .tm-paciente-v91-root small {
-        line-height: 1.15 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-slot .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-slot input,
-      .tm-paciente-v91-root .tm-paciente-v91-slot select,
-      .tm-paciente-v91-root .tm-paciente-v91-slot .input-group-text {
-        height: 31px !important;
-        min-height: 31px !important;
-        padding-top: 4px !important;
-        padding-bottom: 4px !important;
-        font-size: 14px !important;
-        line-height: 1.2 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
-        height: 100% !important;
-        min-height: 0 !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host {
-        margin-top: 6px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-title {
-        margin-bottom: 3px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
-        height: 74px !important;
-        min-height: 74px !important;
-        padding: 6px 9px !important;
-        font-size: 14px !important;
-        line-height: 1.25 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select {
-        margin-top: 7px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select select,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-text {
-        height: 31px !important;
-        min-height: 31px !important;
-        font-size: 14px !important;
-        line-height: 1.2 !important;
-      }
-
-      .tm-paciente-v91-root #myTab {
-        margin-top: 8px !important;
-      }
-
-      .tm-paciente-v91-root .modal-footer {
-        padding-top: 10px !important;
-        padding-bottom: 10px !important;
-      }
-
-      .tm-paciente-v91-root .modal-footer .btn {
-        padding-top: 6px !important;
-        padding-bottom: 6px !important;
-        font-size: 16px !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.8 - HEADER DINÂMICO SEM ESPAÇO VAZIO
-      ========================= */
-      .tm-paciente-v91-root .list-group-item.list-group-item-success {
-        min-height: 0 !important;
-        height: auto !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-header-note:empty,
-      .tm-paciente-v91-root .tm-paciente-v91-header-note.tm-paciente-v91-note-empty {
-        display: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        height: 0 !important;
-        min-height: 0 !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.9 - PREPEND ? MESMA ALTURA DO SELECT
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group {
-        height: 31px !important;
-        min-height: 31px !important;
-        max-height: 31px !important;
-        align-items: stretch !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-prepend,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-append {
-        height: 31px !important;
-        min-height: 31px !important;
-        max-height: 31px !important;
-        display: flex !important;
-        align-items: stretch !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-text {
-        height: 31px !important;
-        min-height: 31px !important;
-        max-height: 31px !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        line-height: 1 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select select,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-control {
-        height: 31px !important;
-        min-height: 31px !important;
-        max-height: 31px !important;
-        padding-top: 4px !important;
-        padding-bottom: 4px !important;
-        line-height: 1.2 !important;
-        box-sizing: border-box !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 10.0 - OBSERVAÇÃO 3 LINHAS
-      ========================= */
-      .tm-paciente-v91-root textarea,
-      .tm-paciente-v91-root .tm-paciente-v91-observation textarea {
-        height: 72px !important;
-        min-height: 72px !important;
-        max-height: 72px !important;
-        resize: none !important;
-        line-height: 1.4 !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 10.1 - DATA DE NASCIMENTO IGUAL PRIMEIRA VEZ
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
-        position: relative !important;
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-        width: 100% !important;
-        overflow: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"],
-      .tm-paciente-v91-root .tm-paciente-v91-birth input {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        padding-right: 48px !important;
-        box-sizing: border-box !important;
-        background: #fff !important;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"]::-webkit-calendar-picker-indicator {
-        opacity: 0 !important;
-        display: none !important;
-        -webkit-appearance: none !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline {
-        position: absolute !important;
-        top: 1px !important;
-        right: 1px !important;
-        bottom: 1px !important;
-        width: 46px !important;
-        height: auto !important;
-        max-height: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        z-index: 5 !important;
-        display: flex !important;
-        align-items: stretch !important;
-        pointer-events: none !important;
-        overflow: hidden !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-        background: #d9d9d9 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
-        width: 100% !important;
-        height: 100% !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        border-radius: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #666 !important;
-        line-height: 1 !important;
-        border-top: 0 !important;
-        border-right: 0 !important;
-        border-bottom: 0 !important;
-        border-left: 1px solid #cfd4da !important;
-        box-shadow: none !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-        text-align: center !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 11.6 - CORREÇÃO SEGURA DATA NASCIMENTO
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
-        position: relative !important;
-        overflow: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input {
-        padding-right: 48px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline {
-        position: absolute !important;
-        top: 1px !important;
-        right: 1px !important;
-        bottom: 1px !important;
-        width: 46px !important;
-        height: auto !important;
-        z-index: 5 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        display: flex !important;
-        align-items: stretch !important;
-        pointer-events: none !important;
-        overflow: hidden !important;
-        background: #d9d9d9 !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
-        width: 100% !important;
-        height: 100% !important;
-        padding: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #666 !important;
-        border-left: 1px solid #cfd4da !important;
-        border-top: 0 !important;
-        border-right: 0 !important;
-        border-bottom: 0 !important;
-        box-sizing: border-box !important;
-      }
-
-
-      
-      /* FIX DEFINITIVO DATA NASCIMENTO */
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline) {
-        display: none !important;
-      }
-
-
-      /* =========================
-         PACIENTE 11.6 - BADGE IDADE FINAL
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline-final) {
-        display: none !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline-final {
-        position: absolute !important;
-        top: 1px !important;
-        right: 1px !important;
-        bottom: 1px !important;
-        width: 46px !important;
-        height: auto !important;
-        z-index: 10 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        align-items: stretch !important;
-        pointer-events: none !important;
-        overflow: hidden !important;
-        background: #d9d9d9 !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline-final .input-group-text {
-        width: 100% !important;
-        height: 100% !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        border-radius: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #666 !important;
-        line-height: 1 !important;
-        border-top: 0 !important;
-        border-right: 0 !important;
-        border-bottom: 0 !important;
-        border-left: 1px solid #cfd4da !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-        text-align: center !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 11.6 - PROCEDIMENTO 509 / OCULTAR MATERIAL
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-procedimento-add,
-      .tm-paciente-v91-root .tm-paciente-procedimento-add .input-group,
-      .tm-paciente-v91-root .tm-paciente-procedimento-add input,
-      .tm-paciente-v91-root .tm-paciente-procedimento-add .form-control {
-        width: 509px !important;
-        max-width: 509px !important;
-        min-width: 509px !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-material-hidden {
-        display: none !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 11.6 - AJUSTE DEFINITIVO PROCEDIMENTO / MATERIAL
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-proc-row-final,
-      .tm-paciente-v91-root .tm-paciente-proc-row-final .input-group,
-      .tm-paciente-v91-root .tm-paciente-proc-row-final input,
-      .tm-paciente-v91-root .tm-paciente-proc-row-final .form-control {
-        width: 509px !important;
-        max-width: 509px !important;
-        min-width: 509px !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-material-row-final {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        max-height: 0 !important;
-        overflow: hidden !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-
-      .tm-paciente-v91-root .input-group:has(input[placeholder*="Adicionar procedimento"]),
-      .tm-paciente-v91-root .input-group:has(input[placeholder*="Adicionar Procedimento"]) {
-        width: 509px !important;
-        max-width: 509px !important;
-        min-width: 509px !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-      }
-
-      .tm-paciente-v91-root .input-group:has(input[placeholder*="Incluir material"]),
-      .tm-paciente-v91-root .input-group:has(input[placeholder*="medicamento"]),
-      .tm-paciente-v91-root .input-group:has(input[placeholder*="taxa"]) {
-        display: none !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 11.6 - BADGE IDADE DATA NASCIMENTO
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-birth {
-        position: relative !important;
-        overflow: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input {
-        padding-right: 48px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-age-badge-110 {
-        position: absolute !important;
-        top: 1px !important;
-        right: 1px !important;
-        bottom: 1px !important;
-        width: 46px !important;
-        height: auto !important;
-        z-index: 9999 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #555 !important;
-        border-left: 1px solid #cfd4da !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-        font-size: 14px !important;
-        line-height: 1 !important;
-        pointer-events: none !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 11.6 - BADGE IDADE PRESA AO CAMPO
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-birth-holder-115 {
-        position: relative !important;
-        overflow: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-birth-holder-115 input {
-        padding-right: 48px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-age-badge-115 {
-        position: absolute !important;
-        top: 1px !important;
-        right: 1px !important;
-        bottom: 1px !important;
-        width: 46px !important;
-        height: auto !important;
-        z-index: 20 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #555 !important;
-        border-left: 1px solid #cfd4da !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-        font-size: 14px !important;
-        line-height: 1 !important;
-        pointer-events: none !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-      }
-
-      .tm-age-floating,
-      .tm-paciente-birth-age-floating {
-        display: none !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 11.6 - BADGE IDADE FIXA NO CAMPO
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-birth-age-holder-116 {
-        position: relative !important;
-        overflow: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-birth-age-holder-116 input {
-        padding-right: 48px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-age-badge-116 {
-        position: absolute !important;
-        top: 1px !important;
-        right: 1px !important;
-        bottom: 1px !important;
-        width: 46px !important;
-        height: auto !important;
-        z-index: 2147483647 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #555 !important;
-        border-left: 1px solid #cfd4da !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-        font-size: 14px !important;
-        line-height: 1 !important;
-        pointer-events: none !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-      }
-
-
-@media (max-width: 1200px) {
-        .tm-top-layout,
-        .tm-observation-layout {
-          grid-template-columns: 1fr;
-        }
-
-        .tm-row-name-birth,
-        .tm-row-cpf-sexo-origem,
-        .tm-row-cel-email,
-        .tm-row-carteira-validade {
-          grid-template-columns: 1fr;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  function hideElement(el) {
-    if (!el) return;
-    el.dataset.tmHiddenByScript = '1';
-    el.classList.add('tm-hidden-by-script');
-    el.style.setProperty('display', 'none', 'important');
-  }
-
-  function hideOriginalRow(el) {
-    if (!el) return;
-    el.classList.add('tm-hidden-original-row');
-    el.style.setProperty('display', 'none', 'important');
-  }
-
-  function getSchedulingModalRoot() {
-    if (!isCallCenterRoute()) return null;
-    const modalContents = document.querySelectorAll('.modal-content');
-
-    for (const modal of modalContents) {
-      const text = norm(modal.innerText || modal.textContent || '');
-      if (!text) continue;
-
-      const modalTitle = norm(modal.querySelector('.modal-title')?.textContent || '');
-      const successTexts = Array.from(modal.querySelectorAll('.btn-success'))
-        .map(btn => norm(btn.textContent || ''));
-
-      const hasCadTemp = !!modal.querySelector('#cadTemp');
-      const hasDadosPessoais = text.includes('Dados Pessoais');
-      const hasOrigemPacientes = text.includes('ORIGEM DE PACIENTES') || text.includes('Origem de Pacientes');
-      const hasConfirmar = successTexts.some(txt => txt.includes('Confirmar'));
-      const hasAtualizar = successTexts.some(txt => txt.includes('Atualizar'));
-      const hasNomeDoPaciente = text.includes('Nome do Paciente');
-
-      if (modalTitle.includes('Editar Marcação')) continue;
-      if (hasAtualizar && !hasConfirmar) continue;
-
-      // FASE 1: Primeira Vez é o ÚNICO fluxo que pode receber a customização pesada.
-      // Regra confirmada no DOM: Primeira Vez tem #cadTemp; Paciente não tem.
-      if (hasCadTemp && !hasNomeDoPaciente && hasDadosPessoais && hasOrigemPacientes && hasConfirmar) {
-        modal.classList.add('tm-klingo-root');
-        return modal;
-      }
+      delete favorites[protocol];
     }
 
-    return null;
+    saveFavoriteTickets(favorites);
   }
 
-  function isPacienteSchedulingModalRoot(root) {
-    if (!root || !isCallCenterRoute()) return false;
-
-    const body = root.querySelector(':scope > .modal-body');
-    const personal = body ? body.querySelector(':scope > .mt-3') : null;
-    if (!body || !personal) return false;
-
-    const text = norm(personal.innerText || personal.textContent || '');
-
-    return (
-      !root.querySelector('#cadTemp') &&
-      text.includes('Nome do Paciente') &&
-      text.includes('Nome Social') &&
-      text.includes('Telefone') &&
-      text.includes('Celular') &&
-      text.includes('Data de Nascimento')
-    );
+  function createFavoriteStarButton() {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute(FAVORITE_STAR_ATTR, 'true');
+    button.setAttribute('aria-label', 'Favoritar ticket');
+    button.setAttribute('title', 'Favoritar ticket');
+    button.textContent = '☆';
+    return button;
   }
 
-  function getActivePacienteSchedulingModalRoot() {
-    if (!isCallCenterRoute()) return null;
+  function updateFavoriteCardState(card, protocol) {
+    if (!card || !protocol) return;
 
-    const modal =
-      document.querySelector('#cadastroModal.modal.show') ||
-      document.querySelector('#cadastroModal.show');
+    const isActive = isFavoriteTicket(protocol);
+    card.setAttribute(FAVORITE_ATTR, protocol);
+    card.setAttribute(FAVORITE_ACTIVE_ATTR, isActive ? 'true' : 'false');
 
-    if (!modal) return null;
+    const star = card.querySelector(`[${FAVORITE_STAR_ATTR}="true"]`);
+    if (!star) return;
 
-    const root =
-      modal.querySelector(':scope > .modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content') ||
-      modal.querySelector('.modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content');
-
-    return isPacienteSchedulingModalRoot(root) ? root : null;
+    star.textContent = isActive ? '★' : '☆';
+    star.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    star.setAttribute('title', isActive ? 'Remover favorito' : 'Favoritar ticket');
+    star.setAttribute('aria-label', isActive ? 'Remover favorito' : 'Favoritar ticket');
   }
 
-  function clearFirstVisitResidueFromPacienteModal() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
+  function ensureFavoriteStar(card) {
+    const protocol = getTicketProtocol(card);
+    if (!protocol) return;
 
-    root.classList.remove(
-      'tm-klingo-root',
-      'tm-first-visit-modal',
-      'tm-registered-patient-modal'
-    );
+    let star = card.querySelector(`[${FAVORITE_STAR_ATTR}="true"]`);
+    if (!star) {
+      star = createFavoriteStarButton();
+      card.appendChild(star);
 
-    root.querySelectorAll('.tm-procedure-title, .tm-header-line, .tm-header-line-2, .tm-header-line-3').forEach((el) => {
-      el.classList.remove(
-        'tm-procedure-title',
-        'tm-header-line',
-        'tm-header-line-2',
-        'tm-header-line-3'
-      );
-    });
+      star.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
 
-    root.querySelectorAll('#tm-top-layout-host, #tm-observation-layout-host, .tm-layout-host, .tm-top-layout, .tm-left-panel').forEach((el) => {
-      el.remove();
-    });
+        const currentProtocol = card.getAttribute(FAVORITE_ATTR) || getTicketProtocol(card);
+        if (!currentProtocol) return;
 
-    root.querySelectorAll('.tm-hidden-original-row').forEach((el) => {
-      el.classList.remove('tm-hidden-original-row');
-      el.style.removeProperty('display');
-    });
-
-    root.querySelectorAll('.tm-hidden-by-script').forEach((el) => {
-      el.classList.remove('tm-hidden-by-script');
-      el.removeAttribute('data-tm-hidden-by-script');
-      el.style.removeProperty('display');
-    });
-
-    root.querySelectorAll('.tm-observation-textarea').forEach((el) => {
-      el.remove();
-    });
-
-    root.querySelectorAll('[data-slot]').forEach((el) => {
-      el.removeAttribute('data-slot');
-    });
-
-    const dialog = root.closest('.modal-dialog');
-    [dialog, root, root.querySelector(':scope > .modal-body')].forEach((el) => {
-      if (!el) return;
-      [
-        'width',
-        'max-width',
-        'min-width',
-        'margin-left',
-        'margin-right',
-        'box-sizing',
-        'padding-left',
-        'padding-right',
-        'display',
-        'flex-direction',
-        'align-items',
-        'flex',
-        'overflow',
-        'overflow-x',
-        'overflow-y',
-        'justify-content'
-      ].forEach((prop) => el.style.removeProperty(prop));
-    });
-  }
-
-  function findTextSmall(root, labelText) {
-    const smalls = root.querySelectorAll('small');
-    for (const small of smalls) {
-      if (norm(small.textContent) === labelText) return small;
-    }
-    return null;
-  }
-
-  function findColByLabel(root, labelText) {
-    const label = findTextSmall(root, labelText);
-    if (!label) return null;
-
-    return (
-      label.closest('.col') ||
-      label.closest('[class*="col-"]') ||
-      label.closest('.form-group') ||
-      label.parentElement
-    );
-  }
-
-  function getCadTemp(root) {
-    return root.querySelector('#cadTemp');
-  }
-
-  function getCadTempTitleRow(root) {
-    const cadTemp = getCadTemp(root);
-    if (!cadTemp) return null;
-
-    const title = findTextSmall(cadTemp, 'Dados Pessoais');
-    return title ? title.closest('.border-bottom') : null;
-  }
-
-  function getObservationTitleRow(root) {
-    const title = findTextSmall(root, 'Observação');
-    return title ? title.closest('.border-bottom') : null;
-  }
-
-  function getObservationFieldsRow(root) {
-    const titleRow = getObservationTitleRow(root);
-    if (!titleRow) return null;
-
-    let current = titleRow.nextElementSibling;
-    while (current) {
-      if (current.classList && current.classList.contains('form-row')) return current;
-      current = current.nextElementSibling;
-    }
-    return null;
-  }
-
-  function getOriginTitleRow(root) {
-    const title = findTextSmall(root, 'ORIGEM DE PACIENTES');
-    return title ? title.closest('.border-bottom') : null;
-  }
-
-  function findOriginFieldBlock(root) {
-    return findColByLabel(root, 'Origem de Pacientes');
-  }
-
-  function findMaterialBlock(root) {
-    const input = root.querySelector('input[placeholder="Incluir material, medicamento ou taxa..."]');
-    if (!input) return null;
-
-    return (
-      input.closest('.form-group.mb-3.mb-1') ||
-      input.closest('.form-group') ||
-      input.closest('.autocomplete') ||
-      input.closest('.input-group') ||
-      input.parentElement
-    );
-  }
-
-  function ensureHost(parent, id, className) {
-    let host = parent.querySelector('#' + id);
-    if (!host) {
-      host = document.createElement('div');
-      host.id = id;
-      host.className = className;
-      parent.appendChild(host);
-    }
-    return host;
-  }
-
-  function moveToSlot(slot, block) {
-    if (!slot || !block) return;
-    slot.innerHTML = '';
-    slot.appendChild(block);
-  }
-
-  function ensureObservationTextarea(block) {
-    if (!block) return;
-
-    const input = block.querySelector('input.form-control[type="text"]');
-    if (!input) return;
-
-    let textarea = block.querySelector('textarea.tm-observation-textarea');
-    if (!textarea) {
-      textarea = document.createElement('textarea');
-      textarea.className = `${input.className} tm-observation-textarea`;
-      textarea.placeholder = input.placeholder || '';
-      textarea.autocomplete = input.autocomplete || 'off';
-      textarea.value = input.value || '';
-      textarea.rows = 4;
-      input.insertAdjacentElement('afterend', textarea);
-      input.classList.add('tm-hidden-by-script');
-      input.style.setProperty('display', 'none', 'important');
-
-      const syncToInput = () => {
-        setNativeInputValue(input, textarea.value);
-        dispatchEvents(input, ['input', 'change']);
-      };
-
-      textarea.addEventListener('input', syncToInput, true);
-      textarea.addEventListener('change', syncToInput, true);
-      textarea.addEventListener('blur', () => {
-        syncToInput();
-        dispatchEvents(input, ['blur']);
+        const nextState = !isFavoriteTicket(currentProtocol);
+        setFavoriteTicket(currentProtocol, nextState);
+        updateFavoriteCardState(card, currentProtocol);
       }, true);
     }
 
-    if (textarea.value !== (input.value || '')) {
-      textarea.value = input.value || '';
+    updateFavoriteCardState(card, protocol);
+  }
+
+  function applyFavoriteStarsToTicketsSafe() {
+    try {
+      const cards = getAllTicketListCards();
+      if (!cards.length) return;
+
+      for (const card of cards) {
+        ensureFavoriteStar(card);
+      }
+    } catch (error) {
+      console.error(`[${SCRIPT_NAME}] falha na camada de favoritos`, error);
     }
   }
 
-  function hideCellCountryButton(celularBlock) {
-    if (!celularBlock) return;
-    const inputGroup = celularBlock.querySelector('.input-group');
-    if (!inputGroup) return;
-    inputGroup.classList.add('tm-cell-input-group');
+  function scheduleFavoriteLayer(delay = 350) {
+    clearTimeout(favoriteApplyTimer);
+    favoriteApplyTimer = window.setTimeout(applyFavoriteStarsToTicketsSafe, delay);
+  }
 
-    const prepend = inputGroup.querySelector('.input-group-prepend');
-    if (prepend) {
-      prepend.classList.add('tm-hidden-by-script');
-      prepend.style.setProperty('display', 'none', 'important');
+  let favoriteClickListenerStarted = false;
+
+  function startFavoriteLayer() {
+    scheduleFavoriteLayer(700);
+
+    if (favoriteIntervalId) {
+      clearInterval(favoriteIntervalId);
+    }
+
+    favoriteIntervalId = window.setInterval(() => {
+      applyFavoriteStarsToTicketsSafe();
+    }, 1500);
+
+    if (!favoriteClickListenerStarted) {
+      favoriteClickListenerStarted = true;
+
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+
+        const trigger = target.closest('button, a, [role="tab"], div.p-2.border.rounded.cursor-pointer');
+        if (!trigger) return;
+
+        scheduleFavoriteLayer(450);
+      }, true);
     }
   }
 
+  /* ========================================================================
+   * SEÇÃO: OCULTAR CARDS INTEIROS POR TÍTULO (22)
+   * ====================================================================== */
+  function hideCardByExactTitle(titleText) {
+    const titles = document.querySelectorAll('h3');
+    for (const title of titles) {
+      const text = normalizeText(title.textContent);
+      if (text !== titleText) continue;
 
-  function ensureHeaderLine(label, className, beforeNode = null) {
-    let line = label.querySelector(`.${className}`);
-    if (!line) {
-      line = document.createElement('div');
-      line.className = className;
-    } else {
-      line.innerHTML = '';
+      const card = findCardContainerFromTitle(title);
+      if (!card) continue;
+      hideElement(card);
     }
-
-    if (beforeNode) {
-      label.insertBefore(line, beforeNode);
-    } else if (!line.parentElement) {
-      label.appendChild(line);
-    }
-
-    if (!line.parentElement) {
-      label.appendChild(line);
-    }
-
-    return line;
   }
 
-  function reorganizeHeaderStructure(root) {
-    if (!isCallCenterRoute()) return;
+  function hideSelectedCards() {
+    hideCardByExactTitle('Informações do Cliente');
+    hideCardByExactTitle('Resumo do Ticket');
+  }
 
-    const listGroup = root.querySelector('.list-group');
-    if (!listGroup) return;
+  /* ========================================================================
+   * SEÇÃO: DATA NAS MENSAGENS DO CHAT (23)
+   * ====================================================================== */
+  function normalizeMessageTimeText(text) {
+    return normalizeText(text).replace(/\s+/g, ' ');
+  }
 
-    const headerItems = listGroup.querySelectorAll(':scope > .list-group-item.list-group-item-success, :scope > .list-group-item.list-group-item-info, :scope > .list-group-item.list-group-item-warning, :scope > .list-group-item.list-group-item-secondary, :scope > .list-group-item.list-group-item-danger');
-    if (!headerItems.length) return;
+  function getRawMessageTime(timeEl) {
+    const current = normalizeMessageTimeText(timeEl.textContent);
+    const attr = normalizeMessageTimeText(timeEl.getAttribute('data-tm-original-time') || '');
 
-    const paymentSourceItem = listGroup.querySelector(':scope > .list-group-item:not(.list-group-item-success):not(.list-group-item-info)');
-    const paymentSourceSmall = paymentSourceItem ? paymentSourceItem.querySelector('small.lead') : null;
+    const attrMatch = attr.match(/(\d{1,2}:\d{2})$/);
+    if (attrMatch) return attrMatch[1];
 
-    headerItems.forEach((headerItem) => {
-      const label = headerItem.querySelector('label.mb-0.w-100');
-      if (!label) return;
+    const currentMatch = current.match(/(\d{1,2}:\d{2})$/);
+    return currentMatch ? currentMatch[1] : '';
+  }
 
-      const titleDiv = label.querySelector('.h4.mb-1');
-      const metaRow = label.querySelector('.d-flex.justify-content-between');
-      const infosWrap = label.querySelector('blockquote') ? label.querySelector('blockquote').closest('div') : null;
+  function findMessageBubbleFromTime(timeEl) {
+    return timeEl.closest('.max-w-\\[75\\%\\].rounded-2xl') ||
+      timeEl.closest('div.max-w-\\[75\\%\\]') ||
+      timeEl.closest('div.rounded-2xl');
+  }
 
-      if (!titleDiv || !metaRow) return;
+  function getBubbleTextForMatch(bubble, timeEl) {
+    const contentParts = [];
 
-      titleDiv.classList.add('tm-procedure-title');
+    for (const el of bubble.querySelectorAll('p.whitespace-pre-wrap, p.text-xs.font-semibold, span')) {
+      if (el === timeEl) continue;
+      const text = normalizeMessageTimeText(el.textContent);
+      if (!text) continue;
+      if (/^(?:Hoje\s+|Ontem\s+|\d{2}\/\d{2}\/\d{4}\s+)?\d{1,2}:\d{2}$/i.test(text)) continue;
+      if (text === '✓' || text === '✓✓') continue;
+      contentParts.push(text);
+    }
 
-      const leftMeta = metaRow.children[0] || null;
-      const rightMeta = metaRow.children[1] || null;
-      if (!leftMeta || !rightMeta) return;
+    return compactForMatch(contentParts.join(' '));
+  }
 
-      const spans = Array.from(leftMeta.querySelectorAll(':scope > span'));
-      const paymentOwn = spans.find((span) => span.querySelector('.fa-credit-card'));
-      const doctorNode = spans.find((span) => span.querySelector('.fa-user-md')) || null;
-      const unitNode = spans.find((span) => span.querySelector('.fa-building')) || null;
+  function getBubbleDirection(bubble) {
+    const cls = String(bubble.className || '');
+    if (cls.includes('bg-blue-500') || cls.includes('bg-blue-600') || cls.includes('text-white')) {
+      return 'OUTBOUND';
+    }
+    return 'INBOUND';
+  }
 
-      let paymentNode = null;
-      if (paymentOwn) {
-        paymentNode = paymentOwn;
-      } else if (paymentSourceSmall) {
-        const wrapper = document.createElement('span');
-        wrapper.className = 'mr-3';
-        wrapper.appendChild(paymentSourceSmall.cloneNode(true));
-        paymentNode = wrapper;
+  function scoreApiMessageMatch(apiMessage, bubbleText, direction, time) {
+    if (!apiMessage || apiMessage.time !== time) return -1;
+
+    let score = 0;
+
+    if (apiMessage.direction === direction) score += 40;
+
+    if (apiMessage.contentNorm && bubbleText) {
+      if (apiMessage.contentNorm === bubbleText) {
+        score += 80;
+      } else if (apiMessage.contentNorm.includes(bubbleText) || bubbleText.includes(apiMessage.contentNorm)) {
+        score += 55;
+      } else {
+        const bubbleWords = bubbleText.split(' ').filter(word => word.length >= 3);
+        const matchCount = bubbleWords.filter(word => apiMessage.contentNorm.includes(word)).length;
+        if (matchCount > 0) score += Math.min(35, matchCount * 7);
+      }
+    }
+
+    return score;
+  }
+
+  function findApiMessageForBubble(bubble, timeEl) {
+    const time = getRawMessageTime(timeEl);
+    if (!time) return null;
+
+    const bubbleText = getBubbleTextForMatch(bubble, timeEl);
+    const direction = getBubbleDirection(bubble);
+
+    let best = null;
+    let bestScore = -1;
+
+    for (const message of MESSAGE_API_CACHE.values()) {
+      const score = scoreApiMessageMatch(message, bubbleText, direction, time);
+      if (score > bestScore) {
+        best = message;
+        bestScore = score;
+      }
+    }
+
+    return bestScore >= 40 ? best : null;
+  }
+
+  function applyDateToMessages() {
+    const timeNodes = Array.from(document.querySelectorAll('span.text-\\[10px\\].opacity-60')).filter(el => {
+      if (!(el instanceof HTMLElement)) return false;
+
+      const text = normalizeMessageTimeText(el.textContent);
+      return /^(?:Hoje\s+|Ontem\s+|\d{2}\/\d{2}\/\d{4}\s+)?\d{1,2}:\d{2}$/.test(text);
+    });
+
+    for (const timeEl of timeNodes) {
+      const bubble = findMessageBubbleFromTime(timeEl);
+      if (!bubble) continue;
+
+      const rawTime = getRawMessageTime(timeEl);
+      if (!rawTime) continue;
+
+      timeEl.setAttribute('data-tm-original-time', rawTime);
+
+      const apiMessage = findApiMessageForBubble(bubble, timeEl);
+      if (!apiMessage) {
+        if (normalizeMessageTimeText(timeEl.textContent) !== rawTime) {
+          timeEl.textContent = rawTime;
+        }
+        continue;
       }
 
-      const dateNode = rightMeta.querySelector('small:not(.mx-2)') || rightMeta.children[0] || null;
-      const timeNode = rightMeta.querySelector('small.mx-2') || rightMeta.children[1] || null;
-
-      const line2 = ensureHeaderLine(label, 'tm-header-line-2 tm-header-line', infosWrap || null);
-      const line3 = ensureHeaderLine(label, 'tm-header-line-3 tm-header-line', infosWrap || null);
-
-      if (paymentNode) line2.appendChild(paymentNode);
-      if (doctorNode) line2.appendChild(doctorNode);
-
-      if (unitNode) line3.appendChild(unitNode);
-      if (dateNode) line3.appendChild(dateNode);
-      if (timeNode) line3.appendChild(timeNode);
-
-      metaRow.remove();
-
-      if (infosWrap) {
-        infosWrap.classList.add('tm-header-infos');
-        label.appendChild(infosWrap);
+      const formatted = `${apiMessage.dateLabel} ${rawTime}`;
+      if (normalizeMessageTimeText(timeEl.textContent) !== formatted) {
+        timeEl.textContent = formatted;
       }
-    });
-
-    if (paymentSourceItem && headerItems.length > 1) {
-      paymentSourceItem.style.display = 'none';
     }
   }
 
-  function resizeSchedulingModal() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
+  /* ========================================================================
+   * SEÇÃO: ÁREA DO AGENTE (10 + 11 mescladas)
+   * Reorganiza e mantém apenas ações relevantes visíveis.
+   * ====================================================================== */
+  function findAgentAreaContainer() {
+    for (const span of document.querySelectorAll('span')) {
+      if (normalizeText(span.textContent) !== 'Área do Agente') continue;
+      const container = span.closest('.bg-card.border.border-border.rounded-lg');
+      if (container) return container;
+    }
+    return null;
+  }
 
-    const dialog = root.closest('.modal-dialog');
-    if (!dialog) return;
+  function findTopRow(agentContainer) {
+    if (!agentContainer) return null;
 
-    const MODAL_W = '580px';
-    const CONTENT_W = '540px';
+    for (const child of Array.from(agentContainer.children)) {
+      if (!(child instanceof HTMLElement) || child.tagName !== 'DIV') continue;
+      const text = normalizeText(child.textContent);
+      if (
+        text.includes('Área do Agente') &&
+        (text.includes('Offline') || text.includes('Online')) &&
+        text.includes('Enviar HSM')
+      ) {
+        return child;
+      }
+    }
+    return null;
+  }
 
-    dialog.style.setProperty('width', MODAL_W, 'important');
-    dialog.style.setProperty('max-width', MODAL_W, 'important');
-    dialog.style.setProperty('min-width', MODAL_W, 'important');
-    dialog.style.setProperty('margin-left', 'auto', 'important');
-    dialog.style.setProperty('margin-right', 'auto', 'important');
+  function findBottomRow(agentContainer, topRow) {
+    if (!agentContainer) return null;
 
-    root.style.setProperty('width', MODAL_W, 'important');
-    root.style.setProperty('max-width', MODAL_W, 'important');
-    root.style.setProperty('min-width', MODAL_W, 'important');
-    root.style.setProperty('overflow', 'hidden', 'important');
+    for (const child of Array.from(agentContainer.children)) {
+      if (child === topRow) continue;
+      if (!child.matches('div')) continue;
+      if (normalizeText(child.textContent).includes('Filas:')) return child;
+    }
+    return null;
+  }
 
-    const body = root.querySelector('.modal-body');
-    if (body) {
-      body.style.setProperty('padding-left', '0', 'important');
-      body.style.setProperty('padding-right', '0', 'important');
-      body.style.setProperty('overflow-x', 'hidden', 'important');
-      body.style.setProperty('overflow-y', 'auto', 'important');
-      body.style.setProperty('display', 'flex', 'important');
-      body.style.setProperty('flex-direction', 'column', 'important');
-      body.style.setProperty('align-items', 'center', 'important');
+  function findOfflineControl(topRow) {
+    if (!topRow) return null;
+
+    for (const btn of topRow.querySelectorAll('button')) {
+      const text = normalizeText(btn.textContent);
+      if (
+        text.includes('Offline') ||
+        text.includes('Online') ||
+        text.includes('Pausa') ||
+        text.includes('Ausente')
+      ) {
+        return btn.closest('.relative.inline-block.text-left') || btn;
+      }
+    }
+    return null;
+  }
+
+  function findSendHsmButton(topRow) {
+    if (!topRow) return null;
+
+    for (const btn of topRow.querySelectorAll('button')) {
+      if (normalizeText(btn.textContent).includes('Enviar HSM')) return btn;
+    }
+    return null;
+  }
+
+  function ensureAgentActionsWrapper(bottomRow) {
+    let wrapper = bottomRow.querySelector(`[${AGENT_ACTIONS_ATTR}="true"]`);
+    if (wrapper) return wrapper;
+
+    wrapper = document.createElement('div');
+    wrapper.setAttribute(AGENT_ACTIONS_ATTR, 'true');
+    bottomRow.appendChild(wrapper);
+    return wrapper;
+  }
+
+  function ensureAgentLeftWrapper(bottomRow) {
+    let left = bottomRow.querySelector(':scope > .tm-agent-left');
+    if (left) return left;
+
+    left = document.createElement('div');
+    left.className = 'tm-agent-left';
+
+    const currentChildren = Array.from(bottomRow.childNodes);
+    for (const node of currentChildren) {
+      if (
+        node.nodeType === Node.ELEMENT_NODE &&
+        node.getAttribute &&
+        node.getAttribute(AGENT_ACTIONS_ATTR) === 'true'
+      ) {
+        continue;
+      }
+      left.appendChild(node);
     }
 
-    const selectors = [
-      '.modal-body > div',
-      '.modal-body .mt-3',
-      '.modal-body #cadTemp',
-      '.modal-body #tm-top-layout-host',
-      '.modal-body #tm-observation-layout-host',
-      '.modal-body #myTab',
-      '.modal-body .tab-content',
-      '.modal-body .tab-pane',
-      '.modal-body hr',
-      '.modal-footer'
-    ];
+    bottomRow.insertBefore(left, bottomRow.firstChild);
+    return left;
+  }
 
-    selectors.forEach((selector) => {
-      root.querySelectorAll(selector).forEach((el) => {
-        el.style.setProperty('width', CONTENT_W, 'important');
-        el.style.setProperty('max-width', CONTENT_W, 'important');
-        el.style.setProperty('margin-left', 'auto', 'important');
-        el.style.setProperty('margin-right', 'auto', 'important');
-        el.style.setProperty('box-sizing', 'border-box', 'important');
-      });
-    });
+  function primeAgentAreaBootState() {
+    const agentContainer = findAgentAreaContainer();
+    if (!agentContainer) return false;
 
-    const topLayout = root.querySelector('.tm-top-layout');
-    if (topLayout) {
-      topLayout.style.setProperty('width', '509px', 'important');
-      topLayout.style.setProperty('max-width', '509px', 'important');
-      topLayout.style.setProperty('margin-left', 'auto', 'important');
-      topLayout.style.setProperty('margin-right', 'auto', 'important');
+    const topRow = findTopRow(agentContainer);
+    const bottomRow = findBottomRow(agentContainer, topRow);
+    if (!topRow || !bottomRow) return false;
+
+    agentContainer.setAttribute(AGENT_AREA_ATTR, 'true');
+    topRow.setAttribute(AGENT_TOP_ATTR, 'true');
+    bottomRow.setAttribute(AGENT_BOTTOM_ATTR, 'true');
+    return true;
+  }
+
+  let agentBootDone = false;
+
+  function finalizeAgentBootMask() {
+    if (agentBootDone) return;
+    const agentContainer = findAgentAreaContainer();
+    if (!agentContainer) return;
+    const topRow = findTopRow(agentContainer);
+    const bottomRow = findBottomRow(agentContainer, topRow);
+    if (!topRow || !bottomRow) return;
+    agentBootDone = true;
+    stopAgentBootMask();
+  }
+
+  function createAgentProxyButton(sourceButton, proxyType) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute(AGENT_PROXY_ATTR, 'true');
+    button.setAttribute('data-tm-agent-proxy-type', proxyType);
+    button.className = sourceButton.className || '';
+
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      sourceButton.click();
+    }, true);
+
+    return button;
+  }
+
+  function ensureAgentActionsMirror(bottomRow) {
+    let mirror = bottomRow.querySelector(`[${AGENT_ACTIONS_MIRROR_ATTR}="true"]`);
+    if (!mirror) {
+      mirror = document.createElement('div');
+      mirror.setAttribute(AGENT_ACTIONS_MIRROR_ATTR, 'true');
+      bottomRow.appendChild(mirror);
+    }
+    return mirror;
+  }
+
+
+  function syncAgentProxyButton(mirror, sourceButton, proxyType) {
+    if (!sourceButton) return;
+
+    let proxy = mirror.querySelector(`[data-tm-agent-proxy-type="${proxyType}"]`);
+    if (!proxy) {
+      proxy = createAgentProxyButton(sourceButton, proxyType);
+      mirror.appendChild(proxy);
     }
 
-    const observationHost = root.querySelector('#tm-observation-layout-host');
-    if (observationHost) {
-      observationHost.style.setProperty('width', '509px', 'important');
-      observationHost.style.setProperty('max-width', '509px', 'important');
-      observationHost.style.setProperty('margin-left', 'auto', 'important');
-      observationHost.style.setProperty('margin-right', 'auto', 'important');
+    if (proxy.className !== sourceButton.className) {
+      proxy.className = sourceButton.className;
     }
 
-    const tabNav = root.querySelector('#myTab');
-    if (tabNav) {
-      tabNav.style.setProperty('width', '509px', 'important');
-      tabNav.style.setProperty('max-width', '509px', 'important');
-      tabNav.style.setProperty('margin-left', 'auto', 'important');
-      tabNav.style.setProperty('margin-right', 'auto', 'important');
+    const sourceHtml = sourceButton.innerHTML;
+    if (proxy.innerHTML !== sourceHtml) {
+      proxy.innerHTML = sourceHtml;
     }
 
-    const tabContent = root.querySelector('.tab-content');
-    if (tabContent) {
-      tabContent.style.setProperty('width', '509px', 'important');
-      tabContent.style.setProperty('max-width', '509px', 'important');
-      tabContent.style.setProperty('margin-left', 'auto', 'important');
-      tabContent.style.setProperty('margin-right', 'auto', 'important');
+    proxy.setAttribute('title', sourceButton.getAttribute('title') || '');
+    proxy.setAttribute('aria-label', sourceButton.getAttribute('aria-label') || sourceButton.textContent.trim() || proxyType);
+    proxy.disabled = !!sourceButton.disabled;
+  }
+
+  function ensureAgentVersionBadge(agentContainer, bottomRow, mirror) {
+    if (!agentContainer || !bottomRow) return;
+
+    let badge = bottomRow.querySelector(`[${AGENT_VERSION_ATTR}="true"]`);
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.setAttribute(AGENT_VERSION_ATTR, 'true');
+      bottomRow.insertBefore(badge, mirror || null);
     }
 
-    root.querySelectorAll('.tab-pane, .tab-pane .mt-3, .tab-pane .form-group.mb-1').forEach((el) => {
-      el.style.setProperty('width', '509px', 'important');
-      el.style.setProperty('max-width', '509px', 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    root.querySelectorAll('.tab-pane .autocomplete, .tab-pane .autocomplete .input-group, .tab-pane input.az-autocomplete, .tab-pane hr').forEach((el) => {
-      el.style.setProperty('width', '509px', 'important');
-      el.style.setProperty('max-width', '509px', 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-    });
-
-    const leftPanel = root.querySelector('.tm-left-panel');
-    if (leftPanel) {
-      leftPanel.style.setProperty('width', '509px', 'important');
-      leftPanel.style.setProperty('max-width', '509px', 'important');
-    }
-
-    root.querySelectorAll('.border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.text-primary, .border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.mt-1.text-primary').forEach((el) => {
-      el.style.setProperty('width', '509px', 'important');
-      el.style.setProperty('max-width', '509px', 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    const footer = root.querySelector('.modal-footer');
-    if (footer) {
-      footer.style.setProperty('width', '509px', 'important');
-      footer.style.setProperty('max-width', '509px', 'important');
-      footer.style.setProperty('padding-right', '8px', 'important');
-      footer.style.setProperty('box-sizing', 'border-box', 'important');
-      footer.style.setProperty('margin-left', 'auto', 'important');
-      footer.style.setProperty('margin-right', 'auto', 'important');
-      footer.style.setProperty('justify-content', 'flex-start', 'important');
-      footer.style.setProperty('padding-left', '0', 'important');
-    }
-
-    const headerList = root.querySelector('.list-group');
-    const headerItem = root.querySelector('.list-group-item.list-group-item-success');
-    if (headerList) {
-      headerList.style.setProperty('margin-left', 'auto', 'important');
-      headerList.style.setProperty('margin-right', 'auto', 'important');
-    }
-    if (headerItem) {
-      headerItem.style.setProperty('margin-left', 'auto', 'important');
-      headerItem.style.setProperty('margin-right', 'auto', 'important');
+    const versionText = `🧪 V${SCRIPT_VERSION}`;
+    if (badge.textContent !== versionText) {
+      badge.textContent = versionText;
     }
   }
 
-  function reorganizeSchedulingModalLayout() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
+  function reorganizeAgentArea() {
+    const agentContainer = findAgentAreaContainer();
+    if (!agentContainer) return;
 
-    const cadTemp = getCadTemp(root);
-    const cadTempTitleRow = getCadTempTitleRow(root);
-    const observationTitleRow = getObservationTitleRow(root);
-    const observationFieldsRow = getObservationFieldsRow(root);
-    const originTitleRow = getOriginTitleRow(root);
-
-    if (!cadTemp || !cadTempTitleRow || !observationTitleRow || !observationFieldsRow) return;
-
-    const sexoBlock = findColByLabel(cadTemp, 'Sexo');
-    const birthBlock = findColByLabel(cadTemp, 'Data de Nascimento');
-    const celularBlock = findColByLabel(cadTemp, 'Celular');
-    const emailBlock = findColByLabel(cadTemp, 'e-mail');
-    const nomeBlock = findColByLabel(cadTemp, 'Nome');
-    const cpfBlock = findColByLabel(cadTemp, 'CPF');
-    const carteiraBlock = findColByLabel(cadTemp, 'No. da Carteira do Plano');
-    const validadeBlock = findColByLabel(cadTemp, 'Validade da Carteira');
-    const origemBlock = findOriginFieldBlock(root);
-
-    const observationInputBlock = observationFieldsRow.children[0] || null;
-    const observationSelectBlock = observationFieldsRow.children[1] || null;
-
-    if (
-      !sexoBlock ||
-      !birthBlock ||
-      !celularBlock ||
-      !emailBlock ||
-      !nomeBlock ||
-      !cpfBlock ||
-      !carteiraBlock ||
-      !validadeBlock ||
-      !origemBlock ||
-      !observationInputBlock ||
-      !observationSelectBlock
-    ) {
+    const topRow = findTopRow(agentContainer);
+    const bottomRow = findBottomRow(agentContainer, topRow);
+    if (!topRow || !bottomRow) {
+      finalizeAgentBootMask();
       return;
     }
 
-    const topLayoutHost = ensureHost(cadTemp, 'tm-top-layout-host', 'tm-layout-host');
-    cadTemp.insertBefore(topLayoutHost, cadTempTitleRow.nextSibling);
+    agentContainer.setAttribute(AGENT_AREA_ATTR, 'true');
+    topRow.setAttribute(AGENT_TOP_ATTR, 'true');
+    bottomRow.setAttribute(AGENT_BOTTOM_ATTR, 'true');
 
-    topLayoutHost.innerHTML = `
-      <div class="tm-top-layout">
-        <div class="tm-left-panel">
-          <div class="tm-grid-row tm-row-name-birth">
-            <div class="tm-field-slot" data-slot="nome"></div>
-            <div class="tm-field-slot" data-slot="nascimento"></div>
-          </div>
-          <div class="tm-grid-row tm-row-cpf-sexo-origem">
-            <div class="tm-field-slot" data-slot="cpf"></div>
-            <div class="tm-field-slot" data-slot="sexo"></div>
-            <div class="tm-field-slot" data-slot="origem"></div>
-          </div>
-          <div class="tm-grid-row tm-row-cel-email">
-            <div class="tm-field-slot" data-slot="celular"></div>
-            <div class="tm-field-slot" data-slot="email"></div>
-          </div>
-          <div class="tm-grid-row tm-row-carteira-validade">
-            <div class="tm-field-slot" data-slot="carteira"></div>
-            <div class="tm-field-slot" data-slot="validade"></div>
-          </div>
-        </div>
-      </div>
-    `;
+    const mirror = ensureAgentActionsMirror(bottomRow);
+    ensureAgentVersionBadge(agentContainer, bottomRow, mirror);
 
-    moveToSlot(topLayoutHost.querySelector('[data-slot="nome"]'), nomeBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="nascimento"]'), birthBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="cpf"]'), cpfBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="sexo"]'), sexoBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="origem"]'), origemBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="celular"]'), celularBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="email"]'), emailBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="carteira"]'), carteiraBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="validade"]'), validadeBlock);
+    const offlineControl = findOfflineControl(topRow);
+    const offlineButton = offlineControl?.querySelector?.('button') || (offlineControl?.tagName === 'BUTTON' ? offlineControl : null);
+    const sendHsmButton = findSendHsmButton(topRow);
 
-    const observationHostParent = observationTitleRow.parentElement;
-    const observationHost = ensureHost(observationHostParent, 'tm-observation-layout-host', 'tm-observation-layout');
-    if (observationTitleRow.nextSibling !== observationHost) {
-      observationHostParent.insertBefore(observationHost, observationTitleRow.nextSibling);
+    if (offlineButton) {
+      syncAgentProxyButton(mirror, offlineButton, 'status');
     }
 
-    observationHost.innerHTML = `
-      <div class="tm-field-slot" data-slot="observacao-input"></div>
-      <div class="tm-field-slot" data-slot="observacao-select"></div>
-    `;
-
-    moveToSlot(observationHost.querySelector('[data-slot="observacao-input"]'), observationInputBlock);
-    moveToSlot(observationHost.querySelector('[data-slot="observacao-select"]'), observationSelectBlock);
-
-    cadTemp.querySelectorAll('.form-row').forEach((row) => hideOriginalRow(row));
-    hideOriginalRow(observationFieldsRow);
-
-    if (originTitleRow) {
-      const originMainRow = originTitleRow.closest('.row');
-      hideOriginalRow(originTitleRow);
-      hideOriginalRow(originMainRow);
+    if (sendHsmButton) {
+      syncAgentProxyButton(mirror, sendHsmButton, 'hsm');
     }
 
-    [
-      sexoBlock,
-      birthBlock,
-      celularBlock,
-      emailBlock,
-      nomeBlock,
-      cpfBlock,
-      carteiraBlock,
-      validadeBlock,
-      origemBlock,
-      observationInputBlock,
-      observationSelectBlock
-    ].forEach((block) => {
-      block.style.setProperty('width', '100%', 'important');
-      block.style.setProperty('max-width', 'none', 'important');
-      block.style.setProperty('padding-left', '0', 'important');
-      block.style.setProperty('padding-right', '0', 'important');
-      block.style.setProperty('flex', 'unset', 'important');
-    });
-
-    hideCellCountryButton(celularBlock);
-    ensureObservationTextarea(observationInputBlock);
+    finalizeAgentBootMask();
   }
 
-  function hideAppointmentModalFields() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const telefoneBlock = findColByLabel(root, 'Telefone');
-    const nomeSocialBlock = findColByLabel(root, 'Nome Social');
-    const materialBlock = findMaterialBlock(root);
-
-    hideElement(telefoneBlock);
-    hideElement(nomeSocialBlock);
-    hideElement(materialBlock);
+  /* ========================================================================
+   * SEÇÃO: HEADER DO TICKET
+   * Oculta a linha inferior e move o campo "Criado há" para baixo do telefone.
+   * ====================================================================== */
+  function findTicketHeaderTopRows() {
+    return Array.from(document.querySelectorAll('div.px-4.py-3.flex.items-center.justify-between.gap-4'));
   }
 
+  function findTicketInfoRowFromTopRow(topRow) {
+    if (!topRow || !topRow.parentElement) return null;
+    const siblings = Array.from(topRow.parentElement.children);
+    const topIndex = siblings.indexOf(topRow);
 
-
-  function forceObservationSelectHeight() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const slot = root.querySelector('.tm-field-slot[data-slot="observacao-select"]');
-    if (!slot) return;
-
-    const els = [
-      slot,
-      slot.querySelector(':scope > .col'),
-      slot.querySelector('.form-group'),
-      slot.querySelector('.input-group'),
-      slot.querySelector('.input-group-prepend'),
-      slot.querySelector('.input-group-text'),
-      slot.querySelector('select')
-    ];
-
-    els.forEach((el) => {
-      if (!el) return;
-      el.style.setProperty('height', '34px', 'important');
-      el.style.setProperty('min-height', '34px', 'important');
-      el.style.setProperty('max-height', '34px', 'important');
-      el.style.setProperty('margin', '0', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    const select = slot.querySelector('select');
-    if (select) {
-      select.style.setProperty('line-height', '34px', 'important');
-      select.style.setProperty('padding-top', '0', 'important');
-      select.style.setProperty('padding-bottom', '0', 'important');
-    }
-
-    const inputText = slot.querySelector('.input-group-text');
-    if (inputText) {
-      inputText.style.setProperty('display', 'flex', 'important');
-      inputText.style.setProperty('align-items', 'center', 'important');
-      inputText.style.setProperty('padding-left', '8px', 'important');
-      inputText.style.setProperty('padding-right', '8px', 'important');
-    }
-  }
-
-
-  function forceObservationSelectHeightExact() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const slot = root.querySelector('.tm-field-slot[data-slot="observacao-select"]');
-    if (!slot) return;
-
-    const col = slot.querySelector(':scope > .col.col-12.col-md-3');
-    const formGroup = slot.querySelector(':scope > .col.col-12.col-md-3 > .form-group.mb-1');
-    const inputGroup = slot.querySelector('.input-group.input-group-sm');
-    const prepend = slot.querySelector('.input-group-prepend');
-    const inputText = slot.querySelector('.input-group-text');
-    const select = slot.querySelector('select.form.form-control, select.form-control, select');
-
-    [slot, col, formGroup, inputGroup, prepend, inputText, select].forEach((el) => {
-      if (!el) return;
-      el.style.setProperty('height', '30px', 'important');
-      el.style.setProperty('min-height', '30px', 'important');
-      el.style.setProperty('max-height', '30px', 'important');
-      el.style.setProperty('margin', '0', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    if (col) {
-      col.style.setProperty('padding-top', '0', 'important');
-      col.style.setProperty('padding-bottom', '0', 'important');
-    }
-
-    if (formGroup) {
-      formGroup.style.setProperty('margin-bottom', '0', 'important');
-    }
-
-    if (select) {
-      select.style.setProperty('line-height', '30px', 'important');
-      select.style.setProperty('padding-top', '0', 'important');
-      select.style.setProperty('padding-bottom', '0', 'important');
-    }
-
-    if (inputText) {
-      inputText.style.setProperty('display', 'flex', 'important');
-      inputText.style.setProperty('align-items', 'center', 'important');
-      inputText.style.setProperty('padding-left', '8px', 'important');
-      inputText.style.setProperty('padding-right', '8px', 'important');
-    }
-  }
-
-
-  function simplifyUnitsSafe() {
-    if (!isCallCenterRoute()) return;
-
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    root.querySelectorAll('.tm-header-line-3 span.mr-2 small.lead').forEach((el) => {
-      if (el.dataset.tmUnitShortApplied === '1') return;
-
-      const raw = (el.textContent || '').replace(/\s+/g, ' ').trim();
-      let unit = '';
-
-      if (raw.includes('COPACABANA')) unit = 'COPACABANA';
-      else if (raw.includes('BARRA')) unit = 'BARRA';
-      else if (raw.includes('SAMEC')) unit = 'SAMEC';
-      else if (raw.includes('BANGU')) unit = 'BANGU';
-      else return;
-
-      const consultorio = el.querySelector('small.text-muted');
-      if (consultorio) {
-        consultorio.style.display = 'none';
+    for (let i = topIndex + 1; i < siblings.length; i += 1) {
+      const el = siblings[i];
+      if (!(el instanceof HTMLElement)) continue;
+      if (
+        el.classList.contains('px-4') &&
+        el.classList.contains('py-2') &&
+        el.classList.contains('border-t') &&
+        el.classList.contains('border-border') &&
+        el.classList.contains('bg-muted/30')
+      ) {
+        return el;
       }
-
-      const icon = el.querySelector('i');
-      const shortTextClass = 'tm-unit-short-text';
-      let shortText = el.querySelector('.' + shortTextClass);
-
-      if (!shortText) {
-        shortText = document.createElement('span');
-        shortText.className = shortTextClass;
-
-        if (icon) {
-          if (icon.nextSibling) {
-            icon.parentNode.insertBefore(shortText, icon.nextSibling);
-          } else {
-            el.appendChild(shortText);
-          }
-        } else {
-          el.insertBefore(shortText, el.firstChild);
-        }
-      }
-
-      // remove apenas nós de texto soltos, sem destruir a estrutura do elemento
-      Array.from(el.childNodes).forEach((node) => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          node.textContent = '';
-        }
-      });
-
-      shortText.textContent = ' ' + unit + ' ';
-      el.dataset.tmUnitShortApplied = '1';
-    });
-  }
-
-
-
-  function calculateBirthAgeSafe(isoValue) {
-    if (!isoValue || !/^\d{4}-\d{2}-\d{2}$/.test(isoValue)) return '';
-
-    const [yyyy, mm, dd] = isoValue.split('-').map(Number);
-    const birth = new Date(yyyy, mm - 1, dd);
-
-    if (
-      birth.getFullYear() !== yyyy ||
-      birth.getMonth() !== mm - 1 ||
-      birth.getDate() !== dd
-    ) return '';
-
-    const today = new Date();
-    let age = today.getFullYear() - yyyy;
-    const monthDiff = today.getMonth() - (mm - 1);
-    const dayDiff = today.getDate() - dd;
-
-    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) age -= 1;
-    if (age < 0 || age > 130) return '';
-
-    return String(age);
-  }
-
-  function findBirthAgeElements(root) {
-    const birthSlot = root.querySelector('[data-slot="nascimento"]');
-    if (!birthSlot) return {};
-
-    const input = birthSlot.querySelector('input[type="date"]');
-    const inputGroup = birthSlot.querySelector('.input-group');
-    if (!input || !inputGroup) return { birthSlot, input, inputGroup };
-
-    const appends = Array.from(birthSlot.querySelectorAll('.input-group-append'));
-    let ageAppend = null;
-
-    appends.forEach((append) => {
-      const ageText = append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
-      if (ageText) ageAppend = append;
-    });
-
-    return { birthSlot, input, inputGroup, ageAppend };
-  }
-
-
-  function syncBirthAgeBadgeFontSafe(input, ageText) {
-    if (!input || !ageText) return;
-
-    const style = window.getComputedStyle(input);
-    if (!style) return;
-
-    ageText.style.setProperty('font-size', style.fontSize, 'important');
-    ageText.style.setProperty('font-family', style.fontFamily, 'important');
-    ageText.style.setProperty('font-weight', style.fontWeight, 'important');
-    ageText.style.setProperty('line-height', style.lineHeight, 'important');
-    ageText.style.setProperty('letter-spacing', style.letterSpacing, 'important');
-  }
-
-  function applyBirthAgeBadgeSafe() {
-    if (!isCallCenterRoute()) return;
-
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const { input, inputGroup, ageAppend } = findBirthAgeElements(root);
-    if (!input || !inputGroup || !ageAppend) return;
-
-    if (ageAppend.parentElement !== inputGroup) {
-      inputGroup.appendChild(ageAppend);
-    }
-
-    ageAppend.classList.add('tm-birth-age-inline');
-
-    const ageText = ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
-    if (!ageText) return;
-
-    syncBirthAgeBadgeFontSafe(input, ageText);
-
-    const age = calculateBirthAgeSafe(input.value);
-    if (!age) {
-      ageAppend.classList.add('tm-age-hidden');
-      return;
-    }
-
-    const currentDigits = (ageText.textContent || '').replace(/\D+/g, '');
-    if (currentDigits !== age) {
-      ageText.textContent = age;
-    }
-
-    ageAppend.classList.remove('tm-age-hidden');
-  }
-
-  function enableBirthAgeBadgeSafe() {
-    if (!isCallCenterRoute()) return;
-
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const { input } = findBirthAgeElements(root);
-    if (!input) return;
-
-    if (input.dataset.tmBirthAgeBadgeBound !== '1') {
-      input.dataset.tmBirthAgeBadgeBound = '1';
-
-      let debounceId = null;
-      const handler = () => {
-        clearTimeout(debounceId);
-        debounceId = setTimeout(() => {
-          applyBirthAgeBadgeSafe();
-        }, 80);
-      };
-
-      input.addEventListener('input', handler, true);
-      input.addEventListener('change', handler, true);
-      input.addEventListener('blur', handler, true);
-    }
-
-    applyBirthAgeBadgeSafe();
-  }
-
-
-
-  function tmPaciente91Field(root, labelText) {
-    if (!root) return null;
-
-    const labels = Array.from(root.querySelectorAll('small.form-text, small'));
-    for (const label of labels) {
-      if (norm(label.textContent || '') !== labelText) continue;
-
-      return (
-        label.closest('.col') ||
-        label.closest('[class*="col-"]') ||
-        label.closest('.form-group') ||
-        label.parentElement
-      );
     }
 
     return null;
   }
 
-  function tmPaciente91Move(slot, block, className) {
-    if (!slot || !block) return;
+  function findCreatedSpan(infoRow) {
+    if (!infoRow) return null;
 
-    block.classList.add('tm-paciente-v91-field', className);
-    block.style.removeProperty('width');
-    block.style.removeProperty('max-width');
-    block.style.removeProperty('flex');
-    block.style.removeProperty('display');
-
-    if (block.parentElement !== slot) {
-      slot.appendChild(block);
+    for (const span of infoRow.querySelectorAll('span.flex.items-center.gap-1')) {
+      if (normalizeText(span.textContent).includes('Criado há')) return span;
     }
+
+    return null;
   }
 
-  function tmPaciente91Hide(el) {
-    if (!el) return;
-    el.classList.add('tm-paciente-v91-hidden');
-    el.style.setProperty('display', 'none', 'important');
+  function findTicketInfoTarget(topRow) {
+    return topRow ? topRow.querySelector('div.min-w-0.flex-1') : null;
   }
 
-  function tmPaciente91EnsureHost(root) {
-    const personal = root.querySelector(':scope > .modal-body > .mt-3');
-    if (!personal) return null;
+  function findTicketAvatar(topRow) {
+    return topRow ? topRow.querySelector('div.w-10.h-10.flex-shrink-0.rounded-full') : null;
+  }
 
-    let title = personal.querySelector('#tm-paciente-v91-title');
-    if (!title) {
-      title = document.createElement('div');
-      title.id = 'tm-paciente-v91-title';
-      title.className = 'border-bottom mb-1 d-flex justify-content-between hover-title-bg text-primary tm-paciente-v91-title';
-      title.innerHTML = '<div><small>Dados Pessoais</small></div><div></div>';
-      personal.insertBefore(title, personal.firstChild);
-    }
+  function ensureCreatedHost(targetBlock) {
+    let host = targetBlock.querySelector(`[${TICKET_CREATED_HOST_ATTR}="true"]`);
+    if (host) return host;
 
-    let host = personal.querySelector('#tm-paciente-v91-host');
-    if (!host) {
-      host = document.createElement('div');
-      host.id = 'tm-paciente-v91-host';
-      host.className = 'tm-paciente-v91-host';
-      host.innerHTML = `
-        <div class="tm-paciente-v91-row tm-paciente-v91-row-name-birth">
-          <div class="tm-paciente-v91-slot" data-v91-slot="nome"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="nascimento"></div>
-        </div>
-        <div class="tm-paciente-v91-row tm-paciente-v91-row-basic">
-          <div class="tm-paciente-v91-slot" data-v91-slot="cpf"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="sexo"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="email"></div>
-        </div>
-        <div class="tm-paciente-v91-row tm-paciente-v91-row-contact">
-          <div class="tm-paciente-v91-slot" data-v91-slot="celular"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="telefone"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="origem"></div>
-        </div>
-        <div class="tm-paciente-v91-row tm-paciente-v91-row-card">
-          <div class="tm-paciente-v91-slot" data-v91-slot="carteira"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="validade"></div>
-        </div>
-      `;
-    }
-
-    if (title.nextSibling !== host) {
-      personal.insertBefore(host, title.nextSibling);
-    }
-
+    host = document.createElement('div');
+    host.setAttribute(TICKET_CREATED_HOST_ATTR, 'true');
+    targetBlock.appendChild(host);
     return host;
   }
 
-  function tmPaciente91IsCompleteBirthValue(value) {
-    const raw = String(value || '').trim();
-    const digits = raw.replace(/\D+/g, '');
+  function moveCreatedDateToHeader() {
+    for (const topRow of findTicketHeaderTopRows()) {
+      const infoRow = findTicketInfoRowFromTopRow(topRow);
+      const targetBlock = findTicketInfoTarget(topRow);
+      if (!infoRow || !targetBlock) continue;
 
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return true;
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return true;
-    if (digits.length === 8) return true;
+      targetBlock.setAttribute(TICKET_CONTACT_BLOCK_ATTR, 'true');
 
-    return false;
-  }
+      const createdSpan = findCreatedSpan(infoRow);
+      if (!createdSpan) continue;
 
-  function tmPaciente91Birth(root) {
-    const birthBlock = root.querySelector('.tm-paciente-v91-birth');
-    if (!birthBlock) return;
+      const host = ensureCreatedHost(targetBlock);
+      const createdSignature = normalizeText(createdSpan.textContent);
 
-    const input = birthBlock.querySelector('input[type="date"], input');
-    const inputGroup = birthBlock.querySelector('.input-group');
-    if (!input || !inputGroup) return;
-
-    const ageAppend = Array.from(birthBlock.querySelectorAll('.input-group-append')).find((append) =>
-      append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]')
-    );
-
-    if (!ageAppend) return;
-
-    if (ageAppend.parentElement !== inputGroup) {
-      inputGroup.appendChild(ageAppend);
-    }
-
-    inputGroup.style.setProperty('position', 'relative', 'important');
-    inputGroup.style.setProperty('overflow', 'hidden', 'important');
-    input.style.setProperty('padding-right', '48px', 'important');
-
-    ageAppend.classList.add('tm-birth-age-inline');
-
-    const ageText = ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
-
-    const syncAge = () => {
-      const complete = tmPaciente91IsCompleteBirthValue(input.value);
-
-      if (!complete) {
-        ageAppend.classList.add('tm-birth-age-waiting');
-        ageAppend.style.setProperty('visibility', 'hidden', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
+      if (host.getAttribute('data-tm-created-signature') !== createdSignature) {
+        host.innerHTML = '';
+        const clone = createdSpan.cloneNode(true);
+        clone.setAttribute(TICKET_CREATED_MOVED_ATTR, 'true');
+        host.appendChild(clone);
+        host.setAttribute('data-tm-created-signature', createdSignature);
       }
 
-      ageAppend.classList.remove('tm-birth-age-waiting');
-      ageAppend.style.removeProperty('visibility');
-
-      if (ageText) {
-        syncBirthAgeBadgeFontSafe(input, ageText);
-        const age = calculateBirthAgeSafe(input.value);
-        if (age && !/^\d{4}a$/.test(age)) {
-          ageText.textContent = age;
-        }
+      if (infoRow.getAttribute(TICKET_INFO_ROW_HIDDEN_ATTR) !== 'true') {
+        infoRow.setAttribute(TICKET_INFO_ROW_HIDDEN_ATTR, 'true');
       }
-    };
 
-    if (!input.dataset.tmPaciente91BirthListener) {
-      input.addEventListener('input', syncAge);
-      input.addEventListener('change', syncAge);
-      input.dataset.tmPaciente91BirthListener = '1';
-    }
+      const avatar = findTicketAvatar(topRow);
+      if (avatar && avatar.getAttribute(HIDDEN_ATTR) !== 'true') {
+        avatar.setAttribute(HIDDEN_ATTR, 'true');
+      }
 
-    syncAge();
-  }
-
-  function tmPaciente91Observation(root) {
-    const obsTitleSmall = Array.from(root.querySelectorAll('small'))
-      .find((small) => norm(small.textContent || '') === 'Observação');
-    const obsTitle = obsTitleSmall ? obsTitleSmall.closest('.border-bottom') : null;
-    if (!obsTitle) return;
-
-    let obsRow = obsTitle.nextElementSibling;
-    while (obsRow && !(obsRow.classList && obsRow.classList.contains('form-row'))) {
-      obsRow = obsRow.nextElementSibling;
-    }
-    if (!obsRow) return;
-
-    const inputBlock = obsRow.children[0] || null;
-    const selectBlock = obsRow.children[1] || null;
-    if (!inputBlock || !selectBlock) return;
-
-    let host = root.querySelector('#tm-paciente-v91-observation-host');
-    if (!host) {
-      host = document.createElement('div');
-      host.id = 'tm-paciente-v91-observation-host';
-      host.className = 'tm-paciente-v91-observation-host';
-      host.innerHTML = `
-        <div class="tm-paciente-v91-observation-title"></div>
-        <div class="tm-paciente-v91-observation-input"></div>
-        <div class="tm-paciente-v91-observation-select"></div>
-      `;
-    }
-
-    if (obsTitle.parentElement && obsTitle.nextSibling !== host) {
-      obsTitle.parentElement.insertBefore(host, obsTitle.nextSibling);
-    }
-
-    host.querySelector('.tm-paciente-v91-observation-title').appendChild(obsTitle);
-    host.querySelector('.tm-paciente-v91-observation-input').appendChild(inputBlock);
-    host.querySelector('.tm-paciente-v91-observation-select').appendChild(selectBlock);
-
-    tmPaciente91Hide(obsRow);
-    ensureObservationTextarea(inputBlock);
-
-    inputBlock.style.setProperty('width', '509px', 'important');
-    inputBlock.style.setProperty('max-width', '509px', 'important');
-    inputBlock.style.setProperty('min-width', '509px', 'important');
-    inputBlock.style.setProperty('flex', '0 0 509px', 'important');
-    inputBlock.style.setProperty('margin-left', '0', 'important');
-    inputBlock.style.setProperty('margin-right', '0', 'important');
-    inputBlock.style.setProperty('padding-left', '0', 'important');
-    inputBlock.style.setProperty('padding-right', '0', 'important');
-
-    const textarea = inputBlock.querySelector('textarea, .tm-observation-textarea, .form-control');
-    if (textarea) {
-      textarea.classList.add('tm-paciente-v91-observation-textarea');
-      textarea.style.setProperty('width', '509px', 'important');
-      textarea.style.setProperty('max-width', '509px', 'important');
-      textarea.style.setProperty('min-width', '509px', 'important');
-      textarea.style.setProperty('height', '74px', 'important');
-      textarea.style.setProperty('min-height', '74px', 'important');
-      textarea.style.setProperty('resize', 'none', 'important');
-      textarea.style.setProperty('overflow-y', 'auto', 'important');
+      if (topRow.parentElement) {
+        topRow.parentElement.setAttribute(TICKET_HEADER_ATTR, 'true');
+      }
     }
   }
 
-  function tmPaciente91HideRows(root) {
-    const personal = root.querySelector(':scope > .modal-body > .mt-3');
-    if (!personal) return;
+  /* ========================================================================
+   * SEÇÃO: CARDS DA FILA / TAGS / NOMES
+   * Mantém: 7, 15, 21
+   * ====================================================================== */
+  function isTicketListCard(card) {
+    if (!card || !(card instanceof HTMLElement)) return false;
 
-    personal.querySelectorAll(':scope > .form-row').forEach((row) => {
-      row.classList.add('tm-paciente-v91-hidden');
-      row.style.setProperty('display', 'none', 'important');
-    });
-  }
-
-
-  function tmPaciente91ShortUnitText(text) {
-    const cleaned = norm(text || '');
-    const paren = cleaned.match(/\(([^)]+)\)/);
-    if (paren && paren[1]) return paren[1].trim();
-
-    const beforeSlash = cleaned.split('/')[0].trim();
-    const beforeDash = beforeSlash.split('-')[0].trim();
-
-    return beforeDash || cleaned;
-  }
-
-  function tmPaciente91NormalizeHeaderSmall(span) {
-    if (!span) return null;
-
-    const small = span.querySelector('small.lead, small');
-    if (!small) return span;
-
-    return span;
-  }
-
-
-  function tmPaciente91CleanEmptyHeaderNote(root) {
-    if (!root) return;
-
-    const item = root.querySelector('.list-group-item.list-group-item-success');
-    if (!item) return;
-
-    const note = item.querySelector('.tm-paciente-v91-header-note');
-    if (note) {
-      const text = norm(note.textContent || '');
-      const isEmpty =
-        !text ||
-        text === '-' ||
-        text === '—' ||
-        text === '–' ||
-        /^[-–—\s]+$/.test(text);
-
-      if (isEmpty) {
-        note.textContent = '';
-        note.classList.add('tm-paciente-v91-note-empty');
-      } else {
-        note.classList.remove('tm-paciente-v91-note-empty');
-      }
-    }
-
-    // Remove linhas residuais vazias criadas/reaproveitadas pelo header do Vue.
-    Array.from(item.querySelectorAll('div, small, span')).forEach((el) => {
-      if (
-        el.classList.contains('tm-paciente-v91-header-line') ||
-        el.classList.contains('tm-paciente-v91-header-title') ||
-        el.classList.contains('tm-paciente-v91-header-note')
-      ) return;
-
-      const text = norm(el.textContent || '');
-      const hasIcon = !!el.querySelector('i');
-      const hasField = !!el.querySelector('input, select, textarea, button');
-
-      if (!hasIcon && !hasField && (/^[-–—\s]*$/.test(text))) {
-        el.style.setProperty('display', 'none', 'important');
-        el.style.setProperty('height', '0', 'important');
-        el.style.setProperty('min-height', '0', 'important');
-        el.style.setProperty('margin', '0', 'important');
-        el.style.setProperty('padding', '0', 'important');
-      }
-    });
-  }
-
-  function tmPaciente91ApplyHeaderLikeFirstVisit(root) {
-    if (!root) return;
-
-    const item = root.querySelector('.list-group-item.list-group-item-success');
-    if (!item) return;
-
-    const label = item.querySelector('label.w-100, label');
-    if (!label) return;
-
-    const title = label.querySelector('.h4.mb-1, .h4');
-    if (!title) return;
-
-    title.classList.add('tm-paciente-v91-header-title');
-
-    let line2 = label.querySelector('.tm-paciente-v91-header-line-2');
-    let line3 = label.querySelector('.tm-paciente-v91-header-line-3');
-    let note = label.querySelector('.tm-paciente-v91-header-note');
-
-    if (!line2) {
-      line2 = document.createElement('div');
-      line2.className = 'tm-paciente-v91-header-line tm-paciente-v91-header-line-2';
-    }
-
-    if (!line3) {
-      line3 = document.createElement('div');
-      line3.className = 'tm-paciente-v91-header-line tm-paciente-v91-header-line-3';
-    }
-
-    if (!note) {
-      note = document.createElement('div');
-      note.className = 'tm-paciente-v91-header-note';
-    }
-
-    const originalInfo = Array.from(label.children).find((child) => {
-      if (child === title || child === line2 || child === line3 || child === note) return false;
-      const text = norm(child.innerText || child.textContent || '');
-      return child.classList.contains('d-flex') && text.includes(':');
-    }) || Array.from(label.children).find((child) => {
-      if (child === title || child === line2 || child === line3 || child === note) return false;
-      const text = norm(child.innerText || child.textContent || '');
-      return child.classList.contains('d-flex') && (
-        text.includes('LEVE') ||
-        text.includes('SAÚDE') ||
-        text.includes('GOLDEN') ||
-        text.includes('PAULO') ||
-        text.includes('GLAUCIA') ||
-        text.includes('CLINICA') ||
-        /\d{2}\/[A-Za-zÀ-ÿ]{3}/.test(text)
-      );
-    });
-
-    if (!originalInfo && line2.children.length && line3.children.length) return;
-
-    const spans = originalInfo ? Array.from(originalInfo.querySelectorAll(':scope span.mr-3, :scope span.mr-2, :scope span')) : [];
-    const convenio = spans.find((span) => {
-      const text = norm(span.innerText || span.textContent || '');
-      return text && !text.includes('CLINICA') && !text.includes('SALA') && !/\d{2}\/[A-Za-zÀ-ÿ]{3}/.test(text) && !/\d{2}:\d{2}/.test(text) && span.querySelector('.fa-credit-card');
-    }) || spans.find((span) => span.querySelector('.fa-credit-card'));
-
-    const profissional = spans.find((span) => span.querySelector('.fa-user-md'));
-    const unidade = spans.find((span) => span.querySelector('.fa-building'));
-
-    const calendarSmall = originalInfo ? Array.from(originalInfo.querySelectorAll('small')).find((small) =>
-      !!small.querySelector('.fa-calendar-alt') || /\d{2}\/[A-Za-zÀ-ÿ]{3}/.test(norm(small.innerText || small.textContent || ''))
-    ) : null;
-
-    const clockSmall = originalInfo ? Array.from(originalInfo.querySelectorAll('small')).find((small) =>
-      !!small.querySelector('.fa-clock') || /\d{2}:\d{2}-\d{2}:\d{2}/.test(norm(small.innerText || small.textContent || ''))
-    ) : null;
-
-    line2.innerHTML = '';
-    line3.innerHTML = '';
-
-    if (convenio) line2.appendChild(tmPaciente91NormalizeHeaderSmall(convenio));
-    if (profissional) line2.appendChild(tmPaciente91NormalizeHeaderSmall(profissional));
-
-    if (unidade) {
-      const small = unidade.querySelector('small.lead, small');
-      if (small && !small.dataset.tmPaciente91UnitShort) {
-        const icon = small.querySelector('i') ? small.querySelector('i').cloneNode(true) : null;
-        const unit = tmPaciente91ShortUnitText(small.textContent || '');
-        small.textContent = '';
-        if (icon) small.appendChild(icon);
-        small.appendChild(document.createTextNode(' ' + unit));
-        small.dataset.tmPaciente91UnitShort = '1';
-      }
-      line3.appendChild(tmPaciente91NormalizeHeaderSmall(unidade));
-    }
-
-    if (calendarSmall) line3.appendChild(calendarSmall);
-    if (clockSmall) line3.appendChild(clockSmall);
-
-    // Texto complementar do procedimento, quando existir.
-    const allLabelText = norm(label.innerText || label.textContent || '');
-    const extraMatch = allLabelText.match(/[-–—]\s*-\s*.+/);
-    if (extraMatch && extraMatch[0]) {
-      note.textContent = extraMatch[0].replace(/\s+/g, ' ').trim();
-    } else if (!note.textContent.trim()) {
-      note.textContent = '';
-    }
-
-    if (title.nextSibling !== line2) {
-      label.insertBefore(line2, title.nextSibling);
-    }
-    if (line2.nextSibling !== line3) {
-      label.insertBefore(line3, line2.nextSibling);
-    }
-    if (line3.nextSibling !== note) {
-      label.insertBefore(note, line3.nextSibling);
-    }
-
-    if (originalInfo && originalInfo.parentElement) {
-      originalInfo.remove();
-    }
-
-    tmPaciente91CleanEmptyHeaderNote(root);
-
-    item.style.setProperty('width', '509px', 'important');
-    item.style.setProperty('max-width', '509px', 'important');
-    item.style.setProperty('margin-left', 'auto', 'important');
-    item.style.setProperty('margin-right', 'auto', 'important');
-    item.style.setProperty('min-height', '0', 'important');
-    item.style.setProperty('height', 'auto', 'important');
-  }
-
-
-  function tmPaciente91AlignLowerBlocks(root) {
-    if (!root) return;
-
-    const observationSelect = root.querySelector('.tm-paciente-v91-observation-select');
-    if (observationSelect) {
-      observationSelect.style.setProperty('width', '240px', 'important');
-      observationSelect.style.setProperty('max-width', '240px', 'important');
-      observationSelect.style.setProperty('min-width', '240px', 'important');
-      observationSelect.style.setProperty('margin-left', '0', 'important');
-      observationSelect.style.setProperty('margin-right', 'auto', 'important');
-      observationSelect.style.setProperty('display', 'block', 'important');
-
-      const group = observationSelect.querySelector('.input-group');
-      if (group) {
-        group.style.setProperty('width', '240px', 'important');
-        group.style.setProperty('max-width', '240px', 'important');
-        group.style.setProperty('display', 'flex', 'important');
-        group.style.setProperty('flex-wrap', 'nowrap', 'important');
-        group.style.setProperty('align-items', 'stretch', 'important');
-      }
-
-      const prepend = observationSelect.querySelector('.input-group-prepend');
-      if (prepend) {
-        prepend.style.setProperty('display', 'flex', 'important');
-        prepend.style.setProperty('align-items', 'stretch', 'important');
-        prepend.style.setProperty('height', '31px', 'important');
-        prepend.style.setProperty('min-height', '31px', 'important');
-        prepend.style.setProperty('max-height', '31px', 'important');
-        prepend.style.setProperty('margin-left', '0', 'important');
-        prepend.style.setProperty('margin-right', '-1px', 'important');
-      }
-
-      const prependText = observationSelect.querySelector('.input-group-text');
-      if (prependText) {
-        prependText.style.setProperty('height', '31px', 'important');
-        prependText.style.setProperty('min-height', '31px', 'important');
-        prependText.style.setProperty('max-height', '31px', 'important');
-        prependText.style.setProperty('padding-top', '0', 'important');
-        prependText.style.setProperty('padding-bottom', '0', 'important');
-        prependText.style.setProperty('line-height', '1', 'important');
-        prependText.style.setProperty('display', 'flex', 'important');
-        prependText.style.setProperty('align-items', 'center', 'important');
-        prependText.style.setProperty('justify-content', 'center', 'important');
-      }
-    }
-
-    const width = '509px';
-
-    [
-      root.querySelector('#myTab'),
-      root.querySelector('#myTabContent'),
-      root.querySelector('.tab-content'),
-      root.querySelector('.tab-pane'),
-      root.querySelector('.tab-pane > .mt-3')
-    ].filter(Boolean).forEach((el) => {
-      el.style.setProperty('width', width, 'important');
-      el.style.setProperty('max-width', width, 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    const lowerInputs = Array.from(root.querySelectorAll('.input-group')).filter((group) => {
-      const text = norm(group.innerText || group.textContent || '');
-      const input = group.querySelector('input');
-      const placeholder = input ? norm(input.getAttribute('placeholder') || '') : '';
+    const hasUser = !!card.querySelector('.lucide-user');
+    const hasQueueTag = !!Array.from(card.querySelectorAll('div.inline-flex.items-center.rounded-full')).find(el => {
+      const text = normalizeText(el.textContent).toLowerCase();
       return (
-        text.includes('Adicionar procedimento') ||
-        text.includes('Incluir material') ||
-        placeholder.includes('Adicionar procedimento') ||
-        placeholder.includes('Incluir material')
+        text === 'clínica do sono' ||
+        text === 'clinica do sono' ||
+        text === 'samec' ||
+        text === 'confirmação' ||
+        text === 'confirmacao'
       );
     });
+    const hasTimeInfo =
+      normalizeText(card.textContent).includes('Última atividade:') ||
+      !!card.querySelector('.lucide-clock');
 
-    lowerInputs.forEach((group) => {
-      group.style.setProperty('width', '240px', 'important');
-      group.style.setProperty('max-width', '240px', 'important');
-      group.style.setProperty('margin-left', '0', 'important');
-      group.style.setProperty('margin-right', 'auto', 'important');
-    });
+    return hasUser && hasQueueTag && hasTimeInfo;
   }
 
-  function tmPaciente91Layout() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    root.classList.add('tm-paciente-v91-root');
-    tmPaciente91ApplyHeaderLikeFirstVisit(root);
-
-    if (root.dataset.tmPaciente91Applied === '1') {
-      tmPaciente91ApplyHeaderLikeFirstVisit(root);
-      tmPaciente91Observation(root);
-      tmPaciente91AlignLowerBlocks(root);
-      tmPaciente91Birth(root);
-      return;
-    }
-
-    const dialog = root.closest('.modal-dialog');
-    if (dialog) {
-      dialog.style.setProperty('width', '580px', 'important');
-      dialog.style.setProperty('max-width', '580px', 'important');
-      dialog.style.setProperty('min-width', '580px', 'important');
-      dialog.style.setProperty('margin-left', 'auto', 'important');
-      dialog.style.setProperty('margin-right', 'auto', 'important');
-    }
-
-    root.style.setProperty('width', '580px', 'important');
-    root.style.setProperty('max-width', '580px', 'important');
-    root.style.setProperty('min-width', '580px', 'important');
-    root.style.setProperty('overflow', 'hidden', 'important');
-
-    const body = root.querySelector(':scope > .modal-body');
-    if (body) {
-      body.style.setProperty('padding-left', '0', 'important');
-      body.style.setProperty('padding-right', '0', 'important');
-      body.style.setProperty('overflow-x', 'hidden', 'important');
-      body.style.setProperty('overflow-y', 'auto', 'important');
-      body.style.setProperty('display', 'flex', 'important');
-      body.style.setProperty('flex-direction', 'column', 'important');
-      body.style.setProperty('align-items', 'center', 'important');
-    }
-
-    const footer = root.querySelector(':scope > .modal-footer');
-    if (footer) {
-      footer.style.setProperty('width', '509px', 'important');
-      footer.style.setProperty('max-width', '509px', 'important');
-      footer.style.setProperty('margin-left', 'auto', 'important');
-      footer.style.setProperty('margin-right', 'auto', 'important');
-      footer.style.setProperty('justify-content', 'flex-start', 'important');
-    }
-
-    const host = tmPaciente91EnsureHost(root);
-    if (!host) return;
-
-    const nome = tmPaciente91Field(root, 'Nome do Paciente');
-    const social = tmPaciente91Field(root, 'Nome Social');
-    const nascimento = tmPaciente91Field(root, 'Data de Nascimento');
-    const cpf = tmPaciente91Field(root, 'CPF');
-    const sexo = tmPaciente91Field(root, 'Sexo');
-    const origem = tmPaciente91Field(root, 'Origem de Pacientes');
-    const celular = tmPaciente91Field(root, 'Celular');
-    const telefone = tmPaciente91Field(root, 'Telefone');
-    const email = tmPaciente91Field(root, 'e-mail');
-    const carteira = tmPaciente91Field(root, 'No. da Carteira do Plano');
-    const validade = tmPaciente91Field(root, 'Validade da Carteira');
-
-    if (!nome || !nascimento || !sexo || !origem || !celular || !telefone || !email || !carteira || !validade) return;
-
-    tmPaciente91Move(host.querySelector('[data-v91-slot="nome"]'), nome, 'tm-paciente-v91-name');
-    tmPaciente91Move(host.querySelector('[data-v91-slot="nascimento"]'), nascimento, 'tm-paciente-v91-birth');
-
-    const basicRow = host.querySelector('.tm-paciente-v91-row-basic');
-
-    if (cpf) {
-      basicRow?.classList.add('tm-paciente-v91-row-basic-has-cpf');
-      basicRow?.classList.remove('tm-paciente-v91-row-basic-no-cpf');
-      tmPaciente91Move(host.querySelector('[data-v91-slot="cpf"]'), cpf, 'tm-paciente-v91-cpf');
-    } else {
-      basicRow?.classList.add('tm-paciente-v91-row-basic-no-cpf');
-      basicRow?.classList.remove('tm-paciente-v91-row-basic-has-cpf');
-      host.querySelector('[data-v91-slot="cpf"]')?.remove();
-    }
-
-    tmPaciente91Move(host.querySelector('[data-v91-slot="sexo"]'), sexo, 'tm-paciente-v91-sex');
-    tmPaciente91Move(host.querySelector('[data-v91-slot="email"]'), email, 'tm-paciente-v91-email');
-
-    tmPaciente91Move(host.querySelector('[data-v91-slot="celular"]'), celular, 'tm-paciente-v91-cell');
-    tmPaciente91Move(host.querySelector('[data-v91-slot="telefone"]'), telefone, 'tm-paciente-v91-phone');
-    tmPaciente91Move(host.querySelector('[data-v91-slot="origem"]'), origem, 'tm-paciente-v91-origin');
-
-    tmPaciente91Move(host.querySelector('[data-v91-slot="carteira"]'), carteira, 'tm-paciente-v91-card');
-    tmPaciente91Move(host.querySelector('[data-v91-slot="validade"]'), validade, 'tm-paciente-v91-valid');
-
-    if (social) tmPaciente91Hide(social);
-
-    const origemTitle = Array.from(root.querySelectorAll('small'))
-      .find((small) => norm(small.textContent || '') === 'ORIGEM DE PACIENTES');
-    const origemTitleRow = origemTitle ? origemTitle.closest('.border-bottom') : null;
-    const origemMainRow = origemTitleRow ? origemTitleRow.closest('.row') : null;
-    tmPaciente91Hide(origemTitleRow);
-    tmPaciente91Hide(origemMainRow);
-
-    tmPaciente91HideRows(root);
-    tmPaciente91Observation(root);
-    tmPaciente91AlignLowerBlocks(root);
-    tmPaciente91Birth(root);
-
-    root.dataset.tmPaciente91Applied = '1';
+  function getAllTicketListCards() {
+    return Array.from(document.querySelectorAll('div.p-2.border.rounded.cursor-pointer')).filter(isTicketListCard);
   }
 
-  function schedulePaciente91Layout() {
-    setTimeout(tmPaciente91Layout, 80);
-    setTimeout(tmPaciente91Layout, 180);
-    setTimeout(tmPaciente91Layout, 350);
-    setTimeout(tmPaciente91Layout, 700);
+  function uppercaseTicketHeaderNames() {
+    for (const nameEl of document.querySelectorAll('div.px-4.py-3.flex.items-center.justify-between.gap-4 h2.font-semibold.text-card-foreground.truncate')) {
+      markUppercase(nameEl);
+    }
   }
 
+  function uppercaseTicketListCardNames() {
+    for (const card of getAllTicketListCards()) {
+      const selectors = [
+        'span.flex.items-center.gap-1.text-xs.text-card-foreground > span.font-medium',
+        'h4.font-medium',
+        'span.font-medium.text-sm',
+        'div.font-medium.text-sm',
+        'div.text-sm.font-medium',
+        'span.text-sm.font-medium'
+      ];
 
-  function tmPaciente103NormalizeBirthBadge() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    const birthBlock = root.querySelector('.tm-paciente-v91-birth');
-    if (!birthBlock) return;
-
-    const inputGroup = birthBlock.querySelector('.input-group');
-    const input = birthBlock.querySelector('input[type="date"], input');
-    if (!inputGroup || !input) return;
-
-    const appends = Array.from(birthBlock.querySelectorAll('.input-group-append'));
-
-    let badge = birthBlock.querySelector('.tm-birth-age-inline');
-    if (!badge) {
-      badge = document.createElement('div');
-      badge.className = 'input-group-append tm-birth-age-inline';
-      const span = document.createElement('div');
-      span.className = 'input-group-text';
-      span.setAttribute('title', 'Idade');
-      badge.appendChild(span);
-      inputGroup.appendChild(badge);
-    }
-
-    appends.forEach((append) => {
-      if (append !== badge) append.remove();
-    });
-
-    const ageText = badge.querySelector('.input-group-text');
-    inputGroup.style.setProperty('position', 'relative', 'important');
-    inputGroup.style.setProperty('overflow', 'hidden', 'important');
-    input.style.setProperty('padding-right', '48px', 'important');
-
-    const sync = () => {
-      const value = String(input.value || '');
-      if (!/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
-        badge.style.setProperty('display', 'none', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
-      }
-      const raw = value.replace(/[^0-9]/g, '');
-
-      if (raw.length !== 8) {
-        badge.style.setProperty('display', 'none', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
+      const found = new Set();
+      for (const selector of selectors) {
+        for (const nameEl of card.querySelectorAll(selector)) {
+          found.add(nameEl);
+        }
       }
 
-      const day = raw.slice(0, 2);
-      const month = raw.slice(2, 4);
-      const year = raw.slice(4, 8);
-      const date = new Date(year + '-' + month + '-' + day);
-
-      if (isNaN(date.getTime())) {
-        badge.style.setProperty('display', 'none', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
+      for (const nameEl of found) {
+        const text = normalizeText(nameEl.textContent);
+        if (!text) continue;
+        if (text.includes('Última atividade:')) continue;
+        if (text.toLowerCase() === 'clínica do sono' || text.toLowerCase() === 'clinica do sono') continue;
+        if (text.toLowerCase() === 'samec' || text.toLowerCase() === 'confirmação' || text.toLowerCase() === 'confirmacao') continue;
+        markUppercase(nameEl);
       }
-
-      const today = new Date();
-      let age = today.getFullYear() - date.getFullYear();
-      const m = today.getMonth() - date.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < date.getDate())) age--;
-
-      badge.style.setProperty('display', 'flex', 'important');
-      if (ageText) ageText.textContent = age + 'a';
-    };
-
-    if (!input.dataset.tmPaciente103BirthFix) {
-      input.addEventListener('input', sync);
-      input.addEventListener('change', sync);
-      input.dataset.tmPaciente103BirthFix = '1';
     }
+  }
 
-    sync();
+  function applyUppercaseToCustomerNames() {
+    uppercaseTicketHeaderNames();
+    uppercaseTicketListCardNames();
+  }
+
+  function getQueueType(labelText) {
+    const text = normalizeText(labelText).toLowerCase();
+    if (text === 'clínica do sono' || text === 'clinica do sono') return 'clinica_do_sono';
+    if (text === 'samec') return 'samec';
+    if (text === 'confirmação' || text === 'confirmacao') return 'confirmacao';
+    return '';
+  }
+
+  function styleQueueTagsInTicketCards() {
+    for (const card of getAllTicketListCards()) {
+      for (const badge of card.querySelectorAll('div.inline-flex.items-center.rounded-full')) {
+        if (!(badge instanceof HTMLElement)) continue;
+
+        const queueType = getQueueType(normalizeText(badge.textContent));
+        if (!queueType) continue;
+
+        badge.setAttribute(QUEUE_TAG_ATTR, 'true');
+        badge.setAttribute(QUEUE_TAG_TYPE_ATTR, queueType);
+        badge.style.backgroundColor = '';
+        badge.style.color = '';
+        badge.style.borderColor = '';
+        badge.style.backgroundImage = 'none';
+      }
+    }
   }
 
 
-  function tmPaciente105NormalizeBirthValue(input) {
-    const visible = String(input.value || '').trim();
-    const digits = visible.replace(/[^0-9]/g, '');
 
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(visible)) {
-      const parts = visible.split('/');
-      return { day: parts[0], month: parts[1], year: parts[2] };
+  function findUnreadBadgeElement(card) {
+    const candidates = card.querySelectorAll('span, div');
+    for (const el of candidates) {
+      if (!(el instanceof HTMLElement)) continue;
+      const text = normalizeText(el.textContent).toLowerCase();
+      if (text === 'não lida' || text === 'nao lida' || text === 'não lido' || text === 'nao lido') {
+        return el;
+      }
     }
-
-    if (/^\d{4}-\d{2}-\d{2}$/.test(visible)) {
-      const parts = visible.split('-');
-      return { day: parts[2], month: parts[1], year: parts[0] };
-    }
-
-    if (digits.length === 8) {
-      return { day: digits.slice(0, 2), month: digits.slice(2, 4), year: digits.slice(4, 8) };
-    }
-
     return null;
   }
 
-  function tmPaciente105ApplyBirthBadge() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    const birthBlock = root.querySelector('.tm-paciente-v91-birth');
-    if (!birthBlock) return;
-
-    const inputGroup = birthBlock.querySelector('.input-group');
-    const input = birthBlock.querySelector('input[type="date"], input');
-    if (!inputGroup || !input) return;
-
-    Array.from(birthBlock.querySelectorAll('.input-group-append')).forEach((append) => {
-      if (!append.classList.contains('tm-birth-age-inline-final')) append.remove();
-    });
-
-    let badge = inputGroup.querySelector('.tm-birth-age-inline-final');
-    if (!badge) {
-      badge = document.createElement('div');
-      badge.className = 'input-group-append tm-birth-age-inline tm-birth-age-inline-final';
-
-      const text = document.createElement('div');
-      text.className = 'input-group-text';
-      text.setAttribute('title', 'Idade');
-      badge.appendChild(text);
-
-      inputGroup.appendChild(badge);
-    }
-
-    const ageText = badge.querySelector('.input-group-text');
-
-    inputGroup.style.setProperty('position', 'relative', 'important');
-    inputGroup.style.setProperty('overflow', 'hidden', 'important');
-    input.style.setProperty('padding-right', '48px', 'important');
-
-    const sync = () => {
-      const parsed = tmPaciente105NormalizeBirthValue(input);
-
-      if (!parsed) {
-        badge.style.setProperty('display', 'none', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
-      }
-
-      const dayNum = Number(parsed.day);
-      const monthNum = Number(parsed.month);
-      const yearNum = Number(parsed.year);
-
+  function findUnreadBadgeWrapper(el, card) {
+    let node = el;
+    while (node && node !== card) {
+      if (!(node instanceof HTMLElement)) break;
       if (
-        !Number.isInteger(dayNum) || !Number.isInteger(monthNum) || !Number.isInteger(yearNum) ||
-        dayNum < 1 || dayNum > 31 ||
-        monthNum < 1 || monthNum > 12 ||
-        yearNum < 1900 || yearNum > 2100
+        node.classList.contains('inline-flex') ||
+        node.classList.contains('rounded-full') ||
+        node.classList.contains('border')
       ) {
-        badge.style.setProperty('display', 'none', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
+        return node;
       }
-
-      const birthDate = new Date(yearNum, monthNum - 1, dayNum);
-      if (
-        birthDate.getFullYear() !== yearNum ||
-        birthDate.getMonth() !== monthNum - 1 ||
-        birthDate.getDate() !== dayNum
-      ) {
-        badge.style.setProperty('display', 'none', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
-      }
-
-      const today = new Date();
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
-
-      badge.style.setProperty('display', 'flex', 'important');
-      if (ageText) ageText.textContent = age + 'a';
-    };
-
-    if (!input.dataset.tmPaciente105BirthFix) {
-      input.addEventListener('input', sync);
-      input.addEventListener('keyup', sync);
-      input.addEventListener('change', sync);
-      input.addEventListener('blur', sync);
-      input.dataset.tmPaciente105BirthFix = '1';
+      node = node.parentElement;
     }
+    return el;
+  }
 
-    sync();
+  function ensureUnreadIcon(card) {
+    let icon = card.querySelector(`[${UNREAD_ICON_ATTR}="true"]`);
+    if (icon) return icon;
+
+    icon = document.createElement('div');
+    icon.setAttribute(UNREAD_ICON_ATTR, 'true');
+
+    const img = document.createElement('img');
+    img.src = UNREAD_ICON_URL;
+    img.alt = 'Mensagem não lida';
+    img.draggable = false;
+
+    icon.appendChild(img);
+    card.appendChild(icon);
+    return icon;
+  }
+
+  function removeUnreadIcon(card) {
+    card.removeAttribute(UNREAD_CARD_ATTR);
+    card.querySelector(`[${UNREAD_ICON_ATTR}="true"]`)?.remove();
+  }
+
+  function applyUnreadMessageIndicators() {
+    for (const card of getAllTicketListCards()) {
+      const unreadBadge = findUnreadBadgeElement(card);
+
+      if (!unreadBadge) {
+        removeUnreadIcon(card);
+        continue;
+      }
+
+      const wrapper = findUnreadBadgeWrapper(unreadBadge, card);
+      hideElement(wrapper instanceof HTMLElement ? wrapper : unreadBadge);
+
+      card.setAttribute(UNREAD_CARD_ATTR, 'true');
+      ensureUnreadIcon(card);
+    }
   }
 
 
-  function tmPaciente106ApplyFinalBirthBadge() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
+  /* ========================================================================
+   * SEÇÃO: FORMATAÇÃO DO TELEFONE EM DADOS DO ATENDIMENTO
+   * Remove o 55 e exibe no padrão (DD) 99999-9999 sem flicker.
+   * ====================================================================== */
+  function stripCountryCode55(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (digits.startsWith('55') && digits.length > 11) {
+      return digits.slice(2);
+    }
+    return digits;
+  }
 
-    const birthBlock =
-      root.querySelector('.tm-paciente-v91-birth') ||
-      tmPaciente91Field(root, 'Data de Nascimento');
+  function formatBrazilPhoneDisplay(value) {
+    const digits = stripCountryCode55(value);
 
-    if (!birthBlock) return;
-
-    const inputGroup = birthBlock.querySelector('.input-group') || birthBlock;
-    const input = birthBlock.querySelector('input[type="date"], input');
-    if (!inputGroup || !input) return;
-
-    // Remove qualquer badge anterior do sistema ou das versões anteriores.
-    birthBlock.querySelectorAll('.input-group-append, .tm-birth-age-inline, .tm-birth-age-inline-final, .tm-paciente-age-badge-final')
-      .forEach((el) => el.remove());
-
-    const rawValue = String(input.value || '').trim();
-    const digits = rawValue.replace(/[^0-9]/g, '');
-
-    let day = '';
-    let month = '';
-    let year = '';
-
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(rawValue)) {
-      [day, month, year] = rawValue.split('/');
-    } else if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
-      const parts = rawValue.split('-');
-      year = parts[0];
-      month = parts[1];
-      day = parts[2];
-    } else if (digits.length === 8) {
-      day = digits.slice(0, 2);
-      month = digits.slice(2, 4);
-      year = digits.slice(4, 8);
-    } else {
-      inputGroup.style.setProperty('position', 'relative', 'important');
-      input.style.setProperty('padding-right', '48px', 'important');
-      return;
+    if (digits.length === 11) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
     }
 
-    const d = Number(day);
-    const m = Number(month);
-    const y = Number(year);
-
-    if (
-      !Number.isInteger(d) || !Number.isInteger(m) || !Number.isInteger(y) ||
-      d < 1 || d > 31 || m < 1 || m > 12 || y < 1900 || y > 2100
-    ) {
-      inputGroup.style.setProperty('position', 'relative', 'important');
-      input.style.setProperty('padding-right', '48px', 'important');
-      return;
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
     }
 
-    const birthDate = new Date(y, m - 1, d);
-    if (
-      birthDate.getFullYear() !== y ||
-      birthDate.getMonth() !== m - 1 ||
-      birthDate.getDate() !== d
-    ) {
-      inputGroup.style.setProperty('position', 'relative', 'important');
-      input.style.setProperty('padding-right', '48px', 'important');
-      return;
+    return digits || String(value || '');
+  }
+
+  function formatAttendanceDataPhones() {
+    for (const card of findAttendanceDataCards()) {
+      const phoneValueEl = findValueSpanByLabel(card, 'Telefone');
+      if (!phoneValueEl) continue;
+
+      const currentText = normalizeText(phoneValueEl.textContent);
+      if (!currentText) continue;
+
+      const formatted = formatBrazilPhoneDisplay(currentText);
+      if (formatted && currentText !== formatted) {
+        phoneValueEl.textContent = formatted;
+      }
+
+      phoneValueEl.setAttribute(PHONE_FORMATTED_ATTR, 'true');
     }
+  }
 
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const diffMonth = today.getMonth() - birthDate.getMonth();
-
-    if (diffMonth < 0 || (diffMonth === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    const badge = document.createElement('div');
-    badge.className = 'tm-paciente-age-badge-final';
-    badge.textContent = age + 'a';
-
-    inputGroup.appendChild(badge);
-
-    inputGroup.style.setProperty('position', 'relative', 'important');
-    inputGroup.style.setProperty('overflow', 'hidden', 'important');
-
-    input.style.setProperty('padding-right', '48px', 'important');
-
-    badge.style.setProperty('position', 'absolute', 'important');
-    badge.style.setProperty('top', '1px', 'important');
-    badge.style.setProperty('right', '1px', 'important');
-    badge.style.setProperty('bottom', '1px', 'important');
-    badge.style.setProperty('width', '46px', 'important');
-    badge.style.setProperty('z-index', '50', 'important');
-    badge.style.setProperty('display', 'flex', 'important');
-    badge.style.setProperty('align-items', 'center', 'important');
-    badge.style.setProperty('justify-content', 'center', 'important');
-    badge.style.setProperty('background', '#d9d9d9', 'important');
-    badge.style.setProperty('color', '#666', 'important');
-    badge.style.setProperty('border-left', '1px solid #cfd4da', 'important');
-    badge.style.setProperty('border-top-right-radius', '.25rem', 'important');
-    badge.style.setProperty('border-bottom-right-radius', '.25rem', 'important');
-    badge.style.setProperty('font-size', '14px', 'important');
-    badge.style.setProperty('line-height', '1', 'important');
-    badge.style.setProperty('pointer-events', 'none', 'important');
-    badge.style.setProperty('box-sizing', 'border-box', 'important');
-
-    if (!input.dataset.tmPaciente106BirthFix) {
-      const rerender = () => {
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 0);
-      };
-
-      input.addEventListener('input', rerender);
-      input.addEventListener('keyup', rerender);
-      input.addEventListener('change', rerender);
-      input.addEventListener('blur', rerender);
-      input.dataset.tmPaciente106BirthFix = '1';
-    }
+  function formatBrazilCpfDisplay(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (digits.length !== 11) return String(value || '');
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
   }
 
   
-  // === FIX FINAL: usar EXATAMENTE a lógica do modal Primeira Vez ===
-  function tmPaciente107MirrorFirstVisitBirth() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
 
-    const firstVisit = document.querySelector('.tm-klingo-root');
-    const pacienteBirth = root.querySelector('.tm-paciente-v91-birth input');
+  function formatAttendanceDataEmails() {
+    for (const card of findAttendanceDataCards()) {
+      const emailValueEl = findValueSpanByLabel(card, 'E-mail');
+      if (!emailValueEl) continue;
 
-    if (!firstVisit || !pacienteBirth) return;
+      const currentText = normalizeText(emailValueEl.textContent);
+      if (!currentText) continue;
 
-    const fvBirth = firstVisit.querySelector('input[type="date"], input');
+      const upper = currentText.toUpperCase();
 
-    if (!fvBirth) return;
+      // valor original para cópia
+      emailValueEl.setAttribute('data-tm-copy-raw', currentText);
 
-    // força o mesmo comportamento visual
-    pacienteBirth.style.cssText = fvBirth.style.cssText;
-
-    // remove qualquer overlay quebrado
-    const group = pacienteBirth.closest('.input-group');
-    if (group) {
-      group.querySelectorAll('.input-group-append').forEach(e => e.remove());
-    }
-
-    // reaplica badge exatamente igual Primeira Vez
-    const wrapper = document.createElement('div');
-    wrapper.className = 'input-group-append';
-
-    const badge = document.createElement('div');
-    badge.className = 'input-group-text';
-    badge.style.pointerEvents = 'none';
-
-    wrapper.appendChild(badge);
-
-    const parent = pacienteBirth.parentElement;
-    parent.appendChild(wrapper);
-
-    const calc = () => {
-      const v = pacienteBirth.value;
-      if (!v || v.length < 10) {
-        badge.textContent = '';
-        return;
+      if (currentText !== upper) {
+        emailValueEl.textContent = upper;
       }
 
-      let y,m,d;
-
-      if (v.includes('-')) {
-        [y,m,d] = v.split('-');
-      } else if (v.includes('/')) {
-        [d,m,y] = v.split('/');
-      }
-
-      const birth = new Date(y, m-1, d);
-      if (isNaN(birth)) return;
-
-      const today = new Date();
-      let age = today.getFullYear() - birth.getFullYear();
-
-      const md = today.getMonth() - birth.getMonth();
-      if (md < 0 || (md === 0 && today.getDate() < birth.getDate())) {
-        age--;
-      }
-
-      badge.textContent = age + 'a';
-    };
-
-    pacienteBirth.oninput = calc;
-    pacienteBirth.onchange = calc;
-
-    calc();
-  }
-
-
-  function tmPaciente108AdjustProcedureMaterial() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    const groups = Array.from(root.querySelectorAll('.input-group'));
-
-    groups.forEach((group) => {
-      const text = norm(group.innerText || group.textContent || '');
-      const input = group.querySelector('input');
-      const placeholder = input ? norm(input.getAttribute('placeholder') || '') : '';
-
-      const isAddProcedure =
-        text.includes('Adicionar procedimento') ||
-        placeholder.includes('Adicionar procedimento');
-
-      const isMaterial =
-        text.includes('Incluir material') ||
-        text.includes('medicamento') ||
-        text.includes('taxa') ||
-        placeholder.includes('Incluir material') ||
-        placeholder.includes('medicamento') ||
-        placeholder.includes('taxa');
-
-      if (isAddProcedure) {
-        group.classList.add('tm-paciente-procedimento-add');
-
-        const wrapper =
-          group.closest('.form-group') ||
-          group.closest('.col') ||
-          group.closest('[class*="col-"]') ||
-          group.parentElement;
-
-        [group, wrapper].filter(Boolean).forEach((el) => {
-          el.style.setProperty('width', '509px', 'important');
-          el.style.setProperty('max-width', '509px', 'important');
-          el.style.setProperty('min-width', '509px', 'important');
-          el.style.setProperty('margin-left', '0', 'important');
-          el.style.setProperty('margin-right', '0', 'important');
-          el.style.setProperty('box-sizing', 'border-box', 'important');
-        });
-      }
-
-      if (isMaterial) {
-        const wrapper =
-          group.closest('.form-group') ||
-          group.closest('.col') ||
-          group.closest('[class*="col-"]') ||
-          group.parentElement;
-
-        [group, wrapper].filter(Boolean).forEach((el) => {
-          el.classList.add('tm-paciente-material-hidden');
-          el.style.setProperty('display', 'none', 'important');
-        });
-      }
-    });
-  }
-
-
-  function tmPaciente109HardProcedureMaterialFix() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    const normalizeText = (v) => String(v || '').replace(/\s+/g, ' ').trim();
-
-    const allInputs = Array.from(root.querySelectorAll('input, .form-control'));
-    allInputs.forEach((input) => {
-      const placeholder = normalizeText(input.getAttribute ? input.getAttribute('placeholder') : '');
-      const valueText = normalizeText(input.value || input.textContent || '');
-      const aroundText = normalizeText((input.closest('.input-group') || input.parentElement || input).innerText || '');
-
-      const haystack = `${placeholder} ${valueText} ${aroundText}`;
-
-      const isProcedure = /Adicionar procedimento/i.test(haystack);
-      const isMaterial = /Incluir material|medicamento|taxa/i.test(haystack);
-
-      const group = input.closest('.input-group') || input;
-      const row =
-        group.closest('.form-group') ||
-        group.closest('.col') ||
-        group.closest('[class*="col-"]') ||
-        group.closest('.row') ||
-        group.parentElement;
-
-      if (isProcedure) {
-        [row, group, input].filter(Boolean).forEach((el) => {
-          el.classList.add('tm-paciente-proc-row-final');
-          el.style.setProperty('width', '509px', 'important');
-          el.style.setProperty('max-width', '509px', 'important');
-          el.style.setProperty('min-width', '509px', 'important');
-          el.style.setProperty('margin-left', '0', 'important');
-          el.style.setProperty('margin-right', '0', 'important');
-          el.style.setProperty('box-sizing', 'border-box', 'important');
-        });
-      }
-
-      if (isMaterial) {
-        [row, group].filter(Boolean).forEach((el) => {
-          el.classList.add('tm-paciente-material-row-final');
-          el.style.setProperty('display', 'none', 'important');
-          el.style.setProperty('visibility', 'hidden', 'important');
-          el.style.setProperty('height', '0', 'important');
-          el.style.setProperty('min-height', '0', 'important');
-          el.style.setProperty('max-height', '0', 'important');
-          el.style.setProperty('overflow', 'hidden', 'important');
-          el.style.setProperty('margin', '0', 'important');
-          el.style.setProperty('padding', '0', 'important');
-        });
-      }
-    });
-
-    // Fallback por texto do input-group, mesmo quando placeholder não vem no input.
-    Array.from(root.querySelectorAll('.input-group')).forEach((group) => {
-      const text = normalizeText(group.innerText || group.textContent || '');
-      const row =
-        group.closest('.form-group') ||
-        group.closest('.col') ||
-        group.closest('[class*="col-"]') ||
-        group.closest('.row') ||
-        group.parentElement;
-
-      if (/Adicionar procedimento/i.test(text)) {
-        [row, group].filter(Boolean).forEach((el) => {
-          el.classList.add('tm-paciente-proc-row-final');
-          el.style.setProperty('width', '509px', 'important');
-          el.style.setProperty('max-width', '509px', 'important');
-          el.style.setProperty('min-width', '509px', 'important');
-          el.style.setProperty('margin-left', '0', 'important');
-          el.style.setProperty('margin-right', '0', 'important');
-        });
-      }
-
-      if (/Incluir material|medicamento|taxa/i.test(text)) {
-        [row, group].filter(Boolean).forEach((el) => {
-          el.classList.add('tm-paciente-material-row-final');
-          el.style.setProperty('display', 'none', 'important');
-          el.style.setProperty('visibility', 'hidden', 'important');
-          el.style.setProperty('height', '0', 'important');
-          el.style.setProperty('min-height', '0', 'important');
-          el.style.setProperty('max-height', '0', 'important');
-          el.style.setProperty('overflow', 'hidden', 'important');
-          el.style.setProperty('margin', '0', 'important');
-          el.style.setProperty('padding', '0', 'important');
-        });
-      }
-    });
-  }
-
-
-  function tmPaciente110ApplyBirthAgeBadge() {
-  const root = getActivePacienteSchedulingModalRoot();
-  if (!root) return;
-
-  const birthBlock =
-    root.querySelector('.tm-paciente-v91-birth') ||
-    tmPaciente91Field(root, 'Data de Nascimento');
-
-  if (!birthBlock) return;
-
-  const input = birthBlock.querySelector('input');
-  if (!input) return;
-
-  const holder = input.closest('.input-group') || input.parentElement;
-  if (!holder) return;
-
-  holder.style.setProperty('position', 'relative', 'important');
-  holder.style.setProperty('overflow', 'hidden', 'important');
-  input.style.setProperty('padding-right', '48px', 'important');
-
-  holder.querySelectorAll(
-    '.tm-paciente-age-badge-110, .tm-paciente-age-badge-final, .tm-birth-age-inline, .tm-birth-age-inline-final, .input-group-append'
-  ).forEach((el) => el.remove());
-
-  const raw = String(input.value || '').trim();
-
-  let d;
-  let m;
-  let y;
-
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-    [d, m, y] = raw.split('/');
-  } else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    const parts = raw.split('-');
-    y = parts[0];
-    m = parts[1];
-    d = parts[2];
-  } else {
-    return;
-  }
-
-  d = Number(d);
-  m = Number(m);
-  y = Number(y);
-
-  if (!d || !m || !y || d < 1 || d > 31 || m < 1 || m > 12 || y < 1900 || y > 2100) return;
-
-  const birth = new Date(y, m - 1, d);
-
-  if (
-    birth.getFullYear() !== y ||
-    birth.getMonth() !== m - 1 ||
-    birth.getDate() !== d
-  ) return;
-
-  const today = new Date();
-  let age = today.getFullYear() - y;
-
-  if (
-    today.getMonth() < (m - 1) ||
-    (today.getMonth() === (m - 1) && today.getDate() < d)
-  ) {
-    age--;
-  }
-
-  const badge = document.createElement('div');
-  badge.className = 'tm-paciente-age-badge-110';
-  badge.textContent = age + 'a';
-
-  holder.appendChild(badge);
-
-  badge.style.setProperty('position', 'absolute', 'important');
-  badge.style.setProperty('top', '1px', 'important');
-  badge.style.setProperty('right', '1px', 'important');
-  badge.style.setProperty('bottom', '1px', 'important');
-  badge.style.setProperty('width', '46px', 'important');
-  badge.style.setProperty('height', 'auto', 'important');
-  badge.style.setProperty('z-index', '9999', 'important');
-  badge.style.setProperty('display', 'flex', 'important');
-  badge.style.setProperty('align-items', 'center', 'important');
-  badge.style.setProperty('justify-content', 'center', 'important');
-  badge.style.setProperty('background', '#d9d9d9', 'important');
-  badge.style.setProperty('color', '#555', 'important');
-  badge.style.setProperty('border-left', '1px solid #cfd4da', 'important');
-  badge.style.setProperty('border-top-right-radius', '.25rem', 'important');
-  badge.style.setProperty('border-bottom-right-radius', '.25rem', 'important');
-  badge.style.setProperty('font-size', '14px', 'important');
-  badge.style.setProperty('line-height', '1', 'important');
-  badge.style.setProperty('pointer-events', 'none', 'important');
-  badge.style.setProperty('box-sizing', 'border-box', 'important');
-  badge.style.setProperty('white-space', 'nowrap', 'important');
-
-  if (!input.dataset.tmPaciente110AgeListener) {
-    const refresh = () => setTimeout(tmPaciente110ApplyBirthAgeBadge, 0);
-    input.addEventListener('input', refresh);
-    input.addEventListener('keyup', refresh);
-    input.addEventListener('change', refresh);
-    input.addEventListener('blur', refresh);
-    input.dataset.tmPaciente110AgeListener = '1';
-  }
-}
-
-function burstUpdateLite() {
-    if (!isCallCenterRoute()) return;
-
-    clearFirstVisitResidueFromPacienteModal();
-    tmPaciente91Layout();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente103NormalizeBirthBadge();
-    tmPaciente105ApplyBirthBadge();
-    tmPaciente106ApplyFinalBirthBadge();
-    tmPaciente107MirrorFirstVisitBirth();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente108AdjustProcedureMaterial();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-
-    const root = getSchedulingModalRoot();
-
-    updateModalTitle();
-    enableBirthDatePaste();
-    injectLayoutCSS();
-    injectFontFix();
-
-    if (root) {
-      hideAppointmentModalFields();
-      reorganizeSchedulingModalLayout();
-      enableBirthAgeBadgeSafe();
-      resizeSchedulingModal();
-      reorganizeHeaderStructure(root);
-    }
-
-    simplifyUnitsSafe();
-  }
-
-  function burstUpdate() {
-    if (!isCallCenterRoute()) return;
-    burstUpdateLite();
-    setTimeout(burstUpdateLite, 100);
-    setTimeout(burstUpdateLite, 250);
-    setTimeout(burstUpdateLite, 500);
-    setTimeout(burstUpdateLite, 900);
-    setTimeout(burstUpdateLite, 1400);
-  }
-
-  document.addEventListener('click', (e) => {
-    if (!isCallCenterRoute()) return;
-
-    const pacienteCard = e.target instanceof Element
-      ? e.target.closest('.card-body.atalho.bg-success')
-      : null;
-
-    if (pacienteCard) {
-      setTimeout(() => {
-        clearFirstVisitResidueFromPacienteModal();
-        tmPaciente91Layout();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-        tmPaciente103NormalizeBirthBadge();
-        tmPaciente105ApplyBirthBadge();
-        tmPaciente106ApplyFinalBirthBadge();
-    tmPaciente107MirrorFirstVisitBirth();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente108AdjustProcedureMaterial();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
-      }, 60);
-      setTimeout(() => {
-        clearFirstVisitResidueFromPacienteModal();
-        tmPaciente91Layout();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-        tmPaciente103NormalizeBirthBadge();
-        tmPaciente105ApplyBirthBadge();
-        tmPaciente106ApplyFinalBirthBadge();
-    tmPaciente107MirrorFirstVisitBirth();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente108AdjustProcedureMaterial();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
-      }, 160);
-      setTimeout(() => {
-        clearFirstVisitResidueFromPacienteModal();
-        tmPaciente91Layout();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-        tmPaciente103NormalizeBirthBadge();
-        tmPaciente105ApplyBirthBadge();
-        tmPaciente106ApplyFinalBirthBadge();
-    tmPaciente107MirrorFirstVisitBirth();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente108AdjustProcedureMaterial();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
-      }, 320);
-      schedulePaciente91Layout();
-    }
-
-    if (!e.target.closest('#minutoModal')) {
-      captureSelectionFromClick(e.target, false);
-    }
-
-    burstUpdate();
-  }, true);
-
-  document.addEventListener('focusin', () => {
-    if (!isCallCenterRoute()) return;
-    enableBirthDatePaste();
-    hideAppointmentModalFields();
-    reorganizeSchedulingModalLayout();
-    enableBirthAgeBadgeSafe();
-  }, true);
-
-  document.addEventListener('contextmenu', async (e) => {
-    if (!e.target.closest('#minutoModal')) return;
-
-    const targetEl = e.target.closest('button, a, div, span');
-    if (!targetEl || !isTimeButton(targetEl)) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    const directCopyText = buildCopyTextFromTarget(targetEl);
-    const changed = captureSelectionFromClick(e.target, true);
-    if (!changed && !directCopyText) return;
-
-    const modalContext = getModalDateContext();
-    if (modalContext.dateText) state.selectedDate = modalContext.dateText;
-    if (modalContext.weekdayText) state.selectedWeekday = modalContext.weekdayText;
-
-    burstUpdate();
-
-    setTimeout(async () => {
-      await copyText(directCopyText || getCopyText(), targetEl);
-    }, 80);
-  }, true);
-
-
-  function isKlingoHost() {
-    return location.hostname.endsWith('klingo.app');
-  }
-
-  function injectDateCalculatorCSS() {
-    if (document.getElementById('tm-datecalc-style')) return;
-
-    const style = document.createElement('style');
-    style.id = 'tm-datecalc-style';
-    style.textContent = `
-      .tm-datecalc-panel {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 360px;
-        max-width: calc(100vw - 24px);
-        background: #ffffff;
-        border: 1px solid #d7dbe2;
-        border-radius: 10px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-        z-index: 999995;
-        overflow: hidden;
-      }
-
-      .tm-datecalc-hidden {
-        display: none !important;
-      }
-
-      .tm-datecalc-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 12px 14px;
-        background: #1679e8;
-        color: #fff;
-      }
-
-      .tm-datecalc-title {
-        font-size: 16px;
-        font-weight: 600;
-        line-height: 1.2;
-      }
-
-      .tm-datecalc-close {
-        border: 0;
-        background: transparent;
-        color: inherit;
-        font-size: 22px;
-        line-height: 1;
-        cursor: pointer;
-        padding: 0;
-      }
-
-      .tm-datecalc-body {
-        padding: 14px;
-      }
-
-      .tm-datecalc-section + .tm-datecalc-section {
-        margin-top: 16px;
-        padding-top: 16px;
-        border-top: 1px solid #e7ebf0;
-      }
-
-      .tm-datecalc-grid {
-        display: grid;
-        grid-template-columns: 1fr 112px;
-        gap: 10px 12px;
-        align-items: end;
-      }
-
-      .tm-datecalc-field {
-        min-width: 0;
-      }
-
-      .tm-datecalc-field label {
-        display: block;
-        margin-bottom: 6px;
-        color: #6c757d;
-        font-size: 13px;
-        line-height: 1.2;
-      }
-
-      
-      .tm-datecalc-field input[type="date"]::-webkit-calendar-picker-indicator {
-        display: none !important;
-        opacity: 0 !important;
-      }
-
-      .tm-datecalc-hoje-btn {
-        height: 38px;
-        padding: 0 10px;
-        margin-left: 6px;
-        border: 1px solid #ced4da;
-        border-radius: .25rem;
-        background: #f1f3f5;
-        cursor: pointer;
-        font-size: 13px;
-      }
-
-      .tm-datecalc-field input {
-        width: 100%;
-        height: 38px;
-        border: 1px solid #ced4da;
-        border-radius: .25rem;
-        padding: 6px 10px;
-        font-size: 15px;
-        line-height: 1.2;
-        color: #495057;
-        background: #fff;
-        box-sizing: border-box;
-      }
-
-      .tm-datecalc-field input:focus {
-        outline: none;
-        border-color: #80bdff;
-        box-shadow: 0 0 0 .2rem rgba(0,123,255,.15);
-      }
-
-      .tm-datecalc-result-box,
-      .tm-datecalc-days-box {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 46px;
-        margin-top: 12px;
-        padding: 10px 12px;
-        border: 1px solid #d9dee5;
-        border-radius: 8px;
-        background: #f7f9fb;
-        text-align: center;
-        box-sizing: border-box;
-      }
-
-      .tm-datecalc-result-box {
-        color: #212529;
-        font-weight: 600;
-        line-height: 1.35;
-      }
-
-      .tm-datecalc-result-box small {
-        display: block;
-        margin-top: 2px;
-        color: #6c757d;
-        font-weight: 500;
-      }
-
-      .tm-datecalc-days-box {
-        color: #212529;
-        font-size: 16px;
-        font-weight: 700;
-      }
-
-      [data-tm-datecalc-item="1"] {
-        cursor: pointer !important;
-      }
-
-      .tm-datecalc-header-trigger-item {
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        align-self: center !important;
-        height: 100% !important;
-        min-height: 0 !important;
-        line-height: 1 !important;
-      }
-
-      .tm-datecalc-header-trigger {
-        position: relative !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        align-self: center !important;
-        width: 36px !important;
-        height: 36px !important;
-        min-width: 36px !important;
-        min-height: 36px !important;
-        padding: 0 !important;
-        margin: 0 14px 0 0 !important;
-        border-radius: 12px !important;
-        border: 1px solid rgba(255,255,255,0.34) !important;
-        background: rgba(255,255,255,0.12) !important;
-        color: #ffffff !important;
-        line-height: 1 !important;
-        text-decoration: none !important;
-        cursor: pointer !important;
-        user-select: none !important;
-        flex: 0 0 auto !important;
-        overflow: hidden !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.10) !important;
-        transform: translateY(2px) !important;
-        transition:
-          transform 0.16s ease,
-          background 0.16s ease,
-          border-color 0.16s ease,
-          box-shadow 0.16s ease,
-          opacity 0.16s ease !important;
-      }
-
-      .tm-datecalc-header-trigger::before {
-        content: '' !important;
-        position: absolute !important;
-        inset: 0 !important;
-        border-radius: inherit !important;
-        background: linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0.05)) !important;
-        opacity: 0 !important;
-        transition: opacity 0.16s ease !important;
-        pointer-events: none !important;
-      }
-
-      .tm-datecalc-header-trigger img {
-        position: relative !important;
-        z-index: 1 !important;
-        display: block !important;
-        width: 19px !important;
-        height: 19px !important;
-        object-fit: contain !important;
-        filter: drop-shadow(0 1px 1px rgba(0,0,0,0.22)) !important;
-        transition: transform 0.16s ease, filter 0.16s ease !important;
-      }
-
-      .tm-datecalc-header-trigger:hover,
-      .tm-datecalc-header-trigger:focus {
-        color: #ffffff !important;
-        text-decoration: none !important;
-        opacity: 1 !important;
-        background: rgba(255,255,255,0.22) !important;
-        border-color: rgba(255,255,255,0.58) !important;
-        box-shadow: 0 7px 16px rgba(0,0,0,0.18) !important;
-        transform: translateY(1px) !important;
-      }
-
-      .tm-datecalc-header-trigger:hover::before,
-      .tm-datecalc-header-trigger:focus::before {
-        opacity: 1 !important;
-      }
-
-      .tm-datecalc-header-trigger:hover img,
-      .tm-datecalc-header-trigger:focus img {
-        transform: scale(1.08) !important;
-        filter: drop-shadow(0 2px 2px rgba(0,0,0,0.26)) !important;
-      }
-
-      .tm-datecalc-header-trigger:active {
-        transform: translateY(2px) scale(0.97) !important;
-        box-shadow: 0 3px 8px rgba(0,0,0,0.12) !important;
-      }
-
-      .tm-script-version-indicator {
-        position: absolute !important;
-        left: 50% !important;
-        top: 50% !important;
-        transform: translate(-50%, -50%) !important;
-        color: #ffffff !important;
-        font-size: inherit !important;
-        line-height: inherit !important;
-        font-weight: inherit !important;
-        font-family: inherit !important;
-        white-space: nowrap !important;
-        pointer-events: none !important;
-        user-select: none !important;
-        z-index: 2 !important;
-      }
-
-      @media (max-width: 640px) {
-        .tm-datecalc-panel {
-          top: 76px;
-          right: 10px;
-          left: 10px;
-          width: auto;
-          max-width: none;
-        }
-
-        .tm-datecalc-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  function getDateCalculatorPanel() {
-    return document.getElementById('tm-datecalc-panel');
-  }
-
-  function ensureDateCalculatorPanel() {
-    let panel = getDateCalculatorPanel();
-    if (panel) return panel;
-
-    panel = document.createElement('div');
-    panel.id = 'tm-datecalc-panel';
-    panel.className = 'tm-datecalc-panel tm-datecalc-hidden';
-    panel.innerHTML = `      <div class="tm-datecalc-body">
-        <div class="tm-datecalc-section">
-          <div class="tm-datecalc-grid">
-            <div class="tm-datecalc-field">
-              <label for="tm-datecalc-start">Data inicial</label>
-              <div style="display:flex;align-items:center;">
-              <input id="tm-datecalc-start" type="date" style="flex:1;">
-              <button type="button" class="tm-datecalc-hoje-btn" data-tm-hoje="1">Hoje</button>
-            </div>
-            </div>
-            <div class="tm-datecalc-field">
-              <label for="tm-datecalc-days">Adicionar dias</label>
-              <input id="tm-datecalc-days" type="number" step="1" placeholder="">
-            </div>
-          </div>
-          <div class="tm-datecalc-result-box" id="tm-datecalc-result-date"></div>
-        </div>
-
-        <div class="tm-datecalc-section">
-          <div class="tm-datecalc-grid">
-            <div class="tm-datecalc-field" style="grid-column: 1 / -1;">
-              <label for="tm-datecalc-end">Data final</label>
-              <div style="display:flex;align-items:center;">
-              <input id="tm-datecalc-end" type="date" style="flex:1;">
-              <button type="button" class="tm-datecalc-hoje-btn" data-tm-hoje-end="1">Hoje</button>
-            </div>
-            </div>
-          </div>
-          <div class="tm-datecalc-days-box" id="tm-datecalc-result-days"></div>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(panel);
-    return panel;
-  }
-
-  
-  function positionDateCalculatorPanel() {
-    const panel = document.getElementById('tm-datecalc-panel');
-    const trigger = document.querySelector('[data-tm-datecalc-header-trigger="1"]');
-    if (!panel || !trigger) return;
-
-    const rect = trigger.getBoundingClientRect();
-
-    panel.style.top = (rect.bottom + window.scrollY + 6) + 'px';
-    panel.style.left = (rect.left + window.scrollX - 280) + 'px';
-  }
-
-function setDateCalculatorOpen(isOpen) {
-    const panel = ensureDateCalculatorPanel();
-    panel.classList.toggle('tm-datecalc-hidden', !isOpen);
-    if (isOpen) positionDateCalculatorPanel();
-
-    if (isOpen) {
-      const startInput = panel.querySelector('#tm-datecalc-start');
-      if (startInput) startInput.focus();
+      bindCopyOnClick(emailValueEl, card, 'email');
     }
   }
 
-  function toggleDateCalculatorPanel() {
-    const panel = ensureDateCalculatorPanel();
-    setDateCalculatorOpen(panel.classList.contains('tm-datecalc-hidden'));
-  }
+  function formatAttendanceDataCpfs() {
+    for (const card of findAttendanceDataCards()) {
+      const cpfValueEl = findValueSpanByLabel(card, 'CPF');
+      if (!cpfValueEl) continue;
 
-  function parseIsoDateSafe(value) {
-    const raw = norm(value || '');
-    if (!raw) return null;
+      const currentText = normalizeText(cpfValueEl.textContent);
+      if (!currentText) continue;
 
-    let yyyy = 0;
-    let mm = 0;
-    let dd = 0;
-    let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-
-    if (match) {
-      yyyy = Number(match[1]);
-      mm = Number(match[2]);
-      dd = Number(match[3]);
-    } else {
-      match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-      if (!match) return null;
-      dd = Number(match[1]);
-      mm = Number(match[2]);
-      yyyy = Number(match[3]);
-    }
-
-    const date = new Date(yyyy, mm - 1, dd, 12, 0, 0, 0);
-
-    if (
-      date.getFullYear() !== yyyy ||
-      date.getMonth() !== mm - 1 ||
-      date.getDate() !== dd
-    ) {
-      return null;
-    }
-
-    return date;
-  }
-
-  function addDaysSafe(date, days) {
-    const amount = Number(days);
-    if (!(date instanceof Date) || Number.isNaN(amount)) return null;
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount, 12, 0, 0, 0);
-  }
-
-  function diffDaysSafe(startDate, endDate) {
-    if (!(startDate instanceof Date) || !(endDate instanceof Date)) return null;
-    const diffMs = endDate.getTime() - startDate.getTime();
-    return Math.round(diffMs / 86400000);
-  }
-
-  function formatDatePtBrFull(date) {
-    if (!(date instanceof Date)) return '';
-    const weekday = WEEKDAYS[date.getDay() === 0 ? 6 : date.getDay() - 1] || '';
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = monthNameFromNumber(String(date.getMonth() + 1).padStart(2, '0'));
-    const year = date.getFullYear();
-    return `${weekday}, ${day} de ${month} de ${year}`;
-  }
-
-  function formatDatePtBrShort(date) {
-    if (!(date instanceof Date)) return '';
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  }
-
-  function refreshDateCalculatorResults() {
-    const panel = getDateCalculatorPanel();
-    if (!panel) return;
-
-    const startInput = panel.querySelector('#tm-datecalc-start');
-    const daysInput = panel.querySelector('#tm-datecalc-days');
-    const endInput = panel.querySelector('#tm-datecalc-end');
-    const resultDate = panel.querySelector('#tm-datecalc-result-date');
-    const resultDays = panel.querySelector('#tm-datecalc-result-days');
-
-    if (!startInput || !daysInput || !endInput || !resultDate || !resultDays) return;
-
-    const startDate = parseIsoDateSafe(startInput.value);
-    const endDate = parseIsoDateSafe(endInput.value);
-    const daysValue = norm(daysInput.value);
-
-    if (startDate && daysValue !== '' && !Number.isNaN(Number(daysValue))) {
-      const targetDate = addDaysSafe(startDate, Number(daysValue));
-      resultDate.textContent = targetDate
-        ? formatDatePtBrShort(targetDate)
-        : 'Não foi possível calcular a data.';
-    } else {
-      resultDate.textContent = '';
-    }
-
-    if (startDate && endDate) {
-      const totalDays = diffDaysSafe(startDate, endDate);
-      if (totalDays === null) {
-        resultDays.textContent = 'Não foi possível calcular a diferença.';
-      } else {
-        const label = Math.abs(totalDays) === 1 ? 'dia' : 'dias';
-        resultDays.textContent = `${totalDays} ${label}`;
+      const formatted = formatBrazilCpfDisplay(currentText);
+      if (formatted && currentText !== formatted) {
+        cpfValueEl.textContent = formatted;
       }
-    } else {
-      resultDays.textContent = '';
     }
   }
 
-  function getCurrentScriptVersion() {
-    const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
-      ? String(GM_info.script.version)
-      : '11.7';
-    const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '11.7';
-  }
-
-  function ensureScriptVersionIndicator() {
-    const navbar = document.querySelector('nav.navbar');
-    if (!navbar) return;
-
-    navbar.style.setProperty('position', 'relative', 'important');
-
-    let indicator = navbar.querySelector('#tm-script-version-indicator');
-    if (!indicator) {
-      indicator = document.createElement('div');
-      indicator.id = 'tm-script-version-indicator';
-      indicator.className = 'tm-script-version-indicator';
-      navbar.appendChild(indicator);
-    }
-
-    const expected = `🧪 V${getCurrentScriptVersion()}`;
-    if (indicator.textContent !== expected) {
-      indicator.textContent = expected;
-    }
-
-    const companyText = navbar.querySelector('.text-white');
-    if (companyText) {
-      const cs = window.getComputedStyle(companyText);
-      indicator.style.setProperty('font-size', cs.fontSize, 'important');
-      indicator.style.setProperty('line-height', cs.lineHeight, 'important');
-      indicator.style.setProperty('font-weight', cs.fontWeight, 'important');
-      indicator.style.setProperty('font-family', cs.fontFamily, 'important');
-    }
-  }
-
-  function startHeaderToolsInitialRenderSafe() {
-    if (!isKlingoHost()) return;
-
-    clearTimeout(startHeaderToolsInitialRenderSafe._timer);
-
-    let attempts = 0;
-    const maxAttempts = 24;
-
-    const run = () => {
-      attempts += 1;
-
-      ensureDateCalculatorHeaderTrigger();
-      ensureScriptVersionIndicator();
-
-      const hasCalculator = !!document.querySelector('[data-tm-datecalc-header-trigger="1"]');
-      const hasVersion = !!document.querySelector('#tm-script-version-indicator');
-
-      if (hasCalculator && hasVersion) return;
-      if (attempts >= maxAttempts) return;
-
-      startHeaderToolsInitialRenderSafe._timer = setTimeout(run, 250);
-    };
-
-    run();
-  }
-
-  function getDateCalculatorHeaderHost() {
-    return document.querySelector('nav.navbar ul.navbar-nav.ml-auto');
-  }
-
-  function ensureDateCalculatorHeaderTrigger() {
-    const host = getDateCalculatorHeaderHost();
-    if (!host) return;
-
-    if (host.querySelector('[data-tm-datecalc-header-trigger="1"]')) return;
-
-    const patientItem = host.querySelector('li');
-    const triggerLi = document.createElement('li');
-    triggerLi.className = 'nav-item tm-datecalc-header-trigger-item';
-
-    const trigger = document.createElement('a');
-    trigger.href = '#';
-    trigger.className = 'nav-link tm-datecalc-header-trigger';
-    trigger.setAttribute('data-tm-datecalc-header-trigger', '1');
-    trigger.setAttribute('title', 'Calculadora de datas');
-    trigger.setAttribute('aria-label', 'Calculadora de datas');
-    trigger.innerHTML = '<img src="https://i.imgur.com/GU5gE57.png">';
-
-    triggerLi.appendChild(trigger);
-
-    if (patientItem) {
-      host.insertBefore(triggerLi, patientItem);
-    } else {
-      host.appendChild(triggerLi);
-    }
-  }
-
-  function isElementVisible(el) {
-    if (!el || !el.isConnected) return false;
-    const style = window.getComputedStyle(el);
-    if (style.display === 'none' || style.visibility === 'hidden') return false;
-    const rect = el.getBoundingClientRect();
-    return !!(rect.width || rect.height);
-  }
-
-  function findDateCalculatorMenuContainer() {
-    const menu = document.querySelector('#creek-dropdown.dropdown-menu');
-    if (!menu) return null;
-
-    const text = norm(menu.textContent || '');
-    if (!text.includes('Sair')) return null;
-    if (!text.includes('Alterar minha senha')) return null;
-
-    return menu;
-  }
-
-  function findExitActionInMenu(menu) {
-    if (!menu) return null;
-
-    const actions = Array.from(menu.querySelectorAll('a, button, div, li, span'));
-    for (const action of actions) {
-      if (!isElementVisible(action)) continue;
-      if (norm(action.textContent) !== 'Sair') continue;
-
-      const anchor =
-        action.closest('a, button, .dropdown-item, [role="menuitem"], li, div') ||
-        action.parentElement;
-
-      if (anchor && anchor !== menu) return anchor;
-    }
-
-    return null;
-  }
-
-  function ensureDateCalculatorMenuItem() {
-    return;
-  }
-
-  function scheduleDateCalculatorMenuRefresh() {
-    if (!isKlingoHost()) return;
-    clearTimeout(scheduleDateCalculatorMenuRefresh._timer);
-    scheduleDateCalculatorMenuRefresh._timer = setTimeout(() => {
-      ensureDateCalculatorHeaderTrigger();
-      ensureScriptVersionIndicator();
-      ensureDateCalculatorMenuItem();
-    }, 120);
-  }
-
-  function bindDateCalculatorEvents() {
-    if (document.body.dataset.tmDatecalcBound === '1') return;
-    document.body.dataset.tmDatecalcBound = '1';
-
-    document.addEventListener('click', (e) => {
-      const headerTrigger = e.target.closest('[data-tm-datecalc-header-trigger="1"]');
-      if (headerTrigger) {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleDateCalculatorPanel();
-        return;
-      }
-
-      const menuItem = e.target.closest('[data-tm-datecalc-item="1"]');
-      if (menuItem) {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleDateCalculatorPanel();
-        return;
-      }
-
-      const hojeEndBtn = e.target.closest('[data-tm-hoje-end="1"]');
-      if (hojeEndBtn) {
-        e.preventDefault();
-        const input = document.getElementById('tm-datecalc-end');
-        if (input) {
-          const today = new Date();
-          const yyyy = today.getFullYear();
-          const mm = String(today.getMonth()+1).padStart(2,'0');
-          const dd = String(today.getDate()).padStart(2,'0');
-          input.value = `${yyyy}-${mm}-${dd}`;
-          input.dispatchEvent(new Event('input', {bubbles:true}));
-        }
-        return;
-      }
-
-      const hojeBtn = e.target.closest('[data-tm-hoje="1"]');
-      if (hojeBtn) {
-        e.preventDefault();
-        const input = document.getElementById('tm-datecalc-start');
-        if (input) {
-          const today = new Date();
-          const yyyy = today.getFullYear();
-          const mm = String(today.getMonth()+1).padStart(2,'0');
-          const dd = String(today.getDate()).padStart(2,'0');
-          input.value = `${yyyy}-${mm}-${dd}`;
-          input.dispatchEvent(new Event('input', {bubbles:true}));
-        }
-        return;
-      }
-
-            const closeBtn = e.target.closest('[data-tm-datecalc-close="1"]');
-      if (closeBtn) {
-        e.preventDefault();
-        e.stopPropagation();
-        setDateCalculatorOpen(false);
-        return;
-      }
-
-      const avatarToggle = e.target.closest('#navbarDropdown');
-      if (avatarToggle) {
-        scheduleDateCalculatorMenuRefresh();
-        setTimeout(scheduleDateCalculatorMenuRefresh, 80);
-        setTimeout(scheduleDateCalculatorMenuRefresh, 180);
-        setTimeout(scheduleDateCalculatorMenuRefresh, 320);
-        return;
-      }
-
-      scheduleDateCalculatorMenuRefresh();
-    }, true);
-
-    document.addEventListener('input', (e) => {
-      if (!e.target.closest('#tm-datecalc-panel')) return;
-      refreshDateCalculatorResults();
-  window.addEventListener('resize', positionDateCalculatorPanel);
-  window.addEventListener('scroll', positionDateCalculatorPanel, true);
-
-    }, true);
-
-    document.addEventListener('change', (e) => {
-      if (!e.target.closest('#tm-datecalc-panel')) return;
-      refreshDateCalculatorResults();
-    }, true);
-
-    window.addEventListener('hashchange', () => {
-      scheduleDateCalculatorMenuRefresh();
-      startHeaderToolsInitialRenderSafe();
-    }, true);
-
-    window.addEventListener('focus', () => {
-      scheduleDateCalculatorMenuRefresh();
-      startHeaderToolsInitialRenderSafe();
-    }, true);
-  }
-
-  function initDateCalculatorFeature() {
-    if (!isKlingoHost()) return;
-    injectDateCalculatorCSS();
-    ensureDateCalculatorPanel();
-    ensureDateCalculatorHeaderTrigger();
-    ensureScriptVersionIndicator();
-    bindDateCalculatorEvents();
-    refreshDateCalculatorResults();
-    scheduleDateCalculatorMenuRefresh();
-    setTimeout(() => {
-      ensureDateCalculatorHeaderTrigger();
-      ensureScriptVersionIndicator();
-    }, 120);
-    setTimeout(() => {
-      ensureDateCalculatorHeaderTrigger();
-      ensureScriptVersionIndicator();
-    }, 300);
-    setTimeout(() => {
-      ensureDateCalculatorHeaderTrigger();
-      ensureScriptVersionIndicator();
-    }, 700);
-
-    startHeaderToolsInitialRenderSafe();
-  }
-
-  const observer = new MutationObserver(() => {
-    applyLoginIndicator();
-    enableBirthDatePaste();
-    burstUpdateLite();
-    scheduleDateCalculatorMenuRefresh();
-  });
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-    characterData: true
-  });
-
-  function initScript() {
-    applyLoginIndicator();
-    initDateCalculatorFeature();
-    if (!isCallCenterRoute()) return;
-    enableBirthDatePaste();
-    injectLayoutCSS();
-    injectFontFix();
-    hideAppointmentModalFields();
-    reorganizeSchedulingModalLayout();
-    resizeSchedulingModal();
-
-    burstUpdate();
-
-    setTimeout(() => {
-      enableBirthDatePaste();
-      burstUpdate();
-    }, 300);
-
-    setTimeout(() => {
-      enableBirthDatePaste();
-      burstUpdate();
-    }, 1000);
-
-    setTimeout(() => {
-      enableBirthDatePaste();
-      burstUpdate();
-    }, 2000);
-
-    console.log('[TM] script inicializado', location.href);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initScript);
-  } else {
-    initScript();
-  }
-
-  window.addEventListener('load', initScript);
-  window.addEventListener('pageshow', initScript);
-  window.addEventListener('focus', () => {
-    applyLoginIndicator();
-    if (!isCallCenterRoute()) return;
-    enableBirthDatePaste();
-    burstUpdate();
-  });
-  window.addEventListener('hashchange', initScript);
-
-  setInterval(() => {
-    if (location.hostname.endsWith('klingo.app')) {
-      applyLoginIndicator();
-      if (!isCallCenterRoute()) return;
-      enableBirthDatePaste();
-      burstUpdate();
-    }
-  }, 1500);
-  setTimeout(tmPaciente108AdjustProcedureMaterial, 300);
-  setTimeout(tmPaciente108AdjustProcedureMaterial, 800);
-
-  setTimeout(tmPaciente109HardProcedureMaterialFix, 200);
-  setTimeout(tmPaciente109HardProcedureMaterialFix, 500);
-  setTimeout(tmPaciente109HardProcedureMaterialFix, 1000);
-  setInterval(() => {
-    if (getActivePacienteSchedulingModalRoot()) tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-  }, 700);
-
-
-  setTimeout(tmPaciente110ApplyBirthAgeBadge, 100);
-  setTimeout(tmPaciente110ApplyBirthAgeBadge, 300);
-  setTimeout(tmPaciente110ApplyBirthAgeBadge, 700);
-  setTimeout(tmPaciente110ApplyBirthAgeBadge, 1200);
-
-
-  setInterval(() => {
-    try {
-      if (getActivePacienteSchedulingModalRoot()) tmPaciente110ApplyBirthAgeBadge();
-    } catch (e) {}
-  }, 300);
-
-
-  function tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez() {
-    const removeBadge = () => {
-      document.querySelectorAll('.tm-paciente-birth-age-floating').forEach((el) => el.remove());
-    };
-
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) {
-      removeBadge();
-      return;
-    }
-
-    const birthBlock =
-      root.querySelector('.tm-paciente-v91-birth') ||
-      tmPaciente91Field(root, 'Data de Nascimento');
-
-    if (!birthBlock) {
-      removeBadge();
-      return;
-    }
-
-    const input = birthBlock.querySelector('input');
-    if (!input) {
-      removeBadge();
-      return;
-    }
-
-    const value = String(input.value || '').trim();
-
-    let day;
-    let month;
-    let year;
-
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
-      [day, month, year] = value.split('/');
-    } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      const parts = value.split('-');
-      year = parts[0];
-      month = parts[1];
-      day = parts[2];
-    } else {
-      removeBadge();
-      input.style.setProperty('padding-right', '48px', 'important');
-      return;
-    }
-
-    day = Number(day);
-    month = Number(month);
-    year = Number(year);
-
-    if (
-      !Number.isInteger(day) ||
-      !Number.isInteger(month) ||
-      !Number.isInteger(year) ||
-      day < 1 ||
-      day > 31 ||
-      month < 1 ||
-      month > 12 ||
-      year < 1900 ||
-      year > 2100
-    ) {
-      removeBadge();
-      return;
-    }
-
+  function calculateAgeFromBirthDate(day, month, year) {
     const birthDate = new Date(year, month - 1, day);
-
     if (
+      Number.isNaN(birthDate.getTime()) ||
       birthDate.getFullYear() !== year ||
       birthDate.getMonth() !== month - 1 ||
       birthDate.getDate() !== day
     ) {
-      removeBadge();
-      return;
+      return null;
     }
 
     const today = new Date();
     let age = today.getFullYear() - year;
+    const hasHadBirthdayThisYear =
+      today.getMonth() > (month - 1) ||
+      (today.getMonth() === (month - 1) && today.getDate() >= day);
 
-    if (
-      today.getMonth() < month - 1 ||
-      (today.getMonth() === month - 1 && today.getDate() < day)
-    ) {
-      age--;
+    if (!hasHadBirthdayThisYear) age -= 1;
+    return age >= 0 ? age : null;
+  }
+
+  function formatBirthDateWithAgeDisplay(value) {
+    const textValue = normalizeText(value);
+    const match = textValue.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!match) return null;
+
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+    const age = calculateAgeFromBirthDate(day, month, year);
+    if (age === null) return null;
+
+    const yearsLabel = age === 1 ? 'ano' : 'anos';
+    const baseDate = `${match[1]}/${match[2]}/${match[3]}`;
+
+    return {
+      baseDate,
+      ageText: `${age} ${yearsLabel}`
+    };
+  }
+
+  function formatAttendanceDataBirthDates() {
+    for (const card of findAttendanceDataCards()) {
+      const birthValueEl = findValueSpanByLabel(card, 'Nascimento');
+      if (!birthValueEl) continue;
+
+      const visibleText = normalizeText(birthValueEl.textContent);
+      const visibleMatch = visibleText.match(/^(\d{2}\/\d{2}\/\d{4})/);
+      const rawAttr = normalizeText(birthValueEl.getAttribute('data-tm-copy-raw') || '');
+      const sourceDate = visibleMatch ? visibleMatch[1] : rawAttr;
+
+      if (!sourceDate) {
+        birthValueEl.removeAttribute(BIRTH_AGE_ATTR);
+        birthValueEl.removeAttribute('data-tm-copy-raw');
+        continue;
+      }
+
+      const formatted = formatBirthDateWithAgeDisplay(sourceDate);
+      if (!formatted) {
+        birthValueEl.removeAttribute(BIRTH_AGE_ATTR);
+        birthValueEl.setAttribute('data-tm-copy-raw', sourceDate);
+        if (visibleText !== sourceDate) {
+          birthValueEl.textContent = sourceDate;
+        }
+        continue;
+      }
+
+      birthValueEl.setAttribute('data-tm-copy-raw', formatted.baseDate);
+      birthValueEl.setAttribute(BIRTH_AGE_ATTR, formatted.ageText);
+
+      if (visibleText !== formatted.baseDate) {
+        birthValueEl.textContent = formatted.baseDate;
+      }
     }
+  }
 
-    input.style.setProperty('padding-right', '48px', 'important');
-
-    let badge = document.querySelector('.tm-paciente-birth-age-floating');
-    if (!badge) {
-      badge = document.createElement('div');
-      badge.className = 'tm-paciente-birth-age-floating';
-      document.body.appendChild(badge);
+  /* ========================================================================
+   * SEÇÃO: COPIAR DADOS DO ATENDIMENTO + TOAST (18 + 19 mescladas)
+   * ====================================================================== */
+  function findAttendanceDataCards() {
+    const result = [];
+    for (const card of document.querySelectorAll('div.rounded-xl.bg-card.border.border-border, div.rounded-lg.bg-card.border.border-border')) {
+      const title = card.querySelector('h3');
+      if (title && normalizeText(title.textContent) === 'Dados do Atendimento') {
+        result.push(card);
+      }
     }
+    return result;
+  }
 
-    const rect = input.getBoundingClientRect();
-    const style = window.getComputedStyle(input);
+  function ensureCopyToast(card) {
+    let toast = card.querySelector(`[${COPY_TOAST_ATTR}="true"]`);
+    if (toast) return toast;
 
-    badge.textContent = age + 'a';
-    badge.style.setProperty('position', 'fixed', 'important');
-    badge.style.setProperty('left', Math.round(rect.right - 47) + 'px', 'important');
-    badge.style.setProperty('top', Math.round(rect.top + 1) + 'px', 'important');
-    badge.style.setProperty('width', '46px', 'important');
-    badge.style.setProperty('height', Math.max(0, Math.round(rect.height - 2)) + 'px', 'important');
-    badge.style.setProperty('z-index', '2147483647', 'important');
-    badge.style.setProperty('display', 'flex', 'important');
-    badge.style.setProperty('align-items', 'center', 'important');
-    badge.style.setProperty('justify-content', 'center', 'important');
-    badge.style.setProperty('background', '#d9d9d9', 'important');
-    badge.style.setProperty('color', '#666', 'important');
-    badge.style.setProperty('border-left', '1px solid #cfd4da', 'important');
-    badge.style.setProperty('border-top-right-radius', style.borderTopRightRadius || '.25rem', 'important');
-    badge.style.setProperty('border-bottom-right-radius', style.borderBottomRightRadius || '.25rem', 'important');
-    badge.style.setProperty('font-size', style.fontSize || '14px', 'important');
-    badge.style.setProperty('font-family', style.fontFamily || 'inherit', 'important');
-    badge.style.setProperty('font-weight', style.fontWeight || '400', 'important');
-    badge.style.setProperty('line-height', '1', 'important');
-    badge.style.setProperty('pointer-events', 'none', 'important');
-    badge.style.setProperty('box-sizing', 'border-box', 'important');
-    badge.style.setProperty('white-space', 'nowrap', 'important');
+    toast = document.createElement('div');
+    toast.setAttribute(COPY_TOAST_ATTR, 'true');
 
-    if (!input.dataset.tmPaciente113AgeListener) {
-      const refresh = () => setTimeout(tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez, 0);
-      input.addEventListener('input', refresh, true);
-      input.addEventListener('keyup', refresh, true);
-      input.addEventListener('change', refresh, true);
-      input.addEventListener('blur', refresh, true);
-      input.dataset.tmPaciente113AgeListener = '1';
+    const img = document.createElement('img');
+    img.src = COPY_ICON_URL;
+    img.alt = 'Copiado';
+    img.draggable = false;
+
+    toast.appendChild(img);
+    card.appendChild(toast);
+    return toast;
+  }
+
+  function showCopyToast(card) {
+    const toast = ensureCopyToast(card);
+    if (toast._tmHideTimer) clearTimeout(toast._tmHideTimer);
+
+    toast.setAttribute(COPY_TOAST_VISIBLE_ATTR, 'true');
+    toast._tmHideTimer = setTimeout(() => {
+      toast.removeAttribute(COPY_TOAST_VISIBLE_ATTR);
+    }, 1300);
+  }
+
+  function findValueSpanByLabel(card, labelText) {
+    for (const label of card.querySelectorAll('span')) {
+      if (normalizeText(label.textContent) !== labelText) continue;
+
+      let row = label.parentElement;
+      while (row && row !== card) {
+        const valueSpan = row.querySelector('span.text-sm.text-card-foreground.break-words.min-w-0');
+        if (valueSpan) return valueSpan;
+        row = row.parentElement;
+      }
+    }
+    return null;
+  }
+
+  function bindCopyOnClick(valueEl, card, fieldName) {
+    if (!valueEl || valueEl.getAttribute(COPY_VALUE_ATTR) === 'true') return;
+
+    valueEl.setAttribute(COPY_VALUE_ATTR, 'true');
+    valueEl.setAttribute('title', `Clique para copiar ${fieldName.toLowerCase()}`);
+
+    valueEl.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const text = normalizeText(valueEl.getAttribute('data-tm-copy-raw') || valueEl.textContent);
+      if (!text) return;
+
+      if (await copyTextToClipboard(text)) {
+        showCopyToast(card);
+      }
+    });
+  }
+
+  function enableCopyOnAttendanceData() {
+    for (const card of findAttendanceDataCards()) {
+      card.setAttribute(COPY_CARD_ATTR, 'true');
+      ensureCopyToast(card);
+
+      for (const [labelText, fieldName] of [
+        ['Nome', 'nome'],
+        ['Nascimento', 'nascimento'],
+        ['CPF', 'cpf'],
+        ['Telefone', 'telefone']
+      ]) {
+        const valueEl = findValueSpanByLabel(card, labelText);
+        if (valueEl) bindCopyOnClick(valueEl, card, fieldName);
+      }
     }
   }
 
 
-  setInterval(() => {
+  function isNotasInternasCard(card) {
     try {
-      tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
-    } catch (e) {}
-  }, 150);
-  window.addEventListener('scroll', () => {
+      if (!(card instanceof HTMLElement)) return false;
+
+      const text = normalizeText(card.textContent || '');
+      const title = Array.from(card.querySelectorAll('h3')).find(el =>
+        normalizeText(el.textContent || '') === 'Notas Internas'
+      );
+
+      if (!title) return false;
+
+      const hasTextarea = !!card.querySelector('textarea[placeholder*="nota interna"], textarea[placeholder*="Nota interna"]');
+      const hasButton = Array.from(card.querySelectorAll('button')).some(btn =>
+        normalizeText(btn.textContent || '') === 'Adicionar Nota'
+      );
+
+      return hasTextarea && hasButton && text.includes('Registre informações importantes');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function hideNotasInternasCard() {
     try {
-      tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
-    } catch (e) {}
-  }, true);
-  window.addEventListener('resize', () => {
-    try {
-      tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
-    } catch (e) {}
-  }, true);
-
-
-
-
-
-
-  // =========================
-  // PACIENTE 11.6 - BADGE IDADE INTERNA, SEM FLICKER
-  // =========================
-  (function tmPaciente115InternalBirthAgeBadge() {
-    let lastInput = null;
-
-    function getBirthInput() {
-      const root = getActivePacienteSchedulingModalRoot && getActivePacienteSchedulingModalRoot();
-      if (!root) return null;
-
-      const birthBlock =
-        root.querySelector('.tm-paciente-v91-birth') ||
-        (typeof tmPaciente91Field === 'function' ? tmPaciente91Field(root, 'Data de Nascimento') : null);
-
-      if (birthBlock) {
-        const input = birthBlock.querySelector('input');
-        if (input) return input;
-      }
-
-      const labels = Array.from(root.querySelectorAll('small, label, div'));
-      for (const label of labels) {
-        const text = String(label.innerText || label.textContent || '').replace(/\s+/g, ' ').trim();
-        if (!text.includes('Data de Nascimento')) continue;
-
-        const field =
-          label.closest('.form-group') ||
-          label.closest('.col') ||
-          label.closest('[class*="col-"]') ||
-          label.parentElement;
-
-        const input = field ? field.querySelector('input') : null;
-        if (input) return input;
-      }
-
-      return null;
-    }
-
-    function parseBirth(value) {
-      const raw = String(value || '').trim();
-
-      let day;
-      let month;
-      let year;
-
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-        [day, month, year] = raw.split('/').map(Number);
-      } else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-        const parts = raw.split('-').map(Number);
-        year = parts[0];
-        month = parts[1];
-        day = parts[2];
-      } else {
-        return null;
-      }
-
-      if (
-        !Number.isInteger(day) ||
-        !Number.isInteger(month) ||
-        !Number.isInteger(year) ||
-        day < 1 ||
-        day > 31 ||
-        month < 1 ||
-        month > 12 ||
-        year < 1900 ||
-        year > 2100
-      ) {
-        return null;
-      }
-
-      const birth = new Date(year, month - 1, day);
-
-      if (
-        birth.getFullYear() !== year ||
-        birth.getMonth() !== month - 1 ||
-        birth.getDate() !== day
-      ) {
-        return null;
-      }
-
-      const today = new Date();
-      let age = today.getFullYear() - year;
-
-      if (
-        today.getMonth() < month - 1 ||
-        (today.getMonth() === month - 1 && today.getDate() < day)
-      ) {
-        age--;
-      }
-
-      return age;
-    }
-
-    function removeOldBadges() {
-      document.querySelectorAll(
-        '.tm-age-floating, .tm-paciente-birth-age-floating, .tm-paciente-age-badge-110, .tm-paciente-age-badge-final, .tm-birth-age-inline, .tm-birth-age-inline-final'
-      ).forEach((el) => el.remove());
-    }
-
-    function applyBadge() {
-      const input = getBirthInput();
-
-      if (!input) {
-        removeOldBadges();
-        lastInput = null;
-        return;
-      }
-
-      lastInput = input;
-
-      const holder = input.closest('.input-group') || input.parentElement;
-      if (!holder) return;
-
-      removeOldBadges();
-
-      const age = parseBirth(input.value);
-
-      holder.classList.add('tm-paciente-birth-holder-115');
-      holder.style.setProperty('position', 'relative', 'important');
-      holder.style.setProperty('overflow', 'hidden', 'important');
-      input.style.setProperty('padding-right', '48px', 'important');
-
-      let badge = holder.querySelector('.tm-paciente-age-badge-115');
-
-      if (age === null) {
-        if (badge) badge.remove();
-        return;
-      }
-
-      if (!badge) {
-        badge = document.createElement('div');
-        badge.className = 'tm-paciente-age-badge-115';
-        holder.appendChild(badge);
-      }
-
-      badge.textContent = age + 'a';
-
-      if (!input.dataset.tmPaciente115AgeListener) {
-        const refresh = () => setTimeout(applyBadge, 0);
-        input.addEventListener('input', refresh, true);
-        input.addEventListener('keyup', refresh, true);
-        input.addEventListener('change', refresh, true);
-        input.addEventListener('blur', refresh, true);
-        input.dataset.tmPaciente115AgeListener = '1';
-      }
-    }
-
-    setInterval(() => {
-      try {
-        applyBadge();
-      } catch (e) {}
-    }, 200);
-
-    window.addEventListener('scroll', () => {
-      try {
-        applyBadge();
-      } catch (e) {}
-    }, true);
-
-    window.addEventListener('resize', () => {
-      try {
-        applyBadge();
-      } catch (e) {}
-    }, true);
-  })();
-
-
-
-  // =========================
-  // PACIENTE 11.6 - BADGE IDADE DEFINITIVA
-  // =========================
-  (function tmPaciente116BirthAgeStable() {
-    function onlyText(v) {
-      return String(v || '').replace(/\s+/g, ' ').trim();
-    }
-
-    function findBirthInput() {
-      const root =
-        (typeof getActivePacienteSchedulingModalRoot === 'function' && getActivePacienteSchedulingModalRoot()) ||
-        document.querySelector('.modal.show .modal-content');
-
-      if (!root) return null;
-
-      const marked = root.querySelector('.tm-paciente-v91-birth input');
-      if (marked) return marked;
-
-      const blocks = Array.from(root.querySelectorAll('.form-group, .col, [class*="col-"], div'));
-      for (const block of blocks) {
-        const text = onlyText(block.innerText || block.textContent || '');
-        if (!text.includes('Data de Nascimento')) continue;
-
-        const input = block.querySelector('input');
-        if (input) return input;
-      }
-
-      const labels = Array.from(root.querySelectorAll('small, label'));
-      for (const label of labels) {
-        const text = onlyText(label.innerText || label.textContent || '');
-        if (!text.includes('Data de Nascimento')) continue;
-
-        let el = label.parentElement;
-        for (let i = 0; el && i < 5; i += 1, el = el.parentElement) {
-          const input = el.querySelector && el.querySelector('input');
-          if (input) return input;
+      for (const card of document.querySelectorAll('[data-tm-hide-notas-internas="true"]')) {
+        if (card instanceof HTMLElement && !isNotasInternasCard(card)) {
+          card.removeAttribute('data-tm-hide-notas-internas');
         }
       }
 
+      for (const title of document.querySelectorAll('h3')) {
+        if (normalizeText(title.textContent) !== 'Notas Internas') continue;
+
+        const card = title.closest('div.rounded-xl.bg-card.border.border-border') ||
+          title.closest('div.rounded-xl');
+
+        if (card instanceof HTMLElement && isNotasInternasCard(card)) {
+          card.setAttribute('data-tm-hide-notas-internas', 'true');
+        }
+      }
+    } catch (error) {
+      console.error(`[${SCRIPT_NAME}] falha ao ocultar Notas Internas`, error);
+    }
+  }
+
+  let imagePopupCounter = 0;
+
+  function sideResetPopupCascadeIfNeeded() {
+    try {
+      const active = document.querySelectorAll('[data-tm-image-popup="true"]').length;
+      if (active === 0) {
+        imagePopupCounter = 0;
+      }
+    } catch (_) {}
+  }
+
+  let imagePopupZIndex = 99990;
+
+  function sideIsPreviewableImage(file) {
+    const mimeType = String(file?.mimeType || '').toLowerCase();
+    const fileName = String(file?.fileName || '').toLowerCase();
+    const icon = String(file?.icon || '').toLowerCase();
+
+    return mimeType.startsWith('image/') ||
+      icon === 'image' ||
+      /\.(png|jpe?g|webp|gif|bmp|avif)(\?|#|$)/i.test(fileName);
+  }
+
+  function sideDownloadFile(url, fileName) {
+    try {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName || 'imagem';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      window.setTimeout(() => {
+        try { link.remove(); } catch (_) {}
+      }, 0);
+    } catch (error) {
+      console.error(`[${SCRIPT_NAME}] falha ao baixar imagem`, error);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }
+
+  function sideGetPopupPanBounds(popup) {
+    const body = popup.querySelector('[data-tm-image-popup-body="true"]');
+    const img = body?.querySelector('img');
+    if (!body || !img) return { maxX: 0, maxY: 0, pannableX: false, pannableY: false };
+
+    const zoom = Number(popup.dataset.tmImageZoom || '1') || 1;
+    const naturalW = Number(popup.dataset.tmImageNaturalW || img.naturalWidth || img.offsetWidth || 1);
+    const naturalH = Number(popup.dataset.tmImageNaturalH || img.naturalHeight || img.offsetHeight || 1);
+    const bodyRect = body.getBoundingClientRect();
+
+    const scaledW = naturalW * zoom;
+    const scaledH = naturalH * zoom;
+
+    const overflowX = Math.max(0, scaledW - bodyRect.width);
+    const overflowY = Math.max(0, scaledH - bodyRect.height);
+
+    return {
+      maxX: overflowX / 2,
+      maxY: overflowY / 2,
+      pannableX: overflowX > 1,
+      pannableY: overflowY > 1
+    };
+  }
+
+  function sideClampPopupPan(popup) {
+    const bounds = sideGetPopupPanBounds(popup);
+
+    let panX = Number(popup.dataset.tmImagePanX || '0') || 0;
+    let panY = Number(popup.dataset.tmImagePanY || '0') || 0;
+
+    panX = bounds.pannableX ? Math.max(-bounds.maxX, Math.min(bounds.maxX, panX)) : 0;
+    panY = bounds.pannableY ? Math.max(-bounds.maxY, Math.min(bounds.maxY, panY)) : 0;
+
+    popup.dataset.tmImagePanX = String(panX);
+    popup.dataset.tmImagePanY = String(panY);
+
+    const body = popup.querySelector('[data-tm-image-popup-body="true"]');
+    if (body) {
+      if (bounds.pannableX || bounds.pannableY) {
+        body.setAttribute('data-tm-pannable', 'true');
+      } else {
+        body.removeAttribute('data-tm-pannable');
+      }
+    }
+
+    return { panX, panY };
+  }
+
+  function sideApplyPopupImageTransform(popup) {
+    try {
+      const img = popup.querySelector('[data-tm-image-popup-body="true"] img');
+      if (!img) return;
+
+      const zoom = Number(popup.dataset.tmImageZoom || '1') || 1;
+      const { panX, panY } = sideClampPopupPan(popup);
+
+      const rotation = Number(popup.dataset.tmImageRotation || '0') || 0;
+      const container = popup.querySelector('[data-tm-image-popup-body="true"]');
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+
+      img.style.maxWidth = cw + 'px';
+      img.style.maxHeight = ch + 'px';
+
+      img.style.transform = `translate3d(${panX}px, ${panY}px, 0) rotate(${rotation}deg) scale(${zoom})`;
+    } catch (error) {
+      console.error(`[${SCRIPT_NAME}] falha ao aplicar transform da imagem`, error);
+    }
+  }
+
+  function sideSetPopupSizeToImageFit(popup, maximized = false, center = true) {
+    try {
+      const img = popup.querySelector('[data-tm-image-popup-body="true"] img');
+      if (!img) return;
+
+      const naturalW = Number(popup.dataset.tmImageNaturalW || img.naturalWidth || 1);
+      const naturalH = Number(popup.dataset.tmImageNaturalH || img.naturalHeight || 1);
+      const headerH = 42;
+
+      const margin = maximized ? 32 : 48;
+      const maxBodyW = Math.max(180, window.innerWidth - margin);
+      const maxBodyH = Math.max(180, window.innerHeight - headerH - margin);
+
+      let scale = Math.min(maxBodyW / naturalW, maxBodyH / naturalH);
+
+      if (!maximized) {
+        scale = Math.min(1, scale);
+      }
+
+      scale = Math.max(0.08, scale);
+
+      const bodyW = Math.max(160, Math.round(naturalW * scale));
+      const bodyH = Math.max(120, Math.round(naturalH * scale));
+      const popupW = bodyW;
+      const popupH = bodyH + headerH;
+
+      popup.style.setProperty('width', `${popupW}px`, 'important');
+      popup.style.setProperty('height', `${popupH}px`, 'important');
+      popup.style.setProperty('transform', 'none', 'important');
+
+      if (center) {
+        const left = Math.max(8, Math.round((window.innerWidth - popupW) / 2));
+        const top = Math.max(8, Math.round((window.innerHeight - popupH) / 2));
+        popup.style.setProperty('left', `${left}px`, 'important');
+        popup.style.setProperty('top', `${top}px`, 'important');
+      }
+
+      popup.dataset.tmImageUserZoom = '1';
+      popup.dataset.tmImagePanX = '0';
+      popup.dataset.tmImagePanY = '0';
+
+      sideRecalculatePopupFit(popup, true);
+    } catch (error) {
+      console.error(`[${SCRIPT_NAME}] falha ao ajustar popup ao tamanho da imagem`, error);
+    }
+  }
+
+  function sideRecalculatePopupFit(popup, resetPan = false) {
+    try {
+      const body = popup.querySelector('[data-tm-image-popup-body="true"]');
+      const img = body?.querySelector('img');
+      if (!body || !img) return;
+
+      const naturalW = Number(popup.dataset.tmImageNaturalW || img.naturalWidth || 1);
+      const naturalH = Number(popup.dataset.tmImageNaturalH || img.naturalHeight || 1);
+      const bodyRect = body.getBoundingClientRect();
+
+      const maxW = Math.max(1, bodyRect.width);
+      const maxH = Math.max(1, bodyRect.height);
+      const fit = Math.max(0.05, Math.min(maxW / naturalW, maxH / naturalH));
+
+      const userZoom = Number(popup.dataset.tmImageUserZoom || '1') || 1;
+
+      popup.dataset.tmImageBaseFit = String(fit);
+      popup.dataset.tmImageZoom = String(fit * userZoom);
+
+      if (resetPan) {
+        popup.dataset.tmImagePanX = '0';
+        popup.dataset.tmImagePanY = '0';
+      }
+
+      sideApplyPopupImageTransform(popup);
+    } catch (error) {
+      console.error(`[${SCRIPT_NAME}] falha ao recalcular encaixe da imagem`, error);
+    }
+  }
+
+  function sideSetPopupImageZoom(popup, nextUserZoom) {
+    try {
+      const userZoom = Math.max(1, Math.min(8, Number(nextUserZoom) || 1));
+      popup.dataset.tmImageUserZoom = String(userZoom);
+      sideRecalculatePopupFit(popup, false);
+    } catch (error) {
+      console.error(`[${SCRIPT_NAME}] falha ao aplicar zoom`, error);
+    }
+  }
+
+  function sideInstallPopupDrag(popup, header) {
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    header.addEventListener('mousedown', (event) => {
+      try {
+        if (event.button !== 0) return;
+        if (event.target.closest('button')) return;
+        if (event.target.closest('[data-tm-image-popup-resize="true"]')) return;
+
+        const rect = popup.getBoundingClientRect();
+        popup.style.setProperty('left', `${rect.left}px`, 'important');
+        popup.style.setProperty('top', `${rect.top}px`, 'important');
+        popup.style.setProperty('transform', 'none', 'important');
+
+        dragging = true;
+        startX = event.clientX;
+        startY = event.clientY;
+        startLeft = rect.left;
+        startTop = rect.top;
+
+        imagePopupZIndex += 1;
+        popup.style.zIndex = String(imagePopupZIndex);
+        popup.dataset.tmPopupOrder = String(imagePopupZIndex);
+      popup.dataset.tmPopupOrder = String(imagePopupZIndex);
+
+        event.preventDefault();
+        event.stopPropagation();
+      } catch (_) {}
+    }, true);
+
+    document.addEventListener('mousemove', (event) => {
+      if (!dragging) return;
+
+      try {
+        const nextLeft = startLeft + (event.clientX - startX);
+        const nextTop = startTop + (event.clientY - startY);
+
+        const maxLeft = Math.max(8, window.innerWidth - popup.offsetWidth - 8);
+        const maxTop = Math.max(8, window.innerHeight - popup.offsetHeight - 8);
+
+        popup.style.setProperty('left', `${Math.max(8, Math.min(maxLeft, nextLeft))}px`, 'important');
+        popup.style.setProperty('top', `${Math.max(8, Math.min(maxTop, nextTop))}px`, 'important');
+
+        event.preventDefault();
+      } catch (_) {}
+    }, true);
+
+    document.addEventListener('mouseup', () => {
+      dragging = false;
+    }, true);
+  }
+
+
+  function sideInstallImagePan(popup, body) {
+    let panning = false;
+    let startX = 0;
+    let startY = 0;
+    let startPanX = 0;
+    let startPanY = 0;
+    let pendingX = 0;
+    let pendingY = 0;
+    let rafId = 0;
+
+    const flushPan = () => {
+      rafId = 0;
+      popup.dataset.tmImagePanX = String(pendingX);
+      popup.dataset.tmImagePanY = String(pendingY);
+      sideApplyPopupImageTransform(popup);
+    };
+
+    body.addEventListener('mousedown', (event) => {
+      try {
+        if (event.button !== 0) return;
+        if (event.target.closest('button')) return;
+
+        const bounds = sideGetPopupPanBounds(popup);
+        if (!bounds.pannableX && !bounds.pannableY) return;
+
+        panning = true;
+        body.setAttribute('data-tm-panning', 'true');
+
+        startX = event.clientX;
+        startY = event.clientY;
+        startPanX = Number(popup.dataset.tmImagePanX || '0') || 0;
+        startPanY = Number(popup.dataset.tmImagePanY || '0') || 0;
+        pendingX = startPanX;
+        pendingY = startPanY;
+
+        imagePopupZIndex += 1;
+        popup.style.zIndex = String(imagePopupZIndex);
+        popup.dataset.tmPopupOrder = String(imagePopupZIndex);
+
+        event.preventDefault();
+        event.stopPropagation();
+      } catch (_) {}
+    }, true);
+
+    document.addEventListener('mousemove', (event) => {
+      if (!panning) return;
+
+      try {
+        const bounds = sideGetPopupPanBounds(popup);
+        const rawX = startPanX + (event.clientX - startX);
+        const rawY = startPanY + (event.clientY - startY);
+
+        pendingX = bounds.pannableX ? Math.max(-bounds.maxX, Math.min(bounds.maxX, rawX)) : 0;
+        pendingY = bounds.pannableY ? Math.max(-bounds.maxY, Math.min(bounds.maxY, rawY)) : 0;
+
+        if (!rafId) {
+          rafId = window.requestAnimationFrame(flushPan);
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+      } catch (_) {}
+    }, true);
+
+    document.addEventListener('mouseup', () => {
+      if (!panning) return;
+      panning = false;
+      body.removeAttribute('data-tm-panning');
+    }, true);
+  }
+
+
+  function sideInstallPopupResize(popup) {
+    const directions = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+    let resizing = false;
+    let dir = '';
+    let startX = 0;
+    let startY = 0;
+    let startW = 0;
+    let startH = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    const minW = 300;
+    const minH = 260;
+
+    const beginResize = (event, direction) => {
+      try {
+        if (event.button !== 0) return;
+        if (popup.getAttribute('data-tm-maximized') === 'true') return;
+
+        resizing = true;
+        dir = direction;
+        startX = event.clientX;
+        startY = event.clientY;
+        startW = popup.offsetWidth;
+        startH = popup.offsetHeight;
+        startLeft = popup.offsetLeft;
+        startTop = popup.offsetTop;
+
+        imagePopupZIndex += 1;
+        popup.style.zIndex = String(imagePopupZIndex);
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      } catch (_) {}
+    };
+
+    for (const direction of directions) {
+      const handle = document.createElement('div');
+      handle.setAttribute('data-tm-image-popup-resize', 'true');
+      handle.setAttribute('data-tm-image-popup-resize-dir', direction);
+      handle.addEventListener('mousedown', (event) => beginResize(event, direction), true);
+      popup.appendChild(handle);
+    }
+
+    document.addEventListener('mousemove', (event) => {
+      if (!resizing) return;
+
+      try {
+        let nextLeft = startLeft;
+        let nextTop = startTop;
+        let nextW = startW;
+        let nextH = startH;
+
+        const dx = event.clientX - startX;
+        const dy = event.clientY - startY;
+
+        if (dir.includes('e')) {
+          nextW = startW + dx;
+        }
+
+        if (dir.includes('s')) {
+          nextH = startH + dy;
+        }
+
+        if (dir.includes('w')) {
+          nextW = startW - dx;
+          nextLeft = startLeft + dx;
+        }
+
+        if (dir.includes('n')) {
+          nextH = startH - dy;
+          nextTop = startTop + dy;
+        }
+
+        if (nextW < minW) {
+          if (dir.includes('w')) nextLeft -= (minW - nextW);
+          nextW = minW;
+        }
+
+        if (nextH < minH) {
+          if (dir.includes('n')) nextTop -= (minH - nextH);
+          nextH = minH;
+        }
+
+        const maxW = window.innerWidth - nextLeft - 8;
+        const maxH = window.innerHeight - nextTop - 8;
+
+        nextW = Math.min(nextW, Math.max(minW, maxW));
+        nextH = Math.min(nextH, Math.max(minH, maxH));
+
+        nextLeft = Math.max(0, Math.min(nextLeft, window.innerWidth - nextW));
+        nextTop = Math.max(0, Math.min(nextTop, window.innerHeight - nextH));
+
+        popup.style.setProperty('left', `${nextLeft}px`, 'important');
+        popup.style.setProperty('top', `${nextTop}px`, 'important');
+        popup.style.setProperty('width', `${nextW}px`, 'important');
+        popup.style.setProperty('height', `${nextH}px`, 'important');
+
+        sideRecalculatePopupFit(popup, false);
+
+        event.preventDefault();
+        event.stopPropagation();
+      } catch (_) {}
+    }, true);
+
+    document.addEventListener('mouseup', () => {
+      resizing = false;
+      dir = '';
+    }, true);
+  }
+
+  function sideCloseTopImagePopup() {
+    try {
+      const popups = Array.from(document.querySelectorAll('[data-tm-image-popup="true"]'))
+        .filter(node => node instanceof HTMLElement);
+
+      if (!popups.length) return false;
+
+      popups.sort((a, b) => {
+        const za = Number(a.dataset.tmPopupOrder || a.style.zIndex || getComputedStyle(a).zIndex || '0') || 0;
+        const zb = Number(b.dataset.tmPopupOrder || b.style.zIndex || getComputedStyle(b).zIndex || '0') || 0;
+        return zb - za;
+      });
+
+      popups[0].remove();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function sideInstallPopupEscClose() {
+    if (window.__tmEffinityImagePopupEscInstalled) return;
+    window.__tmEffinityImagePopupEscInstalled = true;
+
+    document.addEventListener('keydown', (event) => {
+      try {
+        if (event.key !== 'Escape') return;
+        if (!sideCloseTopImagePopup()) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+      } catch (_) {}
+    }, true);
+  }
+
+
+  function sideCreatePopupSvgIcon(type) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('data-tm-image-popup-icon-svg', 'true');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+
+    const makePath = (d) => {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+      return path;
+    };
+
+    const makeLine = (x1, y1, x2, y2) => {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      return line;
+    };
+
+    const makeRect = (x, y, width, height) => {
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', x);
+      rect.setAttribute('y', y);
+      rect.setAttribute('width', width);
+      rect.setAttribute('height', height);
+      rect.setAttribute('rx', '1.8');
+      return rect;
+    };
+
+    if (type === 'download') {
+      svg.appendChild(makePath('M12 3v11'));
+      svg.appendChild(makePath('M7 10l5 5 5-5'));
+      svg.appendChild(makePath('M5 20h14'));
+      return svg;
+    }
+
+    if (type === 'close') {
+      svg.appendChild(makeLine('6', '6', '18', '18'));
+      svg.appendChild(makeLine('18', '6', '6', '18'));
+      return svg;
+    }
+
+    if (type === 'rotate') {
+      const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      group.setAttribute('transform', 'translate(2.4 2.4) scale(0.80)');
+
+      const arc = makePath('M19 12a7 7 0 1 1-2.05-4.95');
+      const arrow = makePath('M19 5v5h-5');
+      const diamond = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      diamond.setAttribute('d', 'M12 8.4 15.6 12 12 15.6 8.4 12Z');
+
+      group.appendChild(arc);
+      group.appendChild(arrow);
+      group.appendChild(diamond);
+      svg.appendChild(group);
+      return svg;
+    }
+
+    svg.appendChild(makeRect('6', '6', '12', '12'));
+    return svg;
+  }
+
+
+  function sideMaximizePopupAsMovableWindow(popup) {
+    try {
+      const width = Math.min(920, window.innerWidth - 48);
+      const height = Math.min(720, window.innerHeight - 48);
+      const left = Math.max(16, Math.round((window.innerWidth - width) / 2));
+      const top = Math.max(16, Math.round((window.innerHeight - height) / 2));
+
+      popup.style.width = `${width}px`;
+      popup.style.height = `${height}px`;
+      popup.style.left = `${left}px`;
+      popup.style.top = `${top}px`;
+      popup.style.transform = 'none';
+      popup.setAttribute('data-tm-maximized', 'true');
+      sideRecalculatePopupFit(popup, true);
+    } catch (_) {}
+  }
+
+  function sideRestorePopupAsMovableWindow(popup) {
+    try {
+      popup.removeAttribute('data-tm-maximized');
+      popup.style.width = '420px';
+      popup.style.height = '520px';
+      popup.style.transform = 'none';
+      sideRecalculatePopupFit(popup, true);
+    } catch (_) {}
+  }
+
+  function sideOpenImagePopup(file) {
+    try {
+      if (!sideIsPreviewableImage(file)) {
+        window.open(file.downloadUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      sideResetPopupCascadeIfNeeded();
+      imagePopupCounter += 1;
+      imagePopupZIndex += 1;
+
+      const popup = document.createElement('div');
+      popup.setAttribute('data-tm-image-popup', 'true');
+      popup.dataset.tmImageZoom = '1';
+      popup.dataset.tmImageBaseFit = '1';
+      popup.dataset.tmImageUserZoom = '1';
+      popup.dataset.tmImagePanX = '0';
+      popup.dataset.tmImagePanY = '0';
+      popup.dataset.tmImageRotation = '0';
+      popup.style.setProperty('left', `${24 + ((imagePopupCounter - 1) % 8) * 28}px`, 'important');
+      popup.style.setProperty('top', `${24 + ((imagePopupCounter - 1) % 8) * 28}px`, 'important');
+      popup.style.zIndex = String(imagePopupZIndex);
+
+      const header = document.createElement('div');
+      header.setAttribute('data-tm-image-popup-header', 'true');
+
+      const title = document.createElement('div');
+      title.setAttribute('data-tm-image-popup-title', 'true');
+      title.title = file.fileName || 'Imagem';
+      title.textContent = file.fileName || 'Imagem';
+
+      const center = document.createElement('div');
+      center.setAttribute('data-tm-image-popup-actions-center', 'true');
+
+      const download = document.createElement('button');
+      download.type = 'button';
+      download.setAttribute('data-tm-image-popup-download', 'true');
+      download.title = 'Download';
+      download.setAttribute('aria-label', 'Download');
+      download.appendChild(sideCreatePopupSvgIcon('download'));
+      download.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        sideDownloadFile(file.downloadUrl, file.fileName);
+      }, true);
+
+      center.appendChild(download);
+
+      const right = document.createElement('div');
+      right.setAttribute('data-tm-image-popup-actions-right', 'true');
+
+      const rotate = document.createElement('button');
+      rotate.type = 'button';
+      rotate.setAttribute('data-tm-image-popup-icon', 'true');
+      rotate.setAttribute('data-tm-image-popup-rotate', 'true');
+      rotate.title = 'Girar';
+      rotate.setAttribute('aria-label', 'Girar');
+      const rotateIcon = document.createElement('span');
+      rotateIcon.textContent = '↻';
+      rotateIcon.setAttribute('aria-hidden', 'true');
+      rotateIcon.style.display = 'inline-flex';
+      rotateIcon.style.alignItems = 'center';
+      rotateIcon.style.justifyContent = 'center';
+      rotateIcon.style.width = '19px';
+      rotateIcon.style.height = '19px';
+      rotateIcon.style.fontSize = '19px';
+      rotateIcon.style.lineHeight = '19px';
+      rotateIcon.style.fontWeight = '400';
+      rotateIcon.style.textAlign = 'center';
+      rotateIcon.style.margin = '0';
+      rotateIcon.style.transform = 'translateY(-1px)';
+      rotate.appendChild(rotateIcon);
+      rotate.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const currentRotation = Number(popup.dataset.tmImageRotation || '0') || 0;
+        popup.dataset.tmImageRotation = String((currentRotation + 90) % 360);
+        sideApplyPopupImageTransform(popup);
+      }, true);
+
+      const maximize = document.createElement('button');
+      maximize.type = 'button';
+      maximize.setAttribute('data-tm-image-popup-icon', 'true');
+      maximize.setAttribute('data-tm-image-popup-maximize', 'true');
+      maximize.title = 'Maximizar';
+      maximize.setAttribute('aria-label', 'Maximizar');
+      maximize.appendChild(sideCreatePopupSvgIcon('maximize'));
+      maximize.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const isMax = popup.getAttribute('data-tm-maximized') === 'true';
+
+        if (isMax) {
+          popup.removeAttribute('data-tm-maximized');
+          maximize.title = 'Maximizar';
+          maximize.setAttribute('aria-label', 'Maximizar');
+          sideSetPopupSizeToImageFit(popup, false, true);
+        } else {
+          popup.setAttribute('data-tm-maximized', 'true');
+
+          const width = Math.min(920, window.innerWidth - 48);
+          const height = Math.min(720, window.innerHeight - 48);
+          const left = Math.max(8, Math.round((window.innerWidth - width) / 2));
+          const top = Math.max(8, Math.round((window.innerHeight - height) / 2));
+
+          popup.style.setProperty('width', `${width}px`, 'important');
+          popup.style.setProperty('height', `${height}px`, 'important');
+          popup.style.setProperty('left', `${left}px`, 'important');
+          popup.style.setProperty('top', `${top}px`, 'important');
+          popup.style.setProperty('transform', 'none', 'important');
+
+          popup.dataset.tmImageUserZoom = '1';
+          popup.dataset.tmImagePanX = '0';
+          popup.dataset.tmImagePanY = '0';
+
+          maximize.title = 'Restaurar';
+          maximize.setAttribute('aria-label', 'Restaurar');
+
+          window.setTimeout(() => sideRecalculatePopupFit(popup, true), 0);
+        }
+      }, true);
+
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.setAttribute('data-tm-image-popup-icon', 'true');
+      close.setAttribute('data-tm-image-popup-close', 'true');
+      close.title = 'Fechar';
+      close.setAttribute('aria-label', 'Fechar');
+      close.appendChild(sideCreatePopupSvgIcon('close'));
+      close.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        popup.remove();
+      }, true);
+
+      right.appendChild(rotate);
+      right.appendChild(maximize);
+      right.appendChild(close);
+
+      header.appendChild(title);
+      header.appendChild(center);
+      header.appendChild(right);
+
+      const body = document.createElement('div');
+      body.setAttribute('data-tm-image-popup-body', 'true');
+
+      const img = document.createElement('img');
+      img.src = file.downloadUrl;
+      img.alt = file.fileName || 'Imagem';
+      img.draggable = false;
+
+      img.addEventListener('load', () => {
+        try {
+          const naturalW = img.naturalWidth || 1;
+          const naturalH = img.naturalHeight || 1;
+
+          popup.dataset.tmImageNaturalW = String(naturalW);
+          popup.dataset.tmImageNaturalH = String(naturalH);
+          popup.dataset.tmImageUserZoom = '1';
+          img.style.width = `${naturalW}px`;
+          img.style.height = `${naturalH}px`;
+          popup.dataset.tmImagePanX = '0';
+          popup.dataset.tmImagePanY = '0';
+          sideSetPopupSizeToImageFit(popup, popup.getAttribute('data-tm-maximized') === 'true', false);
+        } catch (_) {
+          sideSetPopupImageZoom(popup, 1);
+        }
+      }, { once: true });
+
+      body.addEventListener('wheel', (event) => {
+        try {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const current = Number(popup.dataset.tmImageUserZoom || '1') || 1;
+          const factor = event.deltaY < 0 ? 1.12 : 0.88;
+          sideSetPopupImageZoom(popup, current * factor);
+        } catch (error) {
+          console.error(`[${SCRIPT_NAME}] falha no zoom por scroll`, error);
+        }
+      }, { passive: false, capture: true });
+
+      sideInstallImagePan(popup, body);
+
+      body.appendChild(img);
+      popup.appendChild(header);
+      popup.appendChild(body);
+
+      popup.addEventListener('mousedown', () => {
+        imagePopupZIndex += 1;
+        popup.style.zIndex = String(imagePopupZIndex);
+      }, true);
+
+      sideInstallPopupDrag(popup, header);
+      sideInstallPopupResize(popup);
+      sideInstallPopupEscClose();
+      document.body.appendChild(popup);
+
+      window.addEventListener('resize', () => {
+        try {
+          if (document.body.contains(popup)) sideRecalculatePopupFit(popup, false);
+        } catch (_) {}
+      });
+    } catch (error) {
+      console.error(`[${SCRIPT_NAME}] falha ao abrir visualizador de imagem`, error);
+      window.open(file.downloadUrl, '_blank', 'noopener,noreferrer');
+    }
+  }
+
+
+
+  function tmFileCardLooksLikeImage(card) {
+    try {
+      if (!(card instanceof HTMLElement)) return false;
+      const text = normalizeText(card.textContent || '').toLowerCase();
+
+      if (!text.includes('abrir')) return false;
+
+      const img = card.querySelector('img[src]');
+      const imgSrc = img?.getAttribute?.('src') || '';
+
+      return /\.(png|jpe?g|webp|gif|bmp|avif)(\?|#|$)/i.test(imgSrc) ||
+        /filename=.*\.(png|jpe?g|webp|gif|bmp|avif)/i.test(imgSrc) ||
+        /\bimage\b|mídia whatsapp|midia whatsapp|whatsapp_media_|\.png|\.jpg|\.jpeg|\.webp|\.gif/i.test(text);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function tmFindNativeFileCardFromOpenButton(button) {
+    try {
+      let node = button instanceof Element ? button : null;
+      let depth = 0;
+
+      while (node && depth < 8) {
+        if (node instanceof HTMLElement && node.classList.contains('rounded-xl') && tmFileCardLooksLikeImage(node)) {
+          return node;
+        }
+
+        node = node.parentElement;
+        depth += 1;
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  function tmGetNativeFileInfoFromCard(card) {
+    try {
+      const img = card.querySelector('img[src]');
+      const imgSrc = img?.getAttribute?.('src') || '';
+
+      let fileName = '';
+
+      try {
+        const url = new URL(imgSrc, location.href);
+        fileName = url.searchParams.get('filename') || '';
+      } catch (_) {}
+
+      if (!fileName) {
+        const title = Array.from(card.querySelectorAll('p, span, div'))
+          .map(el => normalizeText(el.textContent || ''))
+          .find(text => /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(text) || /^whatsapp_media_/i.test(text));
+
+        if (title) fileName = title;
+      }
+
+      if (!fileName) fileName = 'imagem';
+
+      return {
+        id: `native-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        fileName,
+        mimeType: 'image/jpeg',
+        icon: 'image',
+        thumbnailUrl: imgSrc,
+        downloadUrl: imgSrc
+      };
+    } catch (_) {
       return null;
     }
+  }
 
-    function calcAge(value) {
-      const raw = String(value || '').trim();
+  function installNativeArquivoImagePopup() {
+    if (window.__tmEffinityNativeArquivoImagePopupInstalled) return;
+    window.__tmEffinityNativeArquivoImagePopupInstalled = true;
 
-      let d;
-      let m;
-      let y;
-
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-        [d, m, y] = raw.split('/').map(Number);
-      } else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-        const p = raw.split('-').map(Number);
-        y = p[0];
-        m = p[1];
-        d = p[2];
-      } else {
-        return null;
-      }
-
-      if (
-        !Number.isInteger(d) ||
-        !Number.isInteger(m) ||
-        !Number.isInteger(y) ||
-        d < 1 ||
-        d > 31 ||
-        m < 1 ||
-        m > 12 ||
-        y < 1900 ||
-        y > 2100
-      ) {
-        return null;
-      }
-
-      const birth = new Date(y, m - 1, d);
-      if (
-        birth.getFullYear() !== y ||
-        birth.getMonth() !== m - 1 ||
-        birth.getDate() !== d
-      ) {
-        return null;
-      }
-
-      const today = new Date();
-      let age = today.getFullYear() - y;
-
-      if (
-        today.getMonth() < m - 1 ||
-        (today.getMonth() === m - 1 && today.getDate() < d)
-      ) {
-        age -= 1;
-      }
-
-      return age;
-    }
-
-    function apply() {
-      const input = findBirthInput();
-
-      if (!input) {
-        document.querySelectorAll('.tm-paciente-age-badge-116').forEach((el) => el.remove());
-        return;
-      }
-
-      const holder = input.closest('.input-group') || input.parentElement;
-      if (!holder) return;
-
-      const age = calcAge(input.value);
-
-      holder.classList.add('tm-paciente-birth-age-holder-116');
-      holder.style.setProperty('position', 'relative', 'important');
-      holder.style.setProperty('overflow', 'hidden', 'important');
-      input.style.setProperty('padding-right', '48px', 'important');
-
-      let badge = holder.querySelector('.tm-paciente-age-badge-116');
-
-      if (age === null) {
-        if (badge) badge.remove();
-        return;
-      }
-
-      if (!badge) {
-        badge = document.createElement('div');
-        badge.className = 'tm-paciente-age-badge-116';
-        holder.appendChild(badge);
-      }
-
-      badge.textContent = age + 'a';
-
-      badge.style.setProperty('position', 'absolute', 'important');
-      badge.style.setProperty('top', '1px', 'important');
-      badge.style.setProperty('right', '1px', 'important');
-      badge.style.setProperty('bottom', '1px', 'important');
-      badge.style.setProperty('width', '46px', 'important');
-      badge.style.setProperty('z-index', '2147483647', 'important');
-      badge.style.setProperty('display', 'flex', 'important');
-      badge.style.setProperty('align-items', 'center', 'important');
-      badge.style.setProperty('justify-content', 'center', 'important');
-      badge.style.setProperty('background', '#d9d9d9', 'important');
-      badge.style.setProperty('color', '#555', 'important');
-      badge.style.setProperty('border-left', '1px solid #cfd4da', 'important');
-      badge.style.setProperty('border-top-right-radius', '.25rem', 'important');
-      badge.style.setProperty('border-bottom-right-radius', '.25rem', 'important');
-      badge.style.setProperty('font-size', '14px', 'important');
-      badge.style.setProperty('line-height', '1', 'important');
-      badge.style.setProperty('pointer-events', 'none', 'important');
-      badge.style.setProperty('box-sizing', 'border-box', 'important');
-      badge.style.setProperty('white-space', 'nowrap', 'important');
-
-      if (!input.dataset.tmPaciente116AgeListener) {
-        const refresh = () => {
-          requestAnimationFrame(apply);
-          setTimeout(apply, 60);
-        };
-
-        input.addEventListener('input', refresh, true);
-        input.addEventListener('keyup', refresh, true);
-        input.addEventListener('change', refresh, true);
-        input.addEventListener('blur', refresh, true);
-        input.dataset.tmPaciente116AgeListener = '1';
-      }
-    }
-
-    setInterval(() => {
+    document.addEventListener('click', (event) => {
       try {
-        apply();
-      } catch (e) {}
-    }, 100);
+        const target = event.target;
+        if (!(target instanceof Element)) return;
 
-    window.addEventListener('scroll', () => {
-      try {
-        requestAnimationFrame(apply);
-      } catch (e) {}
+        const button = target.closest('button');
+        if (!button) return;
+        if (!/\bAbrir\b/i.test(normalizeText(button.textContent || ''))) return;
+
+        const card = tmFindNativeFileCardFromOpenButton(button);
+        if (!card) return;
+
+        const file = tmGetNativeFileInfoFromCard(card);
+        if (!file || !file.downloadUrl) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        sideOpenImagePopup(file);
+      } catch (error) {
+        console.error(`[${SCRIPT_NAME}] falha ao abrir imagem em popup`, error);
+      }
     }, true);
+  }
 
-    window.addEventListener('resize', () => {
-      try {
-        requestAnimationFrame(apply);
-      } catch (e) {}
+
+  /* ========================================================================
+   * SEÇÃO: APLICAÇÃO CENTRAL DAS FUNCIONALIDADES SELECIONADAS
+   * ====================================================================== */
+  function applySelectedFeatures() {
+    hideNotasInternasCard();
+    hideSelectedCards();
+    applyDateToMessages();
+    reorganizeAgentArea();
+    moveCreatedDateToHeader();
+    applyUppercaseToCustomerNames();
+    formatAttendanceDataPhones();
+    formatAttendanceDataEmails();
+    formatAttendanceDataCpfs();
+    formatAttendanceDataEmails();
+    formatAttendanceDataBirthDates();
+    enableCopyOnAttendanceData();
+    styleQueueTagsInTicketCards();
+    applyUnreadMessageIndicators();
+  }
+
+  function applyFastAntiFlickerPass() {
+    hideNotasInternasCard();
+    hideSelectedCards();
+    moveCreatedDateToHeader();
+    applyUppercaseToCustomerNames();
+    formatAttendanceDataPhones();
+    formatAttendanceDataEmails();
+    formatAttendanceDataCpfs();
+    formatAttendanceDataEmails();
+    formatAttendanceDataBirthDates();
+    styleQueueTagsInTicketCards();
+    applyUnreadMessageIndicators();
+  }
+
+  function reapplyAll() {
+    applyCSS();
+    applySelectedFeatures();
+  }
+
+  /* ========================================================================
+   * SEÇÃO: INFRAESTRUTURA SPA / REAPLICAÇÃO
+   * Mantida apenas para estabilidade em re-renderizações.
+   * ====================================================================== */
+  let observer = null;
+  let tabPassTimers = [];
+
+  function scheduleTabAntiFlickerPasses() {
+    tabPassTimers.forEach(clearTimeout);
+    tabPassTimers = [];
+
+    applyFastAntiFlickerPass();
+
+    for (const delay of [0, 50, 120, 220]) {
+      tabPassTimers.push(window.setTimeout(applyFastAntiFlickerPass, delay));
+    }
+  }
+
+  function isSidePanelTabTrigger(target) {
+    if (!(target instanceof Element)) return false;
+
+    const trigger = target.closest('button, a, [role="tab"]');
+    if (!trigger) return false;
+
+    const text = normalizeText(trigger.textContent).toLowerCase();
+    return ['geral', 'timeline', 'arquivos', 'histórico', 'historico', 'msgs'].includes(text);
+  }
+
+  function startObserver() {
+    const target = document.getElementById('app') || document.querySelector('[data-v-app]') || document.body;
+    if (!target) return;
+
+    if (observer) observer.disconnect();
+
+    observer = new MutationObserver(() => {
+      applyFastAntiFlickerPass();
+      debounce(reapplyAll, 80);
+    });
+
+    observer.observe(target, { childList: true, subtree: true });
+
+    document.addEventListener('click', (event) => {
+      if (!isSidePanelTabTrigger(event.target)) return;
+      scheduleTabAntiFlickerPasses();
     }, true);
-  })();
+  }
 
+  function init() {
+    applyFastAntiFlickerPass();
+    reapplyAll();
+    stopCardBootMask();
+    ensureSidebarStartsCollapsed();
+    finalizeAgentBootMask();
+    scheduleFavoriteLayer(900);
+    log(`iniciado v${SCRIPT_VERSION}`);
+  }
 
+  function boot() {
+    init();
+    startObserver();
+    startFavoriteLayer();
+    installNativeArquivoImagePopup();
+    installPasteImageSender();
+  }
+
+  installMessageApiInterceptors();
+
+  startCardBootMask();
+  startSidebarBootMask();
+  startAgentBootMask();
+  scheduleAgentBootFailsafe();
+  applyCSS();
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
+  }
+
+  window.addEventListener('load', init);
+  window.addEventListener('pageshow', init);
 })();
