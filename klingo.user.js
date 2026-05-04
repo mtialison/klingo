@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      13.4
+// @version      13.5
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -5121,6 +5121,19 @@ function burstUpdateLite() {
         display: none !important;
       }
 
+
+      /* FIX 13.5 - posição correta botão copiar */
+      .tm-datecalc-result-box {
+        position: relative !important;
+      }
+
+      .tm-datecalc-copy-btn,
+      .tm-datecalc-copy-result {
+        position: absolute !important;
+        right: 10px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+      }
 `;
     document.head.appendChild(style);
   }
