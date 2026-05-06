@@ -1,14 +1,17 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      13.5
+// @version      16.3
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
 // @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
+// @connect      api.klingo.app
 // @author       alison
 // @grant        GM_info
+// @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -111,9 +114,7 @@
   }
 
   function isTimeButton(el) {
-    if (!el) return false;
-    const text = norm(el.textContent);
-    return /^\d{1,2}h$/i.test(text) || /^\d{1,2}:\d{2}$/.test(text);
+    return false;
   }
 
   function findRowContainer(el) {
@@ -205,222 +206,68 @@
     return { name, hasCRM: true };
   }
 
-  function getModalDoctorCandidates() {
-    const modal = document.querySelector('#minutoModal');
-    if (!modal) return [];
 
-    const map = new Map();
-    const timeButtons = Array.from(modal.querySelectorAll('button, a, div, span')).filter(isTimeButton);
-
-    timeButtons.forEach((btn) => {
-      const container = findDoctorContainerFromTimeButton(btn);
-      const info = getDoctorInfoFromContainer(container);
-
-      if (!info.name || !info.hasCRM) return;
-
-      const key = norm(info.name).toLowerCase();
-      if (!map.has(key)) {
-        map.set(key, info.name);
-      }
-    });
-
-    return Array.from(map.values());
-  }
-
-  function getSelectedDoctorName() {
-    if (state.selectedDoctorFromCopy && state.selectedDoctor) {
-      return state.selectedDoctor;
-    }
-
-    const modalDoctors = getModalDoctorCandidates();
-
-    if (modalDoctors.length === 1) {
-      return modalDoctors[0];
-    }
-
-    return '';
-  }
-  function getModalDateContext() {
-    const modal = document.querySelector('#minutoModal');
-    if (!modal) return { dateText: '', weekdayText: '' };
-
-    const text = norm(modal.innerText || modal.textContent || '');
-    const dateMatch = text.match(/\b\d{2}\/\d{2}\b/);
-    const weekday = WEEKDAYS.find((day) => text.includes(day)) || '';
-
-    return {
-      dateText: dateMatch ? formatDatePtBr(dateMatch[0]) : '',
-      weekdayText: weekday
-    };
-  }
-
-  function buildCopyTextFromTarget(target) {
-    const btn = target ? target.closest('button, a, div, span') : null;
-    if (!btn || !isTimeButton(btn)) return '';
-
-    const time = normalizeHour(btn.textContent);
-    const doctorContainer = findDoctorContainerFromTimeButton(btn);
-    const doctorInfo = getDoctorInfoFromContainer(doctorContainer);
-    const modalContext = getModalDateContext();
-
-    if (!doctorInfo.name || !doctorInfo.hasCRM || !modalContext.dateText || !modalContext.weekdayText || !time) {
-      return '';
-    }
-
-    return `👨‍⚕️ ${doctorInfo.name}\n${modalContext.dateText} | ${modalContext.weekdayText} | ${time}`;
-  }
+  /* TM 16.3: função getModalDoctorCandidates removida junto com alterações do modal. */
 
 
-  function captureSelectionFromClick(target, allowModalTime = false) {
-    const insideModal = !!target.closest('#minutoModal');
 
-    if (insideModal && !allowModalTime) return false;
+  /* TM 16.3: função getSelectedDoctorName removida junto com alterações do modal. */
 
-    const btn = target.closest('button, a, div, span');
-    if (!btn || !isTimeButton(btn)) return false;
 
-    const time = normalizeHour(btn.textContent);
+  /* TM 16.3: função getModalDateContext removida junto com alterações do modal. */
 
-    if (insideModal && allowModalTime) {
-      state.selectedTime = time;
 
-      const doctorContainer = findDoctorContainerFromTimeButton(btn);
-      const doctorInfo = getDoctorInfoFromContainer(doctorContainer);
 
-      if (doctorInfo.name && doctorInfo.hasCRM) {
-        state.selectedDoctor = doctorInfo.name;
-        state.selectedDoctorFromCopy = true;
-      } else {
-        state.selectedDoctor = '';
-        state.selectedDoctorFromCopy = false;
-      }
+  /* TM 16.3: função buildCopyTextFromTarget removida junto com alterações do modal. */
 
-      return true;
-    }
 
-    const row = findRowContainer(btn);
-    if (!row) return false;
 
-    const rowText = norm(row.innerText || row.textContent || '');
-    const dateMatch = rowText.match(/\b\d{2}\/\d{2}\b/);
-    const weekday = WEEKDAYS.find(day => rowText.includes(day)) || '';
 
-    if (!dateMatch || !weekday) return false;
+  /* TM 16.3: função captureSelectionFromClick removida junto com alterações do modal. */
 
-    state.selectedDate = formatDatePtBr(dateMatch[0]);
-    state.selectedWeekday = weekday;
-    state.selectedTime = time;
-    state.selectedDoctor = '';
-    state.selectedDoctorFromCopy = false;
-    return true;
-  }
 
-  function getDoctorNameFromModal() {
-    const modalDoctors = getModalDoctorCandidates();
 
-    if (modalDoctors.length === 1) {
-      return modalDoctors[0];
-    }
+  /* TM 16.3: função getDoctorNameFromModal removida junto com alterações do modal. */
 
-    return '';
-  }
 
   function getSubtitleHtml(titleEl) {
     const subtitleEl = titleEl.querySelector('.small.text-muted');
     return subtitleEl ? subtitleEl.outerHTML : '';
   }
 
-  function buildTitleHtml(doctorName) {
-    if (!state.selectedDate || !state.selectedWeekday || !state.selectedTime) {
-      return '';
-    }
 
-    const line2 = `${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
-    const doctorLine = doctorName
-      ? `<span class="tm-doctor-line" style="display:block;">👨‍⚕️ ${doctorName}</span>`
-      : '';
+  /* TM 16.3: função buildTitleHtml removida junto com alterações do modal. */
 
-    return `
-      <span class="tm-main-title" style="display:block; line-height:1.35;">
-        ${doctorLine}
-        <span class="tm-date-line" style="display:block;">${line2}</span>
-      </span>
-    `;
-  }
 
-  function getCopyText() {
-    const doctorName = getSelectedDoctorName();
-    if (!doctorName || !state.selectedDate || !state.selectedWeekday || !state.selectedTime) {
-      return '';
-    }
 
-    return `👨‍⚕️ ${doctorName}\n${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
+  /* TM 16.3: função getCopyText removida junto com alterações do modal. */
+
+
+  function tmDateCalcIsOwnCopyButton(targetEl) {
+    return !!(
+      targetEl &&
+      targetEl.matches &&
+      targetEl.matches('.tm-datecalc-copy-btn, .tm-datecalc-copy-result, [data-tm-datecalc-copy="1"], [data-tm-copy-date-result="1"]')
+    );
   }
 
   function showCopyFeedback(targetEl, message = '') {
-    if (!targetEl) return;
-
-    const oldTip = document.querySelector('#tm-copy-bubble');
-    if (oldTip) oldTip.remove();
-
-    const bubble = document.createElement('div');
-    bubble.id = 'tm-copy-bubble';
-    bubble.textContent = message;
-
-    bubble.style.position = 'fixed';
-    bubble.style.zIndex = '999999';
-    bubble.style.background = '#fff';
-    bubble.style.color = '#222';
-    bubble.style.border = '1px solid #111';
-    bubble.style.borderRadius = '10px';
-    bubble.style.padding = '8px 14px';
-    bubble.style.fontSize = '14px';
-    bubble.style.fontWeight = '600';
-    bubble.style.boxShadow = '0 4px 10px rgba(0,0,0,0.12)';
-    bubble.style.pointerEvents = 'none';
-    bubble.style.opacity = '0';
-    bubble.style.transition = 'opacity 0.15s ease';
-
-    document.body.appendChild(bubble);
-
-    const rect = targetEl.getBoundingClientRect();
-    const bubbleRect = bubble.getBoundingClientRect();
-
-    const top = rect.top - bubbleRect.height - 10;
-    const left = rect.left + (rect.width / 2) - (bubbleRect.width / 2);
-
-    bubble.style.top = `${Math.max(8, top)}px`;
-    bubble.style.left = `${Math.max(8, left)}px`;
-
-    const arrow = document.createElement('div');
-    arrow.style.position = 'absolute';
-    arrow.style.left = '50%';
-    arrow.style.bottom = '-7px';
-    arrow.style.width = '12px';
-    arrow.style.height = '12px';
-    arrow.style.background = '#fff';
-    arrow.style.borderRight = '1px solid #111';
-    arrow.style.borderBottom = '1px solid #111';
-    arrow.style.transform = 'translateX(-50%) rotate(45deg)';
-    bubble.appendChild(arrow);
-
-    requestAnimationFrame(() => {
-      bubble.style.opacity = '1';
-    });
-
-    clearTimeout(bubble._hideTimer);
-    bubble._hideTimer = setTimeout(() => {
-      bubble.style.opacity = '0';
-      setTimeout(() => bubble.remove(), 180);
-    }, 1000);
+    return;
   }
 
   async function copyText(text, targetEl) {
     if (!text) return;
 
+    const isDateCalcCopy = tmDateCalcIsOwnCopyButton(targetEl);
+
     try {
       await navigator.clipboard.writeText(text);
-      tmDateCalcMarkCopied(targetEl);
+
+      if (isDateCalcCopy) {
+        tmDateCalcMarkCopied(targetEl);
+      } else {
+        showCopyFeedback(targetEl, 'Copiado');
+      }
     } catch (err) {
       const ta = document.createElement('textarea');
       ta.value = text;
@@ -428,31 +275,18 @@
       ta.select();
       document.execCommand('copy');
       ta.remove();
-      tmDateCalcMarkCopied(targetEl);
+
+      if (isDateCalcCopy) {
+        tmDateCalcMarkCopied(targetEl);
+      } else {
+        showCopyFeedback(targetEl, 'Copiado');
+      }
     }
   }
 
-  function updateModalTitle() {
-    const modal = document.querySelector('#minutoModal');
-    const titleEl = document.querySelector('#minutoModal h5.modal-title');
 
-    if (!modal || !titleEl) return;
+  /* TM 16.3: função updateModalTitle removida junto com alterações do modal. */
 
-    const doctorName = getSelectedDoctorName();
-    const titleHtml = buildTitleHtml(doctorName);
-
-    if (!titleHtml) return;
-
-    const subtitleHtml = getSubtitleHtml(titleEl);
-    const currentMain = titleEl.querySelector('.tm-main-title');
-    const expectedText = doctorName
-      ? `👨‍⚕️ ${doctorName} ${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`
-      : `${state.selectedDate} | ${state.selectedWeekday} | ${state.selectedTime}`;
-
-    if (currentMain && norm(currentMain.textContent) === norm(expectedText)) return;
-
-    titleEl.innerHTML = `${titleHtml}${subtitleHtml}`;
-  }
 
   function applyLoginIndicator() {
     const passwordInput = document.querySelector('input[type="password"]');
@@ -492,120 +326,41 @@
     card.appendChild(ratIcon);
   }
 
-  function parsePastedBirthDate(text) {
-    const raw = norm(text);
-    if (!raw) return '';
 
-    const onlyDigits = raw.replace(/\D/g, '');
+  /* TM 16.3: função parsePastedBirthDate removida junto com o modal. */
 
-    if (onlyDigits.length === 8) {
-      const dd = onlyDigits.slice(0, 2);
-      const mm = onlyDigits.slice(2, 4);
-      const yyyy = onlyDigits.slice(4, 8);
 
-      if (isValidDate(dd, mm, yyyy)) {
-        return `${yyyy}-${mm}-${dd}`;
-      }
 
-      const yyyy2 = onlyDigits.slice(0, 4);
-      const mm2 = onlyDigits.slice(4, 6);
-      const dd2 = onlyDigits.slice(6, 8);
+  /* TM 16.3: função isValidDate removida junto com o modal. */
 
-      if (isValidDate(dd2, mm2, yyyy2)) {
-        return `${yyyy2}-${mm2}-${dd2}`;
-      }
-    }
 
-    let m = raw.match(/^(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})$/);
-    if (m && isValidDate(m[1], m[2], m[3])) {
-      return `${m[3]}-${m[2]}-${m[1]}`;
-    }
 
-    m = raw.match(/^(\d{4})[\/.\-](\d{2})[\/.\-](\d{2})$/);
-    if (m && isValidDate(m[3], m[2], m[1])) {
-      return `${m[1]}-${m[2]}-${m[3]}`;
-    }
+  /* TM 16.3: função setNativeInputValue removida junto com o modal. */
 
-    return '';
-  }
 
-  function isValidDate(dd, mm, yyyy) {
-    const day = Number(dd);
-    const month = Number(mm);
-    const year = Number(yyyy);
 
-    if (!day || !month || !year) return false;
-    if (year < 1900 || year > 2100) return false;
+  /* TM 16.3: função dispatchEvents removida junto com o modal. */
 
-    const date = new Date(year, month - 1, day);
-    return (
-      date.getFullYear() === year &&
-      date.getMonth() === month - 1 &&
-      date.getDate() === day
-    );
-  }
 
-  function setNativeInputValue(el, value) {
-    const prototype = Object.getPrototypeOf(el);
-    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
-    const setter = descriptor && descriptor.set;
 
-    if (setter) {
-      setter.call(el, value);
-    } else {
-      el.value = value;
-    }
-  }
+  /* TM 16.3: função dispatchBirthDateEvents removida junto com o modal. */
 
-  function dispatchEvents(el, names) {
-    names.forEach((name) => {
-      const ev = new Event(name, { bubbles: true });
-      el.dispatchEvent(ev);
-    });
-  }
 
-  function dispatchBirthDateEvents(el) {
-    dispatchEvents(el, ['input', 'change', 'blur']);
-  }
 
-  function isBirthDateInput(input) {
-    if (!(input instanceof HTMLInputElement)) return false;
-    if (input.type !== 'date') return false;
-    if (input.name !== 'teste') return false;
-    return !!input.closest('.input-group.input-group-sm');
-  }
+  /* TM 16.3: função isBirthDateInput removida junto com o modal. */
 
-  function handleBirthDatePaste(event) {
-    const input = event.target;
-    if (!isBirthDateInput(input)) return;
 
-    const pasted = event.clipboardData ? event.clipboardData.getData('text') : '';
-    const normalized = parsePastedBirthDate(pasted);
-    if (!normalized) return;
 
-    event.preventDefault();
-    event.stopPropagation();
+  /* TM 16.3: função handleBirthDatePaste removida junto com o modal. */
 
-    setNativeInputValue(input, normalized);
-    dispatchBirthDateEvents(input);
-  }
 
-  function enableBirthDatePaste() {
-    const inputs = document.querySelectorAll('input[type="date"][name="teste"]');
 
-    inputs.forEach((input) => {
-      if (!isBirthDateInput(input)) return;
-      if (input.dataset.tmBirthPasteEnabled === '1') return;
 
-      input.dataset.tmBirthPasteEnabled = '1';
-      input.addEventListener('paste', handleBirthDatePaste, true);
-    });
-  }
 
   /* =========================
      OCULTAR ELEMENTOS (CSS)
   ========================= */
-  
+
   function injectFontFix() {
     if (document.getElementById('tm-font-fix')) return;
     const style = document.createElement('style');
@@ -715,4110 +470,7 @@
     document.head.appendChild(style);
   }
 
-  function injectLayoutCSS() {
-    if (!isCallCenterRoute()) return;
-    if (document.getElementById('tm-klingo-layout-style')) return;
-
-    const style = document.createElement('style');
-    style.id = 'tm-klingo-layout-style';
-    style.textContent = `
-      .tm-hidden-by-script {
-        display: none !important;
-      }
-
-      .tm-layout-host {
-        margin-top: 8px;
-        margin-bottom: 8px;
-      }
-
-      .tm-top-layout {
-        display: grid;
-        grid-template-columns: 509px;
-        gap: 18px;
-        align-items: start;
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-left-panel {
-        min-width: 0;
-        width: 509px !important;
-        max-width: 509px !important;
-      }
-
-      .tm-grid-row {
-        display: grid;
-        gap: 10px 12px;
-        margin-bottom: 10px;
-        align-items: end;
-      }
-
-      .tm-row-name-birth {
-        grid-template-columns: 342px 155px;
-      }
-
-      .tm-row-cpf-sexo-origem {
-        grid-template-columns: 155px 175px 155px;
-      }
-
-      .tm-row-cel-email {
-        grid-template-columns: 155px 342px;
-      }
-
-      .tm-row-carteira-validade {
-        grid-template-columns: 342px 155px;
-      }
-
-      .tm-field-slot,
-      .tm-field-slot > .col,
-      .tm-field-slot > .form-group,
-      .tm-field-slot > [class*="col-"] {
-        min-width: 0;
-      }
-
-      .tm-field-slot > .col,
-      .tm-field-slot > [class*="col-"] {
-        flex: unset !important;
-        max-width: none !important;
-        width: 100% !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-      }
-
-      .tm-field-slot .form-group {
-        margin-bottom: 0 !important;
-      }
-
-      .tm-field-slot .input-group,
-      .tm-field-slot .form-control,
-      .tm-field-slot select,
-      .tm-field-slot input,
-      .tm-field-slot textarea {
-        width: 100% !important;
-      }
-
-      .tm-cell-input-group .input-group-prepend,
-      .tm-cell-input-group .dropdown {
-        display: none !important;
-      }
-
-      .tm-cell-input-group .form-control {
-        border-top-left-radius: .25rem !important;
-        border-bottom-left-radius: .25rem !important;
-      }
-
-      .tm-observation-layout {
-        display: grid;
-        grid-template-columns: 509px;
-        gap: 12px;
-        align-items: start;
-        margin-top: 6px;
-        margin-bottom: 10px;
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-observation-layout .tm-field-slot > .col,
-      .tm-observation-layout .tm-field-slot > [class*="col-"] {
-        width: 100% !important;
-      }
-
-      .tm-observation-textarea {
-        min-height: 68px !important;
-        height: 68px !important;
-        padding: 8px 10px !important;
-        line-height: 1.35 !important;
-        resize: none !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
-        white-space: pre-wrap !important;
-        overflow-y: auto !important;
-        vertical-align: top !important;
-      }
-
-      .tm-observation-layout .input-group {
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-      }
-
-      .tm-observation-layout .input-group-prepend {
-        display: flex !important;
-        margin-right: 0 !important;
-        flex: 0 0 auto !important;
-      }
-
-      .tm-observation-layout .input-group-text {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        height: 30px !important;
-        min-width: 38px !important;
-        border-top-right-radius: 0 !important;
-        border-bottom-right-radius: 0 !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-      }
-
-      .tm-observation-layout select.form-control {
-        height: 30px !important;
-        max-width: 188px !important;
-        width: 188px !important;
-        border-top-left-radius: 0 !important;
-        border-bottom-left-radius: 0 !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        line-height: 30px !important;
-      }
-
-      .tm-klingo-root .form-row.tm-hidden-original-row,
-      .tm-klingo-root .row.tm-hidden-original-row,
-      .tm-klingo-root .tm-hidden-original-row {
-        display: none !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success {
-        max-width: 509px !important;
-        width: 509px !important;
-        background: #d5edff !important;
-        color: #003358 !important;
-        border-color: #b7d9ee !important;
-        padding: 12px 14px !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group {
-        max-width: 509px !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success label,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success .h4,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success .lead,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success small,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success span,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success i {
-        color: #003358 !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success .badge.badge-light {
-        background: #ffffff !important;
-        color: #003358 !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success .text-muted,
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success small.text-muted {
-        color: #4d7088 !important;
-      }
-
-      .tm-klingo-root > .modal-body > div:first-child > div:first-child > .list-group > .list-group-item.list-group-item-success i.fa-exclamation-triangle.text-warning {
-        color: #f4b400 !important;
-      }
-
-      
-      /* OCULTAR CONSULTÓRIO AO LADO DA UNIDADE (HEADER) */
-      /* =========================
-         HEADER - TAMANHO CONFIGURÁVEL
-      ========================= */
-
-      .tm-klingo-root .list-group-item.list-group-item-success .h4 {
-        font-size: ${TM_HEADER_CONFIG.titulo} !important;
-      }
-
-      .tm-klingo-root .list-group-item.list-group-item-success .lead {
-        font-size: ${TM_HEADER_CONFIG.linha} !important;
-      }
-
-      .tm-klingo-root .list-group-item.list-group-item-success small {
-        font-size: ${TM_HEADER_CONFIG.detalhes} !important;
-      }
-
-      .tm-klingo-root .list-group-item.list-group-item-success small.text-muted {
-        display: none !important;
-      }
-
-.tm-klingo-root .tm-procedure-title {
-        display: block !important;
-        margin-bottom: 8px !important;
-        font-size: 20px !important;
-        line-height: 1.25 !important;
-        white-space: normal !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
-      }
-
-      .tm-klingo-root .tm-header-line {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        align-items: center !important;
-        gap: 6px 10px !important;
-        margin-bottom: 6px !important;
-        line-height: 1.3 !important;
-      }
-
-      .tm-klingo-root .tm-header-line > * {
-        display: inline-flex !important;
-        align-items: center !important;
-        min-width: 0 !important;
-      }
-
-      .tm-klingo-root .tm-header-line small,
-      .tm-klingo-root .tm-header-line .lead {
-        margin-bottom: 0 !important;
-        white-space: normal !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
-      }
-
-      .tm-klingo-root .tm-header-infos {
-        margin-top: 6px !important;
-      }
-
-      .tm-klingo-root .tm-header-infos footer {
-        display: -webkit-box !important;
-        -webkit-box-orient: vertical !important;
-        -webkit-line-clamp: 3 !important;
-        line-clamp: 3 !important;
-        font-size: 12px !important;
-        line-height: 1.35 !important;
-        white-space: pre-wrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
-        margin: 0 !important;
-        max-height: calc(1.35em * 3) !important;
-        transition: max-height 0.15s ease !important;
-        cursor: default !important;
-      }
-
-      .tm-klingo-root .tm-header-infos:hover footer {
-        display: block !important;
-        -webkit-line-clamp: unset !important;
-        line-clamp: unset !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        max-height: 1000px !important;
-      }
-
-      .tm-klingo-root [data-slot="validade"] {
-        margin-top: 0 !important;
-      }
-
-      .tm-klingo-root [data-slot="validade"] .form-control {
-        max-width: 155px !important;
-        width: 155px !important;
-      }
-
-      .tm-klingo-root [data-slot="observacao-select"] {
-        max-width: 226px !important;
-        width: 226px !important;
-      }
-
-      .tm-klingo-root [data-slot="observacao-select"] .form-group {
-        width: 226px !important;
-      }
-
-      /* AJUSTE: largura do campo "Adicionar procedimento" igual ao header */
-      .tm-klingo-root .autocomplete,
-      .tm-klingo-root .autocomplete .input-group,
-      .tm-klingo-root input.az-autocomplete {
-        width: 509px !important;
-        max-width: 509px !important;
-      }
-
-      .tm-klingo-root input[placeholder="Adicionar procedimento..."] {
-        max-width: 1046px !important;
-        width: 1046px !important;
-      }
-
-
-      .tm-klingo-root {
-        width: 680px !important;
-        max-width: 680px !important;
-        overflow: hidden !important;
-      }
-
-      .tm-klingo-root .modal-body {
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        overflow-x: hidden !important;
-        overflow-y: auto !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-      }
-
-      .tm-klingo-root .modal-body > div,
-      .tm-klingo-root .mt-3,
-      .tm-klingo-root .tab-content,
-      .tm-klingo-root .tab-pane,
-      .tm-klingo-root #myTab,
-      .tm-klingo-root #cadTemp,
-      .tm-klingo-root #tm-top-layout-host,
-      .tm-klingo-root hr,
-      .tm-klingo-root .modal-footer {
-        width: 540px !important;
-        max-width: 540px !important;
-        box-sizing: border-box !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-klingo-root #tm-observation-layout-host,
-      .tm-klingo-root #myTab,
-      .tm-klingo-root .tab-content,
-      .tm-klingo-root .tab-pane,
-      .tm-klingo-root .modal-footer,
-      .tm-klingo-root .tab-pane .mt-3,
-      .tm-klingo-root .tab-pane .form-group.mb-1 {
-        width: 509px !important;
-        max-width: 509px !important;
-        box-sizing: border-box !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-klingo-root .tab-pane .autocomplete,
-      .tm-klingo-root .tab-pane .autocomplete .input-group,
-      .tm-klingo-root .tab-pane input.az-autocomplete {
-        width: 509px !important;
-        max-width: 509px !important;
-      }
-
-      .tm-klingo-root .tab-pane hr {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-klingo-root .modal-footer {
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-klingo-root .list-group,
-      .tm-klingo-root .list-group-item.list-group-item-success {
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-klingo-root .modal-footer {
-        justify-content: flex-start !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-      }
-
-
-      .tm-klingo-root .modal-body > *,
-      .tm-klingo-root #cadTemp,
-      .tm-klingo-root #tm-top-layout-host,
-      .tm-klingo-root #tm-observation-layout-host,
-      .tm-klingo-root .border-bottom,
-      .tm-klingo-root .nav-tabs,
-      .tm-klingo-root .tab-content,
-      .tm-klingo-root .tab-pane,
-      .tm-klingo-root hr,
-      .tm-klingo-root .modal-footer {
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-klingo-root #cadTemp,
-      .tm-klingo-root #tm-top-layout-host,
-      .tm-klingo-root #tm-observation-layout-host,
-      .tm-klingo-root .border-bottom,
-      .tm-klingo-root .nav-tabs,
-      .tm-klingo-root .tab-content,
-      .tm-klingo-root .tab-pane,
-      .tm-klingo-root hr {
-        width: 568px !important;
-        max-width: 568px !important;
-      }
-
-
-      /* AJUSTE TÍTULOS (Dados Pessoais / Observação) */
-      .tm-klingo-root .border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.text-primary,
-      .tm-klingo-root .border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.mt-1.text-primary {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        box-sizing: border-box !important;
-      }
-
-
-      /* OCULTAR ÍCONE NATIVO DO INPUT DATE NO CAMPO DATA DE NASCIMENTO */
-      .tm-klingo-root [data-slot="nascimento"] input[type="date"]::-webkit-calendar-picker-indicator {
-        opacity: 0 !important;
-        display: none !important;
-        -webkit-appearance: none !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] input[type="date"]::-webkit-inner-spin-button,
-      .tm-klingo-root [data-slot="nascimento"] input[type="date"]::-webkit-clear-button {
-        display: none !important;
-        -webkit-appearance: none !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] input[type="date"] {
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        background-image: none !important;
-        padding-right: 8px !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .input-group-append,
-      .tm-klingo-root [data-slot="nascimento"] .input-group-text,
-      .tm-klingo-root [data-slot="nascimento"] .btn,
-      .tm-klingo-root [data-slot="nascimento"] button {
-        display: none !important;
-      }
-
-
-      /* DATA DE NASCIMENTO: badge de idade inline */
-      .tm-klingo-root [data-slot="nascimento"] .input-group {
-        position: relative !important;
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] input[type="date"],
-      .tm-klingo-root [data-slot="nascimento"] input.form-control {
-        padding-right: 46px !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline {
-        position: absolute !important;
-        top: 1px !important;
-        bottom: 1px !important;
-        right: 1px !important;
-        width: 44px !important;
-        transform: none !important;
-        z-index: 3 !important;
-        display: flex !important;
-        align-items: stretch !important;
-        margin: 0 !important;
-        pointer-events: none !important;
-        overflow: hidden !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .tm-birth-age-inline .input-group-text {
-        width: 100% !important;
-        min-width: 0 !important;
-        height: 100% !important;
-        max-height: none !important;
-        padding: 0 !important;
-        border-radius: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #666 !important;
-        line-height: 1 !important;
-        border-top: 0 !important;
-        border-right: 0 !important;
-        border-bottom: 0 !important;
-        border-left: 1px solid #cfd4da !important;
-        box-shadow: none !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-        text-align: center !important;
-      }
-
-      .tm-klingo-root [data-slot="nascimento"] .tm-age-hidden {
-        display: none !important;
-      }
-
-
-      /* =========================
-         PACIENTE 9.1 - MÓDULO LIMPO
-         Base 8.3 + host próprio, sem fases antigas
-      ========================= */
-      .tm-paciente-v91-root {
-        width: 580px !important;
-        max-width: 580px !important;
-        min-width: 580px !important;
-        overflow: hidden !important;
-      }
-
-      .tm-paciente-v91-root .modal-body {
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        overflow-x: hidden !important;
-        overflow-y: auto !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-header,
-      .tm-paciente-v91-root .tm-paciente-v91-title,
-      .tm-paciente-v91-root .tm-paciente-v91-host,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host,
-      .tm-paciente-v91-root .modal-footer {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .list-group,
-      .tm-paciente-v91-root .list-group-item.list-group-item-success {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-paciente-v91-root .list-group-item.list-group-item-success {
-        background: #d5edff !important;
-        color: #003358 !important;
-        border-color: #b7d9ee !important;
-        padding: 12px 14px !important;
-      }
-
-      .tm-paciente-v91-root .list-group-item.list-group-item-success,
-      .tm-paciente-v91-root .list-group-item.list-group-item-success * {
-        color: #003358 !important;
-      }
-
-      .tm-paciente-v91-row {
-        display: grid !important;
-        gap: 10px 12px !important;
-        margin-bottom: 10px !important;
-        align-items: end !important;
-      }
-
-      .tm-paciente-v91-row-name-birth {
-        grid-template-columns: 342px 155px !important;
-      }
-
-      .tm-paciente-v91-row-basic {
-        grid-template-columns: 155px 155px 187px !important;
-      }
-
-      .tm-paciente-v91-row-basic-has-cpf {
-        grid-template-columns: 155px 155px 187px !important;
-      }
-
-      .tm-paciente-v91-row-contact {
-        grid-template-columns: 155px 155px 187px !important;
-      }
-
-      .tm-paciente-v91-row-email {
-        display: none !important;
-      }
-
-      .tm-paciente-v91-row-card {
-        grid-template-columns: 342px 155px !important;
-      }
-
-      .tm-paciente-v91-slot,
-      .tm-paciente-v91-slot > .col,
-      .tm-paciente-v91-slot > [class*="col-"] {
-        width: 100% !important;
-        max-width: none !important;
-        min-width: 0 !important;
-        flex: unset !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-slot .form-group {
-        margin-bottom: 0 !important;
-      }
-
-      .tm-paciente-v91-slot .input-group,
-      .tm-paciente-v91-slot .form-control,
-      .tm-paciente-v91-slot input,
-      .tm-paciente-v91-slot select {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-hidden {
-        display: none !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
-        position: relative !important;
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"]::-webkit-calendar-picker-indicator {
-        opacity: 0 !important;
-        display: none !important;
-        -webkit-appearance: none !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"] {
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        background-image: none !important;
-        padding-right: 46px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline {
-        position: absolute !important;
-        top: 1px !important;
-        bottom: 1px !important;
-        right: 1px !important;
-        width: 44px !important;
-        transform: none !important;
-        z-index: 3 !important;
-        display: flex !important;
-        align-items: stretch !important;
-        margin: 0 !important;
-        pointer-events: none !important;
-        overflow: hidden !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
-        width: 100% !important;
-        height: 100% !important;
-        min-width: 0 !important;
-        padding: 0 !important;
-        border-radius: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #666 !important;
-        line-height: 1 !important;
-        border-top: 0 !important;
-        border-right: 0 !important;
-        border-bottom: 0 !important;
-        border-left: 1px solid #cfd4da !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-        text-align: center !important;
-      }
-
-      .tm-paciente-v91-observation-host {
-        margin-top: 10px !important;
-      }
-
-      .tm-paciente-v91-observation-title,
-      .tm-paciente-v91-observation-input {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-paciente-v91-observation-input textarea,
-      .tm-paciente-v91-observation-input .form-control,
-      .tm-paciente-v91-observation-textarea {
-        width: 509px !important;
-        max-width: 509px !important;
-        height: 84px !important;
-        min-height: 84px !important;
-        resize: none !important;
-        overflow-y: auto !important;
-        padding: 8px 10px !important;
-        line-height: 1.35 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-observation-select {
-        width: 240px !important;
-        max-width: 240px !important;
-        margin-top: 10px !important;
-      }
-
-      .tm-paciente-v91-observation-select .input-group,
-      .tm-paciente-v91-observation-select .form-control,
-      .tm-paciente-v91-observation-select select {
-        width: 240px !important;
-        max-width: 240px !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.2 - ORDEM E TAMANHO DOS INPUTS
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-host,
-      .tm-paciente-v91-root .tm-paciente-v91-title,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host,
-      .tm-paciente-v91-root .modal-footer {
-        width: 509px !important;
-        max-width: 509px !important;
-      }
-
-      .tm-paciente-v91-row-name-birth {
-        grid-template-columns: 342px 155px !important;
-      }
-
-      .tm-paciente-v91-row-basic {
-        grid-template-columns: 155px 155px 187px !important;
-      }
-
-      .tm-paciente-v91-row-contact {
-        grid-template-columns: 155px 155px 187px !important;
-      }
-
-      .tm-paciente-v91-row-card {
-        grid-template-columns: 342px 155px !important;
-      }
-
-      .tm-paciente-v91-row-email {
-        display: none !important;
-      }
-
-      .tm-paciente-v91-slot,
-      .tm-paciente-v91-slot > .col,
-      .tm-paciente-v91-slot > [class*="col-"] {
-        min-width: 0 !important;
-        max-width: none !important;
-      }
-
-      .tm-paciente-v91-slot .form-control,
-      .tm-paciente-v91-slot input,
-      .tm-paciente-v91-slot select {
-        height: 34px !important;
-        font-size: 14px !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.3 - HEADER IGUAL PRIMEIRA VEZ
-      ========================= */
-      .tm-paciente-v91-root .list-group,
-      .tm-paciente-v91-root .list-group-item.list-group-item-success {
-        width: 509px !important;
-        max-width: 509px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-paciente-v91-root .list-group-item.list-group-item-success {
-        background: #d5edff !important;
-        border-color: #b7d9ee !important;
-        color: #003358 !important;
-        padding: 12px 14px !important;
-        min-height: 132px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .list-group-item.list-group-item-success,
-      .tm-paciente-v91-root .list-group-item.list-group-item-success * {
-        color: #003358 !important;
-      }
-
-      .tm-paciente-v91-header-title {
-        display: block !important;
-        margin-bottom: 8px !important;
-        font-size: 16px !important;
-        line-height: 1.25 !important;
-        font-weight: 400 !important;
-        white-space: normal !important;
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
-      }
-
-      .tm-paciente-v91-header-line {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        align-items: center !important;
-        gap: 6px 12px !important;
-        margin-bottom: 6px !important;
-        line-height: 1.25 !important;
-        font-size: 12px !important;
-      }
-
-      .tm-paciente-v91-header-line,
-      .tm-paciente-v91-header-line * {
-        font-size: 12px !important;
-        line-height: 1.25 !important;
-      }
-
-      .tm-paciente-v91-header-line .lead,
-      .tm-paciente-v91-header-line small,
-      .tm-paciente-v91-header-line span {
-        font-size: 12px !important;
-      }
-
-      .tm-paciente-v91-header-note {
-        display: block !important;
-        margin-top: 8px !important;
-        font-size: 12px !important;
-        line-height: 1.3 !important;
-        text-align: center !important;
-        color: #6c757d !important;
-        white-space: normal !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-      }
-
-      .tm-paciente-v91-header-line small.text-muted,
-      .tm-paciente-v91-header-line small .text-muted,
-      .tm-paciente-v91-header-line .text-muted {
-        display: none !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.4 - AJUSTES EMAIL / NASCIMENTO / OBSERVAÇÃO
-      ========================= */
-      .tm-paciente-v91-row-basic.tm-paciente-v91-row-basic-no-cpf {
-        grid-template-columns: 155px 342px !important;
-      }
-
-      .tm-paciente-v91-row-basic.tm-paciente-v91-row-basic-no-cpf [data-v91-slot="email"] {
-        grid-column: auto !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-email,
-      .tm-paciente-v91-root .tm-paciente-v91-email .form-group,
-      .tm-paciente-v91-root .tm-paciente-v91-email .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-email input,
-      .tm-paciente-v91-root .tm-paciente-v91-email .form-control {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
-        position: relative !important;
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-        width: 100% !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"],
-      .tm-paciente-v91-root .tm-paciente-v91-birth input {
-        padding-right: 46px !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline {
-        position: absolute !important;
-        top: 1px !important;
-        bottom: 1px !important;
-        right: 1px !important;
-        width: 44px !important;
-        z-index: 4 !important;
-        margin: 0 !important;
-        pointer-events: none !important;
-        overflow: hidden !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline.tm-birth-age-waiting {
-        visibility: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
-        width: 100% !important;
-        height: 100% !important;
-        min-width: 0 !important;
-        padding: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-title,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input {
-        width: 509px !important;
-        max-width: 509px !important;
-        min-width: 509px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input > .col,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input > [class*="col-"],
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
-        width: 509px !important;
-        max-width: 509px !important;
-        min-width: 509px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
-        height: 84px !important;
-        min-height: 84px !important;
-        resize: none !important;
-        overflow-y: auto !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.5 - GRID UNIFICADO / ALINHAMENTO DEFINITIVO
-      ========================= */
-      .tm-paciente-v91-root {
-        --tm-paciente-width: 509px;
-        --tm-paciente-gap: 10px;
-      }
-
-      .tm-paciente-v91-root .modal-body {
-        overflow-x: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-title,
-      .tm-paciente-v91-root .tm-paciente-v91-host,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host,
-      .tm-paciente-v91-root .modal-footer {
-        width: var(--tm-paciente-width) !important;
-        max-width: var(--tm-paciente-width) !important;
-        min-width: var(--tm-paciente-width) !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-host,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host {
-        overflow: visible !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-host *,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host * {
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row {
-        width: var(--tm-paciente-width) !important;
-        max-width: var(--tm-paciente-width) !important;
-        min-width: var(--tm-paciente-width) !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        display: grid !important;
-        gap: 10px !important;
-        align-items: end !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row-name-birth {
-        grid-template-columns: 344px 155px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row-basic,
-      .tm-paciente-v91-root .tm-paciente-v91-row-basic-has-cpf {
-        grid-template-columns: 155px 155px 179px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row-basic-no-cpf {
-        grid-template-columns: 155px 344px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row-contact {
-        grid-template-columns: 155px 155px 179px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row-card {
-        grid-template-columns: 344px 155px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-slot,
-      .tm-paciente-v91-root .tm-paciente-v91-slot > .col,
-      .tm-paciente-v91-root .tm-paciente-v91-slot > [class*="col-"],
-      .tm-paciente-v91-root .tm-paciente-v91-field {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        flex: unset !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-slot .form-group,
-      .tm-paciente-v91-root .tm-paciente-v91-slot .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-slot .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-slot input,
-      .tm-paciente-v91-root .tm-paciente-v91-slot select {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-origin,
-      .tm-paciente-v91-root .tm-paciente-v91-origin .form-group,
-      .tm-paciente-v91-root .tm-paciente-v91-origin select,
-      .tm-paciente-v91-root .tm-paciente-v91-origin .form-control {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-title,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input > .col,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input > [class*="col-"],
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
-        width: var(--tm-paciente-width) !important;
-        max-width: var(--tm-paciente-width) !important;
-        min-width: var(--tm-paciente-width) !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
-        height: 84px !important;
-        min-height: 84px !important;
-        resize: none !important;
-        overflow-y: auto !important;
-        padding: 8px 10px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select {
-        width: 240px !important;
-        max-width: 240px !important;
-        min-width: 240px !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        margin-top: 10px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select > .col,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select > [class*="col-"],
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select select,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-control {
-        width: 240px !important;
-        max-width: 240px !important;
-        min-width: 0 !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-      }
-
-      .tm-paciente-v91-root #myTab,
-      .tm-paciente-v91-root #myTabContent,
-      .tm-paciente-v91-root .tab-content,
-      .tm-paciente-v91-root .tab-pane,
-      .tm-paciente-v91-root .tab-pane > .mt-3,
-      .tm-paciente-v91-root .input-group {
-        max-width: var(--tm-paciente-width) !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root #myTab,
-      .tm-paciente-v91-root #myTabContent,
-      .tm-paciente-v91-root .tab-content,
-      .tm-paciente-v91-root .tab-pane {
-        width: var(--tm-paciente-width) !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-      }
-
-      .tm-paciente-v91-root .input-group:has([placeholder*="Adicionar procedimento"]),
-      .tm-paciente-v91-root .input-group:has([placeholder*="Incluir material"]) {
-        width: 240px !important;
-        max-width: 240px !important;
-        margin-left: 0 !important;
-        margin-right: auto !important;
-      }
-
-      .tm-paciente-v91-root .modal-footer {
-        justify-content: flex-start !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.6 - ? AO LADO DO SELECT
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select {
-        width: 240px !important;
-        max-width: 240px !important;
-        min-width: 240px !important;
-        margin-left: 0 !important;
-        margin-right: auto !important;
-        margin-top: 10px !important;
-        padding-left: 0 !important;
-        display: block !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select > .col,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select > [class*="col-"] {
-        width: 240px !important;
-        max-width: 240px !important;
-        min-width: 240px !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        flex: unset !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group {
-        width: 240px !important;
-        max-width: 240px !important;
-        min-width: 240px !important;
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-        justify-content: flex-start !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-prepend {
-        display: flex !important;
-        align-items: stretch !important;
-        flex: 0 0 auto !important;
-        margin-left: 0 !important;
-        margin-right: -1px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-prepend .input-group-text,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-text {
-        height: 34px !important;
-        min-height: 34px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select select,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-control {
-        flex: 1 1 auto !important;
-        width: 1% !important;
-        min-width: 0 !important;
-        max-width: none !important;
-        height: 34px !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.7 - COMPACTAÇÃO PROPORCIONAL
-      ========================= */
-      .tm-paciente-v91-root .list-group-item.list-group-item-success {
-        min-height: 132px !important;
-        padding: 10px 14px !important;
-        margin-bottom: 12px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-title {
-        margin-bottom: 6px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-host {
-        row-gap: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-row {
-        gap: 7px 10px !important;
-        margin-bottom: 7px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-slot .form-group {
-        margin-bottom: 0 !important;
-      }
-
-      .tm-paciente-v91-root small.form-text,
-      .tm-paciente-v91-root small {
-        line-height: 1.15 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-slot .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-slot input,
-      .tm-paciente-v91-root .tm-paciente-v91-slot select,
-      .tm-paciente-v91-root .tm-paciente-v91-slot .input-group-text {
-        height: 31px !important;
-        min-height: 31px !important;
-        padding-top: 4px !important;
-        padding-bottom: 4px !important;
-        font-size: 14px !important;
-        line-height: 1.2 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
-        height: 100% !important;
-        min-height: 0 !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-host {
-        margin-top: 6px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-title {
-        margin-bottom: 3px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input textarea,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-input .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-textarea {
-        height: 74px !important;
-        min-height: 74px !important;
-        padding: 6px 9px !important;
-        font-size: 14px !important;
-        line-height: 1.25 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select {
-        margin-top: 7px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-control,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select select,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-text {
-        height: 31px !important;
-        min-height: 31px !important;
-        font-size: 14px !important;
-        line-height: 1.2 !important;
-      }
-
-      .tm-paciente-v91-root #myTab {
-        margin-top: 8px !important;
-      }
-
-      .tm-paciente-v91-root .modal-footer {
-        padding-top: 10px !important;
-        padding-bottom: 10px !important;
-      }
-
-      .tm-paciente-v91-root .modal-footer .btn {
-        padding-top: 6px !important;
-        padding-bottom: 6px !important;
-        font-size: 16px !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.8 - HEADER DINÂMICO SEM ESPAÇO VAZIO
-      ========================= */
-      .tm-paciente-v91-root .list-group-item.list-group-item-success {
-        min-height: 0 !important;
-        height: auto !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-header-note:empty,
-      .tm-paciente-v91-root .tm-paciente-v91-header-note.tm-paciente-v91-note-empty {
-        display: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        height: 0 !important;
-        min-height: 0 !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 9.9 - PREPEND ? MESMA ALTURA DO SELECT
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group {
-        height: 31px !important;
-        min-height: 31px !important;
-        max-height: 31px !important;
-        align-items: stretch !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-prepend,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-append {
-        height: 31px !important;
-        min-height: 31px !important;
-        max-height: 31px !important;
-        display: flex !important;
-        align-items: stretch !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .input-group-text {
-        height: 31px !important;
-        min-height: 31px !important;
-        max-height: 31px !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        line-height: 1 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select select,
-      .tm-paciente-v91-root .tm-paciente-v91-observation-select .form-control {
-        height: 31px !important;
-        min-height: 31px !important;
-        max-height: 31px !important;
-        padding-top: 4px !important;
-        padding-bottom: 4px !important;
-        line-height: 1.2 !important;
-        box-sizing: border-box !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 10.0 - OBSERVAÇÃO 3 LINHAS
-      ========================= */
-      .tm-paciente-v91-root textarea,
-      .tm-paciente-v91-root .tm-paciente-v91-observation textarea {
-        height: 72px !important;
-        min-height: 72px !important;
-        max-height: 72px !important;
-        resize: none !important;
-        line-height: 1.4 !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 10.1 - DATA DE NASCIMENTO IGUAL PRIMEIRA VEZ
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
-        position: relative !important;
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        align-items: stretch !important;
-        width: 100% !important;
-        overflow: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"],
-      .tm-paciente-v91-root .tm-paciente-v91-birth input {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        padding-right: 48px !important;
-        box-sizing: border-box !important;
-        background: #fff !important;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input[type="date"]::-webkit-calendar-picker-indicator {
-        opacity: 0 !important;
-        display: none !important;
-        -webkit-appearance: none !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline {
-        position: absolute !important;
-        top: 1px !important;
-        right: 1px !important;
-        bottom: 1px !important;
-        width: 46px !important;
-        height: auto !important;
-        max-height: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        z-index: 5 !important;
-        display: flex !important;
-        align-items: stretch !important;
-        pointer-events: none !important;
-        overflow: hidden !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-        background: #d9d9d9 !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
-        width: 100% !important;
-        height: 100% !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        border-radius: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #666 !important;
-        line-height: 1 !important;
-        border-top: 0 !important;
-        border-right: 0 !important;
-        border-bottom: 0 !important;
-        border-left: 1px solid #cfd4da !important;
-        box-shadow: none !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-        text-align: center !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 11.6 - CORREÇÃO SEGURA DATA NASCIMENTO
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group {
-        position: relative !important;
-        overflow: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input {
-        padding-right: 48px !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline {
-        position: absolute !important;
-        top: 1px !important;
-        right: 1px !important;
-        bottom: 1px !important;
-        width: 46px !important;
-        height: auto !important;
-        z-index: 5 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        display: flex !important;
-        align-items: stretch !important;
-        pointer-events: none !important;
-        overflow: hidden !important;
-        background: #d9d9d9 !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline .input-group-text {
-        width: 100% !important;
-        height: 100% !important;
-        padding: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #666 !important;
-        border-left: 1px solid #cfd4da !important;
-        border-top: 0 !important;
-        border-right: 0 !important;
-        border-bottom: 0 !important;
-        box-sizing: border-box !important;
-      }
-
-
-      
-      /* FIX DEFINITIVO DATA NASCIMENTO */
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline) {
-        display: none !important;
-      }
-
-
-      /* =========================
-         PACIENTE 11.6 - BADGE IDADE FINAL
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group-append:not(.tm-birth-age-inline-final) {
-        display: none !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline-final {
-        position: absolute !important;
-        top: 1px !important;
-        right: 1px !important;
-        bottom: 1px !important;
-        width: 46px !important;
-        height: auto !important;
-        z-index: 10 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        align-items: stretch !important;
-        pointer-events: none !important;
-        overflow: hidden !important;
-        background: #d9d9d9 !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth .tm-birth-age-inline-final .input-group-text {
-        width: 100% !important;
-        height: 100% !important;
-        min-height: 0 !important;
-        max-height: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        border-radius: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #666 !important;
-        line-height: 1 !important;
-        border-top: 0 !important;
-        border-right: 0 !important;
-        border-bottom: 0 !important;
-        border-left: 1px solid #cfd4da !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-        text-align: center !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 11.6 - PROCEDIMENTO 509 / OCULTAR MATERIAL
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-procedimento-add,
-      .tm-paciente-v91-root .tm-paciente-procedimento-add .input-group,
-      .tm-paciente-v91-root .tm-paciente-procedimento-add input,
-      .tm-paciente-v91-root .tm-paciente-procedimento-add .form-control {
-        width: 509px !important;
-        max-width: 509px !important;
-        min-width: 509px !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-material-hidden {
-        display: none !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 11.6 - AJUSTE DEFINITIVO PROCEDIMENTO / MATERIAL
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-proc-row-final,
-      .tm-paciente-v91-root .tm-paciente-proc-row-final .input-group,
-      .tm-paciente-v91-root .tm-paciente-proc-row-final input,
-      .tm-paciente-v91-root .tm-paciente-proc-row-final .form-control {
-        width: 509px !important;
-        max-width: 509px !important;
-        min-width: 509px !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-material-row-final {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        max-height: 0 !important;
-        overflow: hidden !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-
-      .tm-paciente-v91-root .input-group:has(input[placeholder*="Adicionar procedimento"]),
-      .tm-paciente-v91-root .input-group:has(input[placeholder*="Adicionar Procedimento"]) {
-        width: 509px !important;
-        max-width: 509px !important;
-        min-width: 509px !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-      }
-
-      .tm-paciente-v91-root .input-group:has(input[placeholder*="Incluir material"]),
-      .tm-paciente-v91-root .input-group:has(input[placeholder*="medicamento"]),
-      .tm-paciente-v91-root .input-group:has(input[placeholder*="taxa"]) {
-        display: none !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 11.6 - BADGE IDADE DATA NASCIMENTO
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-v91-birth .input-group,
-      .tm-paciente-v91-root .tm-paciente-v91-birth {
-        position: relative !important;
-        overflow: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-v91-birth input {
-        padding-right: 48px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-age-badge-110 {
-        position: absolute !important;
-        top: 1px !important;
-        right: 1px !important;
-        bottom: 1px !important;
-        width: 46px !important;
-        height: auto !important;
-        z-index: 9999 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #555 !important;
-        border-left: 1px solid #cfd4da !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-        font-size: 14px !important;
-        line-height: 1 !important;
-        pointer-events: none !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 11.6 - BADGE IDADE PRESA AO CAMPO
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-birth-holder-115 {
-        position: relative !important;
-        overflow: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-birth-holder-115 input {
-        padding-right: 48px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-age-badge-115 {
-        position: absolute !important;
-        top: 1px !important;
-        right: 1px !important;
-        bottom: 1px !important;
-        width: 46px !important;
-        height: auto !important;
-        z-index: 20 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #555 !important;
-        border-left: 1px solid #cfd4da !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-        font-size: 14px !important;
-        line-height: 1 !important;
-        pointer-events: none !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-      }
-
-      .tm-age-floating,
-      .tm-paciente-birth-age-floating {
-        display: none !important;
-      }
-
-
-
-      /* =========================
-         PACIENTE 11.6 - BADGE IDADE FIXA NO CAMPO
-      ========================= */
-      .tm-paciente-v91-root .tm-paciente-birth-age-holder-116 {
-        position: relative !important;
-        overflow: hidden !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-birth-age-holder-116 input {
-        padding-right: 48px !important;
-        box-sizing: border-box !important;
-      }
-
-      .tm-paciente-v91-root .tm-paciente-age-badge-116 {
-        position: absolute !important;
-        top: 1px !important;
-        right: 1px !important;
-        bottom: 1px !important;
-        width: 46px !important;
-        height: auto !important;
-        z-index: 2147483647 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: #d9d9d9 !important;
-        color: #555 !important;
-        border-left: 1px solid #cfd4da !important;
-        border-top-right-radius: .25rem !important;
-        border-bottom-right-radius: .25rem !important;
-        font-size: 14px !important;
-        line-height: 1 !important;
-        pointer-events: none !important;
-        box-sizing: border-box !important;
-        white-space: nowrap !important;
-      }
-
-
-@media (max-width: 1200px) {
-        .tm-top-layout,
-        .tm-observation-layout {
-          grid-template-columns: 1fr;
-        }
-
-        .tm-row-name-birth,
-        .tm-row-cpf-sexo-origem,
-        .tm-row-cel-email,
-        .tm-row-carteira-validade {
-          grid-template-columns: 1fr;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  function hideElement(el) {
-    if (!el) return;
-    el.dataset.tmHiddenByScript = '1';
-    el.classList.add('tm-hidden-by-script');
-    el.style.setProperty('display', 'none', 'important');
-  }
-
-  function hideOriginalRow(el) {
-    if (!el) return;
-    el.classList.add('tm-hidden-original-row');
-    el.style.setProperty('display', 'none', 'important');
-  }
-
-  function getSchedulingModalRoot() {
-    if (!isCallCenterRoute()) return null;
-    const modalContents = document.querySelectorAll('.modal-content');
-
-    for (const modal of modalContents) {
-      const text = norm(modal.innerText || modal.textContent || '');
-      if (!text) continue;
-
-      const modalTitle = norm(modal.querySelector('.modal-title')?.textContent || '');
-      const successTexts = Array.from(modal.querySelectorAll('.btn-success'))
-        .map(btn => norm(btn.textContent || ''));
-
-      const hasCadTemp = !!modal.querySelector('#cadTemp');
-      const hasDadosPessoais = text.includes('Dados Pessoais');
-      const hasOrigemPacientes = text.includes('ORIGEM DE PACIENTES') || text.includes('Origem de Pacientes');
-      const hasConfirmar = successTexts.some(txt => txt.includes('Confirmar'));
-      const hasAtualizar = successTexts.some(txt => txt.includes('Atualizar'));
-      const hasNomeDoPaciente = text.includes('Nome do Paciente');
-
-      if (modalTitle.includes('Editar Marcação')) continue;
-      if (hasAtualizar && !hasConfirmar) continue;
-
-      // FASE 1: Primeira Vez é o ÚNICO fluxo que pode receber a customização pesada.
-      // Regra confirmada no DOM: Primeira Vez tem #cadTemp; Paciente não tem.
-      if (hasCadTemp && !hasNomeDoPaciente && hasDadosPessoais && hasOrigemPacientes && hasConfirmar) {
-        modal.classList.add('tm-klingo-root');
-        return modal;
-      }
-    }
-
-    return null;
-  }
-
-  function isPacienteSchedulingModalRoot(root) {
-    if (!root || !isCallCenterRoute()) return false;
-
-    const body = root.querySelector(':scope > .modal-body');
-    const personal = body ? body.querySelector(':scope > .mt-3') : null;
-    if (!body || !personal) return false;
-
-    const text = norm(personal.innerText || personal.textContent || '');
-
-    return (
-      !root.querySelector('#cadTemp') &&
-      text.includes('Nome do Paciente') &&
-      text.includes('Nome Social') &&
-      text.includes('Telefone') &&
-      text.includes('Celular') &&
-      text.includes('Data de Nascimento')
-    );
-  }
-
-  function getActivePacienteSchedulingModalRoot() {
-    if (!isCallCenterRoute()) return null;
-
-    const modal =
-      document.querySelector('#cadastroModal.modal.show') ||
-      document.querySelector('#cadastroModal.show');
-
-    if (!modal) return null;
-
-    const root =
-      modal.querySelector(':scope > .modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content') ||
-      modal.querySelector('.modal-dialog.modal-xl.modal-dialog-scrollable > .modal-content');
-
-    return isPacienteSchedulingModalRoot(root) ? root : null;
-  }
-
-  function clearFirstVisitResidueFromPacienteModal() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    root.classList.remove(
-      'tm-klingo-root',
-      'tm-first-visit-modal',
-      'tm-registered-patient-modal'
-    );
-
-    root.querySelectorAll('.tm-procedure-title, .tm-header-line, .tm-header-line-2, .tm-header-line-3').forEach((el) => {
-      el.classList.remove(
-        'tm-procedure-title',
-        'tm-header-line',
-        'tm-header-line-2',
-        'tm-header-line-3'
-      );
-    });
-
-    root.querySelectorAll('#tm-top-layout-host, #tm-observation-layout-host, .tm-layout-host, .tm-top-layout, .tm-left-panel').forEach((el) => {
-      el.remove();
-    });
-
-    root.querySelectorAll('.tm-hidden-original-row').forEach((el) => {
-      el.classList.remove('tm-hidden-original-row');
-      el.style.removeProperty('display');
-    });
-
-    root.querySelectorAll('.tm-hidden-by-script').forEach((el) => {
-      el.classList.remove('tm-hidden-by-script');
-      el.removeAttribute('data-tm-hidden-by-script');
-      el.style.removeProperty('display');
-    });
-
-    root.querySelectorAll('.tm-observation-textarea').forEach((el) => {
-      el.remove();
-    });
-
-    root.querySelectorAll('[data-slot]').forEach((el) => {
-      el.removeAttribute('data-slot');
-    });
-
-    const dialog = root.closest('.modal-dialog');
-    [dialog, root, root.querySelector(':scope > .modal-body')].forEach((el) => {
-      if (!el) return;
-      [
-        'width',
-        'max-width',
-        'min-width',
-        'margin-left',
-        'margin-right',
-        'box-sizing',
-        'padding-left',
-        'padding-right',
-        'display',
-        'flex-direction',
-        'align-items',
-        'flex',
-        'overflow',
-        'overflow-x',
-        'overflow-y',
-        'justify-content'
-      ].forEach((prop) => el.style.removeProperty(prop));
-    });
-  }
-
-  function findTextSmall(root, labelText) {
-    const smalls = root.querySelectorAll('small');
-    for (const small of smalls) {
-      if (norm(small.textContent) === labelText) return small;
-    }
-    return null;
-  }
-
-  function findColByLabel(root, labelText) {
-    const label = findTextSmall(root, labelText);
-    if (!label) return null;
-
-    return (
-      label.closest('.col') ||
-      label.closest('[class*="col-"]') ||
-      label.closest('.form-group') ||
-      label.parentElement
-    );
-  }
-
-  function getCadTemp(root) {
-    return root.querySelector('#cadTemp');
-  }
-
-  function getCadTempTitleRow(root) {
-    const cadTemp = getCadTemp(root);
-    if (!cadTemp) return null;
-
-    const title = findTextSmall(cadTemp, 'Dados Pessoais');
-    return title ? title.closest('.border-bottom') : null;
-  }
-
-  function getObservationTitleRow(root) {
-    const title = findTextSmall(root, 'Observação');
-    return title ? title.closest('.border-bottom') : null;
-  }
-
-  function getObservationFieldsRow(root) {
-    const titleRow = getObservationTitleRow(root);
-    if (!titleRow) return null;
-
-    let current = titleRow.nextElementSibling;
-    while (current) {
-      if (current.classList && current.classList.contains('form-row')) return current;
-      current = current.nextElementSibling;
-    }
-    return null;
-  }
-
-  function getOriginTitleRow(root) {
-    const title = findTextSmall(root, 'ORIGEM DE PACIENTES');
-    return title ? title.closest('.border-bottom') : null;
-  }
-
-  function findOriginFieldBlock(root) {
-    return findColByLabel(root, 'Origem de Pacientes');
-  }
-
-  function findMaterialBlock(root) {
-    const input = root.querySelector('input[placeholder="Incluir material, medicamento ou taxa..."]');
-    if (!input) return null;
-
-    return (
-      input.closest('.form-group.mb-3.mb-1') ||
-      input.closest('.form-group') ||
-      input.closest('.autocomplete') ||
-      input.closest('.input-group') ||
-      input.parentElement
-    );
-  }
-
-  function ensureHost(parent, id, className) {
-    let host = parent.querySelector('#' + id);
-    if (!host) {
-      host = document.createElement('div');
-      host.id = id;
-      host.className = className;
-      parent.appendChild(host);
-    }
-    return host;
-  }
-
-  function moveToSlot(slot, block) {
-    if (!slot || !block) return;
-    slot.innerHTML = '';
-    slot.appendChild(block);
-  }
-
-  function ensureObservationTextarea(block) {
-    if (!block) return;
-
-    const input = block.querySelector('input.form-control[type="text"]');
-    if (!input) return;
-
-    let textarea = block.querySelector('textarea.tm-observation-textarea');
-    if (!textarea) {
-      textarea = document.createElement('textarea');
-      textarea.className = `${input.className} tm-observation-textarea`;
-      textarea.placeholder = input.placeholder || '';
-      textarea.autocomplete = input.autocomplete || 'off';
-      textarea.value = input.value || '';
-      textarea.rows = 4;
-      input.insertAdjacentElement('afterend', textarea);
-      input.classList.add('tm-hidden-by-script');
-      input.style.setProperty('display', 'none', 'important');
-
-      const syncToInput = () => {
-        setNativeInputValue(input, textarea.value);
-        dispatchEvents(input, ['input', 'change']);
-      };
-
-      textarea.addEventListener('input', syncToInput, true);
-      textarea.addEventListener('change', syncToInput, true);
-      textarea.addEventListener('blur', () => {
-        syncToInput();
-        dispatchEvents(input, ['blur']);
-      }, true);
-    }
-
-    if (textarea.value !== (input.value || '')) {
-      textarea.value = input.value || '';
-    }
-  }
-
-  function hideCellCountryButton(celularBlock) {
-    if (!celularBlock) return;
-    const inputGroup = celularBlock.querySelector('.input-group');
-    if (!inputGroup) return;
-    inputGroup.classList.add('tm-cell-input-group');
-
-    const prepend = inputGroup.querySelector('.input-group-prepend');
-    if (prepend) {
-      prepend.classList.add('tm-hidden-by-script');
-      prepend.style.setProperty('display', 'none', 'important');
-    }
-  }
-
-
-  function ensureHeaderLine(label, className, beforeNode = null) {
-    let line = label.querySelector(`.${className}`);
-    if (!line) {
-      line = document.createElement('div');
-      line.className = className;
-    } else {
-      line.innerHTML = '';
-    }
-
-    if (beforeNode) {
-      label.insertBefore(line, beforeNode);
-    } else if (!line.parentElement) {
-      label.appendChild(line);
-    }
-
-    if (!line.parentElement) {
-      label.appendChild(line);
-    }
-
-    return line;
-  }
-
-  function reorganizeHeaderStructure(root) {
-    if (!isCallCenterRoute()) return;
-
-    const listGroup = root.querySelector('.list-group');
-    if (!listGroup) return;
-
-    const headerItems = listGroup.querySelectorAll(':scope > .list-group-item.list-group-item-success, :scope > .list-group-item.list-group-item-info, :scope > .list-group-item.list-group-item-warning, :scope > .list-group-item.list-group-item-secondary, :scope > .list-group-item.list-group-item-danger');
-    if (!headerItems.length) return;
-
-    const paymentSourceItem = listGroup.querySelector(':scope > .list-group-item:not(.list-group-item-success):not(.list-group-item-info)');
-    const paymentSourceSmall = paymentSourceItem ? paymentSourceItem.querySelector('small.lead') : null;
-
-    headerItems.forEach((headerItem) => {
-      const label = headerItem.querySelector('label.mb-0.w-100');
-      if (!label) return;
-
-      const titleDiv = label.querySelector('.h4.mb-1');
-      const metaRow = label.querySelector('.d-flex.justify-content-between');
-      const infosWrap = label.querySelector('blockquote') ? label.querySelector('blockquote').closest('div') : null;
-
-      if (!titleDiv || !metaRow) return;
-
-      titleDiv.classList.add('tm-procedure-title');
-
-      const leftMeta = metaRow.children[0] || null;
-      const rightMeta = metaRow.children[1] || null;
-      if (!leftMeta || !rightMeta) return;
-
-      const spans = Array.from(leftMeta.querySelectorAll(':scope > span'));
-      const paymentOwn = spans.find((span) => span.querySelector('.fa-credit-card'));
-      const doctorNode = spans.find((span) => span.querySelector('.fa-user-md')) || null;
-      const unitNode = spans.find((span) => span.querySelector('.fa-building')) || null;
-
-      let paymentNode = null;
-      if (paymentOwn) {
-        paymentNode = paymentOwn;
-      } else if (paymentSourceSmall) {
-        const wrapper = document.createElement('span');
-        wrapper.className = 'mr-3';
-        wrapper.appendChild(paymentSourceSmall.cloneNode(true));
-        paymentNode = wrapper;
-      }
-
-      const dateNode = rightMeta.querySelector('small:not(.mx-2)') || rightMeta.children[0] || null;
-      const timeNode = rightMeta.querySelector('small.mx-2') || rightMeta.children[1] || null;
-
-      const line2 = ensureHeaderLine(label, 'tm-header-line-2 tm-header-line', infosWrap || null);
-      const line3 = ensureHeaderLine(label, 'tm-header-line-3 tm-header-line', infosWrap || null);
-
-      if (paymentNode) line2.appendChild(paymentNode);
-      if (doctorNode) line2.appendChild(doctorNode);
-
-      if (unitNode) line3.appendChild(unitNode);
-      if (dateNode) line3.appendChild(dateNode);
-      if (timeNode) line3.appendChild(timeNode);
-
-      metaRow.remove();
-
-      if (infosWrap) {
-        infosWrap.classList.add('tm-header-infos');
-        label.appendChild(infosWrap);
-      }
-    });
-
-    if (paymentSourceItem && headerItems.length > 1) {
-      paymentSourceItem.style.display = 'none';
-    }
-  }
-
-  function resizeSchedulingModal() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const dialog = root.closest('.modal-dialog');
-    if (!dialog) return;
-
-    const MODAL_W = '580px';
-    const CONTENT_W = '540px';
-
-    dialog.style.setProperty('width', MODAL_W, 'important');
-    dialog.style.setProperty('max-width', MODAL_W, 'important');
-    dialog.style.setProperty('min-width', MODAL_W, 'important');
-    dialog.style.setProperty('margin-left', 'auto', 'important');
-    dialog.style.setProperty('margin-right', 'auto', 'important');
-
-    root.style.setProperty('width', MODAL_W, 'important');
-    root.style.setProperty('max-width', MODAL_W, 'important');
-    root.style.setProperty('min-width', MODAL_W, 'important');
-    root.style.setProperty('overflow', 'hidden', 'important');
-
-    const body = root.querySelector('.modal-body');
-    if (body) {
-      body.style.setProperty('padding-left', '0', 'important');
-      body.style.setProperty('padding-right', '0', 'important');
-      body.style.setProperty('overflow-x', 'hidden', 'important');
-      body.style.setProperty('overflow-y', 'auto', 'important');
-      body.style.setProperty('display', 'flex', 'important');
-      body.style.setProperty('flex-direction', 'column', 'important');
-      body.style.setProperty('align-items', 'center', 'important');
-    }
-
-    const selectors = [
-      '.modal-body > div',
-      '.modal-body .mt-3',
-      '.modal-body #cadTemp',
-      '.modal-body #tm-top-layout-host',
-      '.modal-body #tm-observation-layout-host',
-      '.modal-body #myTab',
-      '.modal-body .tab-content',
-      '.modal-body .tab-pane',
-      '.modal-body hr',
-      '.modal-footer'
-    ];
-
-    selectors.forEach((selector) => {
-      root.querySelectorAll(selector).forEach((el) => {
-        el.style.setProperty('width', CONTENT_W, 'important');
-        el.style.setProperty('max-width', CONTENT_W, 'important');
-        el.style.setProperty('margin-left', 'auto', 'important');
-        el.style.setProperty('margin-right', 'auto', 'important');
-        el.style.setProperty('box-sizing', 'border-box', 'important');
-      });
-    });
-
-    const topLayout = root.querySelector('.tm-top-layout');
-    if (topLayout) {
-      topLayout.style.setProperty('width', '509px', 'important');
-      topLayout.style.setProperty('max-width', '509px', 'important');
-      topLayout.style.setProperty('margin-left', 'auto', 'important');
-      topLayout.style.setProperty('margin-right', 'auto', 'important');
-    }
-
-    const observationHost = root.querySelector('#tm-observation-layout-host');
-    if (observationHost) {
-      observationHost.style.setProperty('width', '509px', 'important');
-      observationHost.style.setProperty('max-width', '509px', 'important');
-      observationHost.style.setProperty('margin-left', 'auto', 'important');
-      observationHost.style.setProperty('margin-right', 'auto', 'important');
-    }
-
-    const tabNav = root.querySelector('#myTab');
-    if (tabNav) {
-      tabNav.style.setProperty('width', '509px', 'important');
-      tabNav.style.setProperty('max-width', '509px', 'important');
-      tabNav.style.setProperty('margin-left', 'auto', 'important');
-      tabNav.style.setProperty('margin-right', 'auto', 'important');
-    }
-
-    const tabContent = root.querySelector('.tab-content');
-    if (tabContent) {
-      tabContent.style.setProperty('width', '509px', 'important');
-      tabContent.style.setProperty('max-width', '509px', 'important');
-      tabContent.style.setProperty('margin-left', 'auto', 'important');
-      tabContent.style.setProperty('margin-right', 'auto', 'important');
-    }
-
-    root.querySelectorAll('.tab-pane, .tab-pane .mt-3, .tab-pane .form-group.mb-1').forEach((el) => {
-      el.style.setProperty('width', '509px', 'important');
-      el.style.setProperty('max-width', '509px', 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    root.querySelectorAll('.tab-pane .autocomplete, .tab-pane .autocomplete .input-group, .tab-pane input.az-autocomplete, .tab-pane hr').forEach((el) => {
-      el.style.setProperty('width', '509px', 'important');
-      el.style.setProperty('max-width', '509px', 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-    });
-
-    const leftPanel = root.querySelector('.tm-left-panel');
-    if (leftPanel) {
-      leftPanel.style.setProperty('width', '509px', 'important');
-      leftPanel.style.setProperty('max-width', '509px', 'important');
-    }
-
-    root.querySelectorAll('.border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.text-primary, .border-bottom.mb-1.d-flex.justify-content-between.hover-title-bg.mt-1.text-primary').forEach((el) => {
-      el.style.setProperty('width', '509px', 'important');
-      el.style.setProperty('max-width', '509px', 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    const footer = root.querySelector('.modal-footer');
-    if (footer) {
-      footer.style.setProperty('width', '509px', 'important');
-      footer.style.setProperty('max-width', '509px', 'important');
-      footer.style.setProperty('padding-right', '8px', 'important');
-      footer.style.setProperty('box-sizing', 'border-box', 'important');
-      footer.style.setProperty('margin-left', 'auto', 'important');
-      footer.style.setProperty('margin-right', 'auto', 'important');
-      footer.style.setProperty('justify-content', 'flex-start', 'important');
-      footer.style.setProperty('padding-left', '0', 'important');
-    }
-
-    const headerList = root.querySelector('.list-group');
-    const headerItem = root.querySelector('.list-group-item.list-group-item-success');
-    if (headerList) {
-      headerList.style.setProperty('margin-left', 'auto', 'important');
-      headerList.style.setProperty('margin-right', 'auto', 'important');
-    }
-    if (headerItem) {
-      headerItem.style.setProperty('margin-left', 'auto', 'important');
-      headerItem.style.setProperty('margin-right', 'auto', 'important');
-    }
-  }
-
-  function reorganizeSchedulingModalLayout() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const cadTemp = getCadTemp(root);
-    const cadTempTitleRow = getCadTempTitleRow(root);
-    const observationTitleRow = getObservationTitleRow(root);
-    const observationFieldsRow = getObservationFieldsRow(root);
-    const originTitleRow = getOriginTitleRow(root);
-
-    if (!cadTemp || !cadTempTitleRow || !observationTitleRow || !observationFieldsRow) return;
-
-    const sexoBlock = findColByLabel(cadTemp, 'Sexo');
-    const birthBlock = findColByLabel(cadTemp, 'Data de Nascimento');
-    const celularBlock = findColByLabel(cadTemp, 'Celular');
-    const emailBlock = findColByLabel(cadTemp, 'e-mail');
-    const nomeBlock = findColByLabel(cadTemp, 'Nome');
-    const cpfBlock = findColByLabel(cadTemp, 'CPF');
-    const carteiraBlock = findColByLabel(cadTemp, 'No. da Carteira do Plano');
-    const validadeBlock = findColByLabel(cadTemp, 'Validade da Carteira');
-    const origemBlock = findOriginFieldBlock(root);
-
-    const observationInputBlock = observationFieldsRow.children[0] || null;
-    const observationSelectBlock = observationFieldsRow.children[1] || null;
-
-    if (
-      !sexoBlock ||
-      !birthBlock ||
-      !celularBlock ||
-      !emailBlock ||
-      !nomeBlock ||
-      !cpfBlock ||
-      !carteiraBlock ||
-      !validadeBlock ||
-      !origemBlock ||
-      !observationInputBlock ||
-      !observationSelectBlock
-    ) {
-      return;
-    }
-
-    const topLayoutHost = ensureHost(cadTemp, 'tm-top-layout-host', 'tm-layout-host');
-    cadTemp.insertBefore(topLayoutHost, cadTempTitleRow.nextSibling);
-
-    topLayoutHost.innerHTML = `
-      <div class="tm-top-layout">
-        <div class="tm-left-panel">
-          <div class="tm-grid-row tm-row-name-birth">
-            <div class="tm-field-slot" data-slot="nome"></div>
-            <div class="tm-field-slot" data-slot="nascimento"></div>
-          </div>
-          <div class="tm-grid-row tm-row-cpf-sexo-origem">
-            <div class="tm-field-slot" data-slot="cpf"></div>
-            <div class="tm-field-slot" data-slot="sexo"></div>
-            <div class="tm-field-slot" data-slot="origem"></div>
-          </div>
-          <div class="tm-grid-row tm-row-cel-email">
-            <div class="tm-field-slot" data-slot="celular"></div>
-            <div class="tm-field-slot" data-slot="email"></div>
-          </div>
-          <div class="tm-grid-row tm-row-carteira-validade">
-            <div class="tm-field-slot" data-slot="carteira"></div>
-            <div class="tm-field-slot" data-slot="validade"></div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    moveToSlot(topLayoutHost.querySelector('[data-slot="nome"]'), nomeBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="nascimento"]'), birthBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="cpf"]'), cpfBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="sexo"]'), sexoBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="origem"]'), origemBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="celular"]'), celularBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="email"]'), emailBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="carteira"]'), carteiraBlock);
-    moveToSlot(topLayoutHost.querySelector('[data-slot="validade"]'), validadeBlock);
-
-    const observationHostParent = observationTitleRow.parentElement;
-    const observationHost = ensureHost(observationHostParent, 'tm-observation-layout-host', 'tm-observation-layout');
-    if (observationTitleRow.nextSibling !== observationHost) {
-      observationHostParent.insertBefore(observationHost, observationTitleRow.nextSibling);
-    }
-
-    observationHost.innerHTML = `
-      <div class="tm-field-slot" data-slot="observacao-input"></div>
-      <div class="tm-field-slot" data-slot="observacao-select"></div>
-    `;
-
-    moveToSlot(observationHost.querySelector('[data-slot="observacao-input"]'), observationInputBlock);
-    moveToSlot(observationHost.querySelector('[data-slot="observacao-select"]'), observationSelectBlock);
-
-    cadTemp.querySelectorAll('.form-row').forEach((row) => hideOriginalRow(row));
-    hideOriginalRow(observationFieldsRow);
-
-    if (originTitleRow) {
-      const originMainRow = originTitleRow.closest('.row');
-      hideOriginalRow(originTitleRow);
-      hideOriginalRow(originMainRow);
-    }
-
-    [
-      sexoBlock,
-      birthBlock,
-      celularBlock,
-      emailBlock,
-      nomeBlock,
-      cpfBlock,
-      carteiraBlock,
-      validadeBlock,
-      origemBlock,
-      observationInputBlock,
-      observationSelectBlock
-    ].forEach((block) => {
-      block.style.setProperty('width', '100%', 'important');
-      block.style.setProperty('max-width', 'none', 'important');
-      block.style.setProperty('padding-left', '0', 'important');
-      block.style.setProperty('padding-right', '0', 'important');
-      block.style.setProperty('flex', 'unset', 'important');
-    });
-
-    hideCellCountryButton(celularBlock);
-    ensureObservationTextarea(observationInputBlock);
-  }
-
-  function hideAppointmentModalFields() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const telefoneBlock = findColByLabel(root, 'Telefone');
-    const nomeSocialBlock = findColByLabel(root, 'Nome Social');
-    const materialBlock = findMaterialBlock(root);
-
-    hideElement(telefoneBlock);
-    hideElement(nomeSocialBlock);
-    hideElement(materialBlock);
-  }
-
-
-
-  function forceObservationSelectHeight() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const slot = root.querySelector('.tm-field-slot[data-slot="observacao-select"]');
-    if (!slot) return;
-
-    const els = [
-      slot,
-      slot.querySelector(':scope > .col'),
-      slot.querySelector('.form-group'),
-      slot.querySelector('.input-group'),
-      slot.querySelector('.input-group-prepend'),
-      slot.querySelector('.input-group-text'),
-      slot.querySelector('select')
-    ];
-
-    els.forEach((el) => {
-      if (!el) return;
-      el.style.setProperty('height', '34px', 'important');
-      el.style.setProperty('min-height', '34px', 'important');
-      el.style.setProperty('max-height', '34px', 'important');
-      el.style.setProperty('margin', '0', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    const select = slot.querySelector('select');
-    if (select) {
-      select.style.setProperty('line-height', '34px', 'important');
-      select.style.setProperty('padding-top', '0', 'important');
-      select.style.setProperty('padding-bottom', '0', 'important');
-    }
-
-    const inputText = slot.querySelector('.input-group-text');
-    if (inputText) {
-      inputText.style.setProperty('display', 'flex', 'important');
-      inputText.style.setProperty('align-items', 'center', 'important');
-      inputText.style.setProperty('padding-left', '8px', 'important');
-      inputText.style.setProperty('padding-right', '8px', 'important');
-    }
-  }
-
-
-  function forceObservationSelectHeightExact() {
-    if (!isCallCenterRoute()) return;
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const slot = root.querySelector('.tm-field-slot[data-slot="observacao-select"]');
-    if (!slot) return;
-
-    const col = slot.querySelector(':scope > .col.col-12.col-md-3');
-    const formGroup = slot.querySelector(':scope > .col.col-12.col-md-3 > .form-group.mb-1');
-    const inputGroup = slot.querySelector('.input-group.input-group-sm');
-    const prepend = slot.querySelector('.input-group-prepend');
-    const inputText = slot.querySelector('.input-group-text');
-    const select = slot.querySelector('select.form.form-control, select.form-control, select');
-
-    [slot, col, formGroup, inputGroup, prepend, inputText, select].forEach((el) => {
-      if (!el) return;
-      el.style.setProperty('height', '30px', 'important');
-      el.style.setProperty('min-height', '30px', 'important');
-      el.style.setProperty('max-height', '30px', 'important');
-      el.style.setProperty('margin', '0', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    if (col) {
-      col.style.setProperty('padding-top', '0', 'important');
-      col.style.setProperty('padding-bottom', '0', 'important');
-    }
-
-    if (formGroup) {
-      formGroup.style.setProperty('margin-bottom', '0', 'important');
-    }
-
-    if (select) {
-      select.style.setProperty('line-height', '30px', 'important');
-      select.style.setProperty('padding-top', '0', 'important');
-      select.style.setProperty('padding-bottom', '0', 'important');
-    }
-
-    if (inputText) {
-      inputText.style.setProperty('display', 'flex', 'important');
-      inputText.style.setProperty('align-items', 'center', 'important');
-      inputText.style.setProperty('padding-left', '8px', 'important');
-      inputText.style.setProperty('padding-right', '8px', 'important');
-    }
-  }
-
-
-  function simplifyUnitsSafe() {
-    if (!isCallCenterRoute()) return;
-
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    root.querySelectorAll('.tm-header-line-3 span.mr-2 small.lead').forEach((el) => {
-      if (el.dataset.tmUnitShortApplied === '1') return;
-
-      const raw = (el.textContent || '').replace(/\s+/g, ' ').trim();
-      let unit = '';
-
-      if (raw.includes('COPACABANA')) unit = 'COPACABANA';
-      else if (raw.includes('BARRA')) unit = 'BARRA';
-      else if (raw.includes('SAMEC')) unit = 'SAMEC';
-      else if (raw.includes('BANGU')) unit = 'BANGU';
-      else return;
-
-      const consultorio = el.querySelector('small.text-muted');
-      if (consultorio) {
-        consultorio.style.display = 'none';
-      }
-
-      const icon = el.querySelector('i');
-      const shortTextClass = 'tm-unit-short-text';
-      let shortText = el.querySelector('.' + shortTextClass);
-
-      if (!shortText) {
-        shortText = document.createElement('span');
-        shortText.className = shortTextClass;
-
-        if (icon) {
-          if (icon.nextSibling) {
-            icon.parentNode.insertBefore(shortText, icon.nextSibling);
-          } else {
-            el.appendChild(shortText);
-          }
-        } else {
-          el.insertBefore(shortText, el.firstChild);
-        }
-      }
-
-      // remove apenas nós de texto soltos, sem destruir a estrutura do elemento
-      Array.from(el.childNodes).forEach((node) => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          node.textContent = '';
-        }
-      });
-
-      shortText.textContent = ' ' + unit + ' ';
-      el.dataset.tmUnitShortApplied = '1';
-    });
-  }
-
-
-
-  function calculateBirthAgeSafe(isoValue) {
-    if (!isoValue || !/^\d{4}-\d{2}-\d{2}$/.test(isoValue)) return '';
-
-    const [yyyy, mm, dd] = isoValue.split('-').map(Number);
-    const birth = new Date(yyyy, mm - 1, dd);
-
-    if (
-      birth.getFullYear() !== yyyy ||
-      birth.getMonth() !== mm - 1 ||
-      birth.getDate() !== dd
-    ) return '';
-
-    const today = new Date();
-    let age = today.getFullYear() - yyyy;
-    const monthDiff = today.getMonth() - (mm - 1);
-    const dayDiff = today.getDate() - dd;
-
-    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) age -= 1;
-    if (age < 0 || age > 130) return '';
-
-    return String(age);
-  }
-
-  function findBirthAgeElements(root) {
-    const birthSlot = root.querySelector('[data-slot="nascimento"]');
-    if (!birthSlot) return {};
-
-    const input = birthSlot.querySelector('input[type="date"]');
-    const inputGroup = birthSlot.querySelector('.input-group');
-    if (!input || !inputGroup) return { birthSlot, input, inputGroup };
-
-    const appends = Array.from(birthSlot.querySelectorAll('.input-group-append'));
-    let ageAppend = null;
-
-    appends.forEach((append) => {
-      const ageText = append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
-      if (ageText) ageAppend = append;
-    });
-
-    return { birthSlot, input, inputGroup, ageAppend };
-  }
-
-
-  function syncBirthAgeBadgeFontSafe(input, ageText) {
-    if (!input || !ageText) return;
-
-    const style = window.getComputedStyle(input);
-    if (!style) return;
-
-    ageText.style.setProperty('font-size', style.fontSize, 'important');
-    ageText.style.setProperty('font-family', style.fontFamily, 'important');
-    ageText.style.setProperty('font-weight', style.fontWeight, 'important');
-    ageText.style.setProperty('line-height', style.lineHeight, 'important');
-    ageText.style.setProperty('letter-spacing', style.letterSpacing, 'important');
-  }
-
-  function applyBirthAgeBadgeSafe() {
-    if (!isCallCenterRoute()) return;
-
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const { input, inputGroup, ageAppend } = findBirthAgeElements(root);
-    if (!input || !inputGroup || !ageAppend) return;
-
-    if (ageAppend.parentElement !== inputGroup) {
-      inputGroup.appendChild(ageAppend);
-    }
-
-    ageAppend.classList.add('tm-birth-age-inline');
-
-    const ageText = ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
-    if (!ageText) return;
-
-    syncBirthAgeBadgeFontSafe(input, ageText);
-
-    const age = calculateBirthAgeSafe(input.value);
-    if (!age) {
-      ageAppend.classList.add('tm-age-hidden');
-      return;
-    }
-
-    const currentDigits = (ageText.textContent || '').replace(/\D+/g, '');
-    if (currentDigits !== age) {
-      ageText.textContent = age;
-    }
-
-    ageAppend.classList.remove('tm-age-hidden');
-  }
-
-  function enableBirthAgeBadgeSafe() {
-    if (!isCallCenterRoute()) return;
-
-    const root = getSchedulingModalRoot();
-    if (!root) return;
-
-    const { input } = findBirthAgeElements(root);
-    if (!input) return;
-
-    if (input.dataset.tmBirthAgeBadgeBound !== '1') {
-      input.dataset.tmBirthAgeBadgeBound = '1';
-
-      let debounceId = null;
-      const handler = () => {
-        clearTimeout(debounceId);
-        debounceId = setTimeout(() => {
-          applyBirthAgeBadgeSafe();
-        }, 80);
-      };
-
-      input.addEventListener('input', handler, true);
-      input.addEventListener('change', handler, true);
-      input.addEventListener('blur', handler, true);
-    }
-
-    applyBirthAgeBadgeSafe();
-  }
-
-
-
-  function tmPaciente91Field(root, labelText) {
-    if (!root) return null;
-
-    const labels = Array.from(root.querySelectorAll('small.form-text, small'));
-    for (const label of labels) {
-      if (norm(label.textContent || '') !== labelText) continue;
-
-      return (
-        label.closest('.col') ||
-        label.closest('[class*="col-"]') ||
-        label.closest('.form-group') ||
-        label.parentElement
-      );
-    }
-
-    return null;
-  }
-
-  function tmPaciente91Move(slot, block, className) {
-    if (!slot || !block) return;
-
-    block.classList.add('tm-paciente-v91-field', className);
-    block.style.removeProperty('width');
-    block.style.removeProperty('max-width');
-    block.style.removeProperty('flex');
-    block.style.removeProperty('display');
-
-    if (block.parentElement !== slot) {
-      slot.appendChild(block);
-    }
-  }
-
-  function tmPaciente91Hide(el) {
-    if (!el) return;
-    el.classList.add('tm-paciente-v91-hidden');
-    el.style.setProperty('display', 'none', 'important');
-  }
-
-  function tmPaciente91EnsureHost(root) {
-    const personal = root.querySelector(':scope > .modal-body > .mt-3');
-    if (!personal) return null;
-
-    let title = personal.querySelector('#tm-paciente-v91-title');
-    if (!title) {
-      title = document.createElement('div');
-      title.id = 'tm-paciente-v91-title';
-      title.className = 'border-bottom mb-1 d-flex justify-content-between hover-title-bg text-primary tm-paciente-v91-title';
-      title.innerHTML = '<div><small>Dados Pessoais</small></div><div></div>';
-      personal.insertBefore(title, personal.firstChild);
-    }
-
-    let host = personal.querySelector('#tm-paciente-v91-host');
-    if (!host) {
-      host = document.createElement('div');
-      host.id = 'tm-paciente-v91-host';
-      host.className = 'tm-paciente-v91-host';
-      host.innerHTML = `
-        <div class="tm-paciente-v91-row tm-paciente-v91-row-name-birth">
-          <div class="tm-paciente-v91-slot" data-v91-slot="nome"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="nascimento"></div>
-        </div>
-        <div class="tm-paciente-v91-row tm-paciente-v91-row-basic">
-          <div class="tm-paciente-v91-slot" data-v91-slot="cpf"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="sexo"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="email"></div>
-        </div>
-        <div class="tm-paciente-v91-row tm-paciente-v91-row-contact">
-          <div class="tm-paciente-v91-slot" data-v91-slot="celular"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="telefone"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="origem"></div>
-        </div>
-        <div class="tm-paciente-v91-row tm-paciente-v91-row-card">
-          <div class="tm-paciente-v91-slot" data-v91-slot="carteira"></div>
-          <div class="tm-paciente-v91-slot" data-v91-slot="validade"></div>
-        </div>
-      `;
-    }
-
-    if (title.nextSibling !== host) {
-      personal.insertBefore(host, title.nextSibling);
-    }
-
-    return host;
-  }
-
-  function tmPaciente91IsCompleteBirthValue(value) {
-    const raw = String(value || '').trim();
-    const digits = raw.replace(/\D+/g, '');
-
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return true;
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return true;
-    if (digits.length === 8) return true;
-
-    return false;
-  }
-
-  function tmPaciente91Birth(root) {
-    const birthBlock = root.querySelector('.tm-paciente-v91-birth');
-    if (!birthBlock) return;
-
-    const input = birthBlock.querySelector('input[type="date"], input');
-    const inputGroup = birthBlock.querySelector('.input-group');
-    if (!input || !inputGroup) return;
-
-    const ageAppend = Array.from(birthBlock.querySelectorAll('.input-group-append')).find((append) =>
-      append.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]')
-    );
-
-    if (!ageAppend) return;
-
-    if (ageAppend.parentElement !== inputGroup) {
-      inputGroup.appendChild(ageAppend);
-    }
-
-    inputGroup.style.setProperty('position', 'relative', 'important');
-    inputGroup.style.setProperty('overflow', 'hidden', 'important');
-    input.style.setProperty('padding-right', '48px', 'important');
-
-    ageAppend.classList.add('tm-birth-age-inline');
-
-    const ageText = ageAppend.querySelector('.input-group-text[title*="Idade"], .input-group-text[title*="idade"]');
-
-    const syncAge = () => {
-      const complete = tmPaciente91IsCompleteBirthValue(input.value);
-
-      if (!complete) {
-        ageAppend.classList.add('tm-birth-age-waiting');
-        ageAppend.style.setProperty('visibility', 'hidden', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
-      }
-
-      ageAppend.classList.remove('tm-birth-age-waiting');
-      ageAppend.style.removeProperty('visibility');
-
-      if (ageText) {
-        syncBirthAgeBadgeFontSafe(input, ageText);
-        const age = calculateBirthAgeSafe(input.value);
-        if (age && !/^\d{4}a$/.test(age)) {
-          ageText.textContent = age;
-        }
-      }
-    };
-
-    if (!input.dataset.tmPaciente91BirthListener) {
-      input.addEventListener('input', syncAge);
-      input.addEventListener('change', syncAge);
-      input.dataset.tmPaciente91BirthListener = '1';
-    }
-
-    syncAge();
-  }
-
-  function tmPaciente91Observation(root) {
-    const obsTitleSmall = Array.from(root.querySelectorAll('small'))
-      .find((small) => norm(small.textContent || '') === 'Observação');
-    const obsTitle = obsTitleSmall ? obsTitleSmall.closest('.border-bottom') : null;
-    if (!obsTitle) return;
-
-    let obsRow = obsTitle.nextElementSibling;
-    while (obsRow && !(obsRow.classList && obsRow.classList.contains('form-row'))) {
-      obsRow = obsRow.nextElementSibling;
-    }
-    if (!obsRow) return;
-
-    const inputBlock = obsRow.children[0] || null;
-    const selectBlock = obsRow.children[1] || null;
-    if (!inputBlock || !selectBlock) return;
-
-    let host = root.querySelector('#tm-paciente-v91-observation-host');
-    if (!host) {
-      host = document.createElement('div');
-      host.id = 'tm-paciente-v91-observation-host';
-      host.className = 'tm-paciente-v91-observation-host';
-      host.innerHTML = `
-        <div class="tm-paciente-v91-observation-title"></div>
-        <div class="tm-paciente-v91-observation-input"></div>
-        <div class="tm-paciente-v91-observation-select"></div>
-      `;
-    }
-
-    if (obsTitle.parentElement && obsTitle.nextSibling !== host) {
-      obsTitle.parentElement.insertBefore(host, obsTitle.nextSibling);
-    }
-
-    host.querySelector('.tm-paciente-v91-observation-title').appendChild(obsTitle);
-    host.querySelector('.tm-paciente-v91-observation-input').appendChild(inputBlock);
-    host.querySelector('.tm-paciente-v91-observation-select').appendChild(selectBlock);
-
-    tmPaciente91Hide(obsRow);
-    ensureObservationTextarea(inputBlock);
-
-    inputBlock.style.setProperty('width', '509px', 'important');
-    inputBlock.style.setProperty('max-width', '509px', 'important');
-    inputBlock.style.setProperty('min-width', '509px', 'important');
-    inputBlock.style.setProperty('flex', '0 0 509px', 'important');
-    inputBlock.style.setProperty('margin-left', '0', 'important');
-    inputBlock.style.setProperty('margin-right', '0', 'important');
-    inputBlock.style.setProperty('padding-left', '0', 'important');
-    inputBlock.style.setProperty('padding-right', '0', 'important');
-
-    const textarea = inputBlock.querySelector('textarea, .tm-observation-textarea, .form-control');
-    if (textarea) {
-      textarea.classList.add('tm-paciente-v91-observation-textarea');
-      textarea.style.setProperty('width', '509px', 'important');
-      textarea.style.setProperty('max-width', '509px', 'important');
-      textarea.style.setProperty('min-width', '509px', 'important');
-      textarea.style.setProperty('height', '74px', 'important');
-      textarea.style.setProperty('min-height', '74px', 'important');
-      textarea.style.setProperty('resize', 'none', 'important');
-      textarea.style.setProperty('overflow-y', 'auto', 'important');
-    }
-  }
-
-  function tmPaciente91HideRows(root) {
-    const personal = root.querySelector(':scope > .modal-body > .mt-3');
-    if (!personal) return;
-
-    personal.querySelectorAll(':scope > .form-row').forEach((row) => {
-      row.classList.add('tm-paciente-v91-hidden');
-      row.style.setProperty('display', 'none', 'important');
-    });
-  }
-
-
-  function tmPaciente91ShortUnitText(text) {
-    const cleaned = norm(text || '');
-    const paren = cleaned.match(/\(([^)]+)\)/);
-    if (paren && paren[1]) return paren[1].trim();
-
-    const beforeSlash = cleaned.split('/')[0].trim();
-    const beforeDash = beforeSlash.split('-')[0].trim();
-
-    return beforeDash || cleaned;
-  }
-
-  function tmPaciente91NormalizeHeaderSmall(span) {
-    if (!span) return null;
-
-    const small = span.querySelector('small.lead, small');
-    if (!small) return span;
-
-    return span;
-  }
-
-
-  function tmPaciente91CleanEmptyHeaderNote(root) {
-    if (!root) return;
-
-    const item = root.querySelector('.list-group-item.list-group-item-success');
-    if (!item) return;
-
-    const note = item.querySelector('.tm-paciente-v91-header-note');
-    if (note) {
-      const text = norm(note.textContent || '');
-      const isEmpty =
-        !text ||
-        text === '-' ||
-        text === '—' ||
-        text === '–' ||
-        /^[-–—\s]+$/.test(text);
-
-      if (isEmpty) {
-        note.textContent = '';
-        note.classList.add('tm-paciente-v91-note-empty');
-      } else {
-        note.classList.remove('tm-paciente-v91-note-empty');
-      }
-    }
-
-    // Remove linhas residuais vazias criadas/reaproveitadas pelo header do Vue.
-    Array.from(item.querySelectorAll('div, small, span')).forEach((el) => {
-      if (
-        el.classList.contains('tm-paciente-v91-header-line') ||
-        el.classList.contains('tm-paciente-v91-header-title') ||
-        el.classList.contains('tm-paciente-v91-header-note')
-      ) return;
-
-      const text = norm(el.textContent || '');
-      const hasIcon = !!el.querySelector('i');
-      const hasField = !!el.querySelector('input, select, textarea, button');
-
-      if (!hasIcon && !hasField && (/^[-–—\s]*$/.test(text))) {
-        el.style.setProperty('display', 'none', 'important');
-        el.style.setProperty('height', '0', 'important');
-        el.style.setProperty('min-height', '0', 'important');
-        el.style.setProperty('margin', '0', 'important');
-        el.style.setProperty('padding', '0', 'important');
-      }
-    });
-  }
-
-  function tmPaciente91ApplyHeaderLikeFirstVisit(root) {
-    if (!root) return;
-
-    const item = root.querySelector('.list-group-item.list-group-item-success');
-    if (!item) return;
-
-    const label = item.querySelector('label.w-100, label');
-    if (!label) return;
-
-    const title = label.querySelector('.h4.mb-1, .h4');
-    if (!title) return;
-
-    title.classList.add('tm-paciente-v91-header-title');
-
-    let line2 = label.querySelector('.tm-paciente-v91-header-line-2');
-    let line3 = label.querySelector('.tm-paciente-v91-header-line-3');
-    let note = label.querySelector('.tm-paciente-v91-header-note');
-
-    if (!line2) {
-      line2 = document.createElement('div');
-      line2.className = 'tm-paciente-v91-header-line tm-paciente-v91-header-line-2';
-    }
-
-    if (!line3) {
-      line3 = document.createElement('div');
-      line3.className = 'tm-paciente-v91-header-line tm-paciente-v91-header-line-3';
-    }
-
-    if (!note) {
-      note = document.createElement('div');
-      note.className = 'tm-paciente-v91-header-note';
-    }
-
-    const originalInfo = Array.from(label.children).find((child) => {
-      if (child === title || child === line2 || child === line3 || child === note) return false;
-      const text = norm(child.innerText || child.textContent || '');
-      return child.classList.contains('d-flex') && text.includes(':');
-    }) || Array.from(label.children).find((child) => {
-      if (child === title || child === line2 || child === line3 || child === note) return false;
-      const text = norm(child.innerText || child.textContent || '');
-      return child.classList.contains('d-flex') && (
-        text.includes('LEVE') ||
-        text.includes('SAÚDE') ||
-        text.includes('GOLDEN') ||
-        text.includes('PAULO') ||
-        text.includes('GLAUCIA') ||
-        text.includes('CLINICA') ||
-        /\d{2}\/[A-Za-zÀ-ÿ]{3}/.test(text)
-      );
-    });
-
-    if (!originalInfo && line2.children.length && line3.children.length) return;
-
-    const spans = originalInfo ? Array.from(originalInfo.querySelectorAll(':scope span.mr-3, :scope span.mr-2, :scope span')) : [];
-    const convenio = spans.find((span) => {
-      const text = norm(span.innerText || span.textContent || '');
-      return text && !text.includes('CLINICA') && !text.includes('SALA') && !/\d{2}\/[A-Za-zÀ-ÿ]{3}/.test(text) && !/\d{2}:\d{2}/.test(text) && span.querySelector('.fa-credit-card');
-    }) || spans.find((span) => span.querySelector('.fa-credit-card'));
-
-    const profissional = spans.find((span) => span.querySelector('.fa-user-md'));
-    const unidade = spans.find((span) => span.querySelector('.fa-building'));
-
-    const calendarSmall = originalInfo ? Array.from(originalInfo.querySelectorAll('small')).find((small) =>
-      !!small.querySelector('.fa-calendar-alt') || /\d{2}\/[A-Za-zÀ-ÿ]{3}/.test(norm(small.innerText || small.textContent || ''))
-    ) : null;
-
-    const clockSmall = originalInfo ? Array.from(originalInfo.querySelectorAll('small')).find((small) =>
-      !!small.querySelector('.fa-clock') || /\d{2}:\d{2}-\d{2}:\d{2}/.test(norm(small.innerText || small.textContent || ''))
-    ) : null;
-
-    line2.innerHTML = '';
-    line3.innerHTML = '';
-
-    if (convenio) line2.appendChild(tmPaciente91NormalizeHeaderSmall(convenio));
-    if (profissional) line2.appendChild(tmPaciente91NormalizeHeaderSmall(profissional));
-
-    if (unidade) {
-      const small = unidade.querySelector('small.lead, small');
-      if (small && !small.dataset.tmPaciente91UnitShort) {
-        const icon = small.querySelector('i') ? small.querySelector('i').cloneNode(true) : null;
-        const unit = tmPaciente91ShortUnitText(small.textContent || '');
-        small.textContent = '';
-        if (icon) small.appendChild(icon);
-        small.appendChild(document.createTextNode(' ' + unit));
-        small.dataset.tmPaciente91UnitShort = '1';
-      }
-      line3.appendChild(tmPaciente91NormalizeHeaderSmall(unidade));
-    }
-
-    if (calendarSmall) line3.appendChild(calendarSmall);
-    if (clockSmall) line3.appendChild(clockSmall);
-
-    // Texto complementar do procedimento, quando existir.
-    const allLabelText = norm(label.innerText || label.textContent || '');
-    const extraMatch = allLabelText.match(/[-–—]\s*-\s*.+/);
-    if (extraMatch && extraMatch[0]) {
-      note.textContent = extraMatch[0].replace(/\s+/g, ' ').trim();
-    } else if (!note.textContent.trim()) {
-      note.textContent = '';
-    }
-
-    if (title.nextSibling !== line2) {
-      label.insertBefore(line2, title.nextSibling);
-    }
-    if (line2.nextSibling !== line3) {
-      label.insertBefore(line3, line2.nextSibling);
-    }
-    if (line3.nextSibling !== note) {
-      label.insertBefore(note, line3.nextSibling);
-    }
-
-    if (originalInfo && originalInfo.parentElement) {
-      originalInfo.remove();
-    }
-
-    tmPaciente91CleanEmptyHeaderNote(root);
-
-    item.style.setProperty('width', '509px', 'important');
-    item.style.setProperty('max-width', '509px', 'important');
-    item.style.setProperty('margin-left', 'auto', 'important');
-    item.style.setProperty('margin-right', 'auto', 'important');
-    item.style.setProperty('min-height', '0', 'important');
-    item.style.setProperty('height', 'auto', 'important');
-  }
-
-
-  function tmPaciente91AlignLowerBlocks(root) {
-    if (!root) return;
-
-    const observationSelect = root.querySelector('.tm-paciente-v91-observation-select');
-    if (observationSelect) {
-      observationSelect.style.setProperty('width', '240px', 'important');
-      observationSelect.style.setProperty('max-width', '240px', 'important');
-      observationSelect.style.setProperty('min-width', '240px', 'important');
-      observationSelect.style.setProperty('margin-left', '0', 'important');
-      observationSelect.style.setProperty('margin-right', 'auto', 'important');
-      observationSelect.style.setProperty('display', 'block', 'important');
-
-      const group = observationSelect.querySelector('.input-group');
-      if (group) {
-        group.style.setProperty('width', '240px', 'important');
-        group.style.setProperty('max-width', '240px', 'important');
-        group.style.setProperty('display', 'flex', 'important');
-        group.style.setProperty('flex-wrap', 'nowrap', 'important');
-        group.style.setProperty('align-items', 'stretch', 'important');
-      }
-
-      const prepend = observationSelect.querySelector('.input-group-prepend');
-      if (prepend) {
-        prepend.style.setProperty('display', 'flex', 'important');
-        prepend.style.setProperty('align-items', 'stretch', 'important');
-        prepend.style.setProperty('height', '31px', 'important');
-        prepend.style.setProperty('min-height', '31px', 'important');
-        prepend.style.setProperty('max-height', '31px', 'important');
-        prepend.style.setProperty('margin-left', '0', 'important');
-        prepend.style.setProperty('margin-right', '-1px', 'important');
-      }
-
-      const prependText = observationSelect.querySelector('.input-group-text');
-      if (prependText) {
-        prependText.style.setProperty('height', '31px', 'important');
-        prependText.style.setProperty('min-height', '31px', 'important');
-        prependText.style.setProperty('max-height', '31px', 'important');
-        prependText.style.setProperty('padding-top', '0', 'important');
-        prependText.style.setProperty('padding-bottom', '0', 'important');
-        prependText.style.setProperty('line-height', '1', 'important');
-        prependText.style.setProperty('display', 'flex', 'important');
-        prependText.style.setProperty('align-items', 'center', 'important');
-        prependText.style.setProperty('justify-content', 'center', 'important');
-      }
-    }
-
-    const width = '509px';
-
-    [
-      root.querySelector('#myTab'),
-      root.querySelector('#myTabContent'),
-      root.querySelector('.tab-content'),
-      root.querySelector('.tab-pane'),
-      root.querySelector('.tab-pane > .mt-3')
-    ].filter(Boolean).forEach((el) => {
-      el.style.setProperty('width', width, 'important');
-      el.style.setProperty('max-width', width, 'important');
-      el.style.setProperty('margin-left', 'auto', 'important');
-      el.style.setProperty('margin-right', 'auto', 'important');
-      el.style.setProperty('box-sizing', 'border-box', 'important');
-    });
-
-    const lowerInputs = Array.from(root.querySelectorAll('.input-group')).filter((group) => {
-      const text = norm(group.innerText || group.textContent || '');
-      const input = group.querySelector('input');
-      const placeholder = input ? norm(input.getAttribute('placeholder') || '') : '';
-      return (
-        text.includes('Adicionar procedimento') ||
-        text.includes('Incluir material') ||
-        placeholder.includes('Adicionar procedimento') ||
-        placeholder.includes('Incluir material')
-      );
-    });
-
-    lowerInputs.forEach((group) => {
-      group.style.setProperty('width', '240px', 'important');
-      group.style.setProperty('max-width', '240px', 'important');
-      group.style.setProperty('margin-left', '0', 'important');
-      group.style.setProperty('margin-right', 'auto', 'important');
-    });
-  }
-
-  function tmPaciente91Layout() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    root.classList.add('tm-paciente-v91-root');
-    tmPaciente91ApplyHeaderLikeFirstVisit(root);
-
-    if (root.dataset.tmPaciente91Applied === '1') {
-      tmPaciente91ApplyHeaderLikeFirstVisit(root);
-      tmPaciente91Observation(root);
-      tmPaciente91AlignLowerBlocks(root);
-      tmPaciente91Birth(root);
-      return;
-    }
-
-    const dialog = root.closest('.modal-dialog');
-    if (dialog) {
-      dialog.style.setProperty('width', '580px', 'important');
-      dialog.style.setProperty('max-width', '580px', 'important');
-      dialog.style.setProperty('min-width', '580px', 'important');
-      dialog.style.setProperty('margin-left', 'auto', 'important');
-      dialog.style.setProperty('margin-right', 'auto', 'important');
-    }
-
-    root.style.setProperty('width', '580px', 'important');
-    root.style.setProperty('max-width', '580px', 'important');
-    root.style.setProperty('min-width', '580px', 'important');
-    root.style.setProperty('overflow', 'hidden', 'important');
-
-    const body = root.querySelector(':scope > .modal-body');
-    if (body) {
-      body.style.setProperty('padding-left', '0', 'important');
-      body.style.setProperty('padding-right', '0', 'important');
-      body.style.setProperty('overflow-x', 'hidden', 'important');
-      body.style.setProperty('overflow-y', 'auto', 'important');
-      body.style.setProperty('display', 'flex', 'important');
-      body.style.setProperty('flex-direction', 'column', 'important');
-      body.style.setProperty('align-items', 'center', 'important');
-    }
-
-    const footer = root.querySelector(':scope > .modal-footer');
-    if (footer) {
-      footer.style.setProperty('width', '509px', 'important');
-      footer.style.setProperty('max-width', '509px', 'important');
-      footer.style.setProperty('margin-left', 'auto', 'important');
-      footer.style.setProperty('margin-right', 'auto', 'important');
-      footer.style.setProperty('justify-content', 'flex-start', 'important');
-    }
-
-    const host = tmPaciente91EnsureHost(root);
-    if (!host) return;
-
-    const nome = tmPaciente91Field(root, 'Nome do Paciente');
-    const social = tmPaciente91Field(root, 'Nome Social');
-    const nascimento = tmPaciente91Field(root, 'Data de Nascimento');
-    const cpf = tmPaciente91Field(root, 'CPF');
-    const sexo = tmPaciente91Field(root, 'Sexo');
-    const origem = tmPaciente91Field(root, 'Origem de Pacientes');
-    const celular = tmPaciente91Field(root, 'Celular');
-    const telefone = tmPaciente91Field(root, 'Telefone');
-    const email = tmPaciente91Field(root, 'e-mail');
-    const carteira = tmPaciente91Field(root, 'No. da Carteira do Plano');
-    const validade = tmPaciente91Field(root, 'Validade da Carteira');
-
-    if (!nome || !nascimento || !sexo || !origem || !celular || !telefone || !email || !carteira || !validade) return;
-
-    tmPaciente91Move(host.querySelector('[data-v91-slot="nome"]'), nome, 'tm-paciente-v91-name');
-    tmPaciente91Move(host.querySelector('[data-v91-slot="nascimento"]'), nascimento, 'tm-paciente-v91-birth');
-
-    const basicRow = host.querySelector('.tm-paciente-v91-row-basic');
-
-    if (cpf) {
-      basicRow?.classList.add('tm-paciente-v91-row-basic-has-cpf');
-      basicRow?.classList.remove('tm-paciente-v91-row-basic-no-cpf');
-      tmPaciente91Move(host.querySelector('[data-v91-slot="cpf"]'), cpf, 'tm-paciente-v91-cpf');
-    } else {
-      basicRow?.classList.add('tm-paciente-v91-row-basic-no-cpf');
-      basicRow?.classList.remove('tm-paciente-v91-row-basic-has-cpf');
-      host.querySelector('[data-v91-slot="cpf"]')?.remove();
-    }
-
-    tmPaciente91Move(host.querySelector('[data-v91-slot="sexo"]'), sexo, 'tm-paciente-v91-sex');
-    tmPaciente91Move(host.querySelector('[data-v91-slot="email"]'), email, 'tm-paciente-v91-email');
-
-    tmPaciente91Move(host.querySelector('[data-v91-slot="celular"]'), celular, 'tm-paciente-v91-cell');
-    tmPaciente91Move(host.querySelector('[data-v91-slot="telefone"]'), telefone, 'tm-paciente-v91-phone');
-    tmPaciente91Move(host.querySelector('[data-v91-slot="origem"]'), origem, 'tm-paciente-v91-origin');
-
-    tmPaciente91Move(host.querySelector('[data-v91-slot="carteira"]'), carteira, 'tm-paciente-v91-card');
-    tmPaciente91Move(host.querySelector('[data-v91-slot="validade"]'), validade, 'tm-paciente-v91-valid');
-
-    if (social) tmPaciente91Hide(social);
-
-    const origemTitle = Array.from(root.querySelectorAll('small'))
-      .find((small) => norm(small.textContent || '') === 'ORIGEM DE PACIENTES');
-    const origemTitleRow = origemTitle ? origemTitle.closest('.border-bottom') : null;
-    const origemMainRow = origemTitleRow ? origemTitleRow.closest('.row') : null;
-    tmPaciente91Hide(origemTitleRow);
-    tmPaciente91Hide(origemMainRow);
-
-    tmPaciente91HideRows(root);
-    tmPaciente91Observation(root);
-    tmPaciente91AlignLowerBlocks(root);
-    tmPaciente91Birth(root);
-
-    root.dataset.tmPaciente91Applied = '1';
-  }
-
-  function schedulePaciente91Layout() {
-    setTimeout(tmPaciente91Layout, 80);
-    setTimeout(tmPaciente91Layout, 180);
-    setTimeout(tmPaciente91Layout, 350);
-    setTimeout(tmPaciente91Layout, 700);
-  }
-
-
-  function tmPaciente103NormalizeBirthBadge() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    const birthBlock = root.querySelector('.tm-paciente-v91-birth');
-    if (!birthBlock) return;
-
-    const inputGroup = birthBlock.querySelector('.input-group');
-    const input = birthBlock.querySelector('input[type="date"], input');
-    if (!inputGroup || !input) return;
-
-    const appends = Array.from(birthBlock.querySelectorAll('.input-group-append'));
-
-    let badge = birthBlock.querySelector('.tm-birth-age-inline');
-    if (!badge) {
-      badge = document.createElement('div');
-      badge.className = 'input-group-append tm-birth-age-inline';
-      const span = document.createElement('div');
-      span.className = 'input-group-text';
-      span.setAttribute('title', 'Idade');
-      badge.appendChild(span);
-      inputGroup.appendChild(badge);
-    }
-
-    appends.forEach((append) => {
-      if (append !== badge) append.remove();
-    });
-
-    const ageText = badge.querySelector('.input-group-text');
-    inputGroup.style.setProperty('position', 'relative', 'important');
-    inputGroup.style.setProperty('overflow', 'hidden', 'important');
-    input.style.setProperty('padding-right', '48px', 'important');
-
-    const sync = () => {
-      const value = String(input.value || '');
-      if (!/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
-        badge.style.setProperty('display', 'none', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
-      }
-      const raw = value.replace(/[^0-9]/g, '');
-
-      if (raw.length !== 8) {
-        badge.style.setProperty('display', 'none', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
-      }
-
-      const day = raw.slice(0, 2);
-      const month = raw.slice(2, 4);
-      const year = raw.slice(4, 8);
-      const date = new Date(year + '-' + month + '-' + day);
-
-      if (isNaN(date.getTime())) {
-        badge.style.setProperty('display', 'none', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
-      }
-
-      const today = new Date();
-      let age = today.getFullYear() - date.getFullYear();
-      const m = today.getMonth() - date.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < date.getDate())) age--;
-
-      badge.style.setProperty('display', 'flex', 'important');
-      if (ageText) ageText.textContent = age + 'a';
-    };
-
-    if (!input.dataset.tmPaciente103BirthFix) {
-      input.addEventListener('input', sync);
-      input.addEventListener('change', sync);
-      input.dataset.tmPaciente103BirthFix = '1';
-    }
-
-    sync();
-  }
-
-
-  function tmPaciente105NormalizeBirthValue(input) {
-    const visible = String(input.value || '').trim();
-    const digits = visible.replace(/[^0-9]/g, '');
-
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(visible)) {
-      const parts = visible.split('/');
-      return { day: parts[0], month: parts[1], year: parts[2] };
-    }
-
-    if (/^\d{4}-\d{2}-\d{2}$/.test(visible)) {
-      const parts = visible.split('-');
-      return { day: parts[2], month: parts[1], year: parts[0] };
-    }
-
-    if (digits.length === 8) {
-      return { day: digits.slice(0, 2), month: digits.slice(2, 4), year: digits.slice(4, 8) };
-    }
-
-    return null;
-  }
-
-  function tmPaciente105ApplyBirthBadge() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    const birthBlock = root.querySelector('.tm-paciente-v91-birth');
-    if (!birthBlock) return;
-
-    const inputGroup = birthBlock.querySelector('.input-group');
-    const input = birthBlock.querySelector('input[type="date"], input');
-    if (!inputGroup || !input) return;
-
-    Array.from(birthBlock.querySelectorAll('.input-group-append')).forEach((append) => {
-      if (!append.classList.contains('tm-birth-age-inline-final')) append.remove();
-    });
-
-    let badge = inputGroup.querySelector('.tm-birth-age-inline-final');
-    if (!badge) {
-      badge = document.createElement('div');
-      badge.className = 'input-group-append tm-birth-age-inline tm-birth-age-inline-final';
-
-      const text = document.createElement('div');
-      text.className = 'input-group-text';
-      text.setAttribute('title', 'Idade');
-      badge.appendChild(text);
-
-      inputGroup.appendChild(badge);
-    }
-
-    const ageText = badge.querySelector('.input-group-text');
-
-    inputGroup.style.setProperty('position', 'relative', 'important');
-    inputGroup.style.setProperty('overflow', 'hidden', 'important');
-    input.style.setProperty('padding-right', '48px', 'important');
-
-    const sync = () => {
-      const parsed = tmPaciente105NormalizeBirthValue(input);
-
-      if (!parsed) {
-        badge.style.setProperty('display', 'none', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
-      }
-
-      const dayNum = Number(parsed.day);
-      const monthNum = Number(parsed.month);
-      const yearNum = Number(parsed.year);
-
-      if (
-        !Number.isInteger(dayNum) || !Number.isInteger(monthNum) || !Number.isInteger(yearNum) ||
-        dayNum < 1 || dayNum > 31 ||
-        monthNum < 1 || monthNum > 12 ||
-        yearNum < 1900 || yearNum > 2100
-      ) {
-        badge.style.setProperty('display', 'none', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
-      }
-
-      const birthDate = new Date(yearNum, monthNum - 1, dayNum);
-      if (
-        birthDate.getFullYear() !== yearNum ||
-        birthDate.getMonth() !== monthNum - 1 ||
-        birthDate.getDate() !== dayNum
-      ) {
-        badge.style.setProperty('display', 'none', 'important');
-        if (ageText) ageText.textContent = '';
-        return;
-      }
-
-      const today = new Date();
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
-
-      badge.style.setProperty('display', 'flex', 'important');
-      if (ageText) ageText.textContent = age + 'a';
-    };
-
-    if (!input.dataset.tmPaciente105BirthFix) {
-      input.addEventListener('input', sync);
-      input.addEventListener('keyup', sync);
-      input.addEventListener('change', sync);
-      input.addEventListener('blur', sync);
-      input.dataset.tmPaciente105BirthFix = '1';
-    }
-
-    sync();
-  }
-
-
-  function tmPaciente106ApplyFinalBirthBadge() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    const birthBlock =
-      root.querySelector('.tm-paciente-v91-birth') ||
-      tmPaciente91Field(root, 'Data de Nascimento');
-
-    if (!birthBlock) return;
-
-    const inputGroup = birthBlock.querySelector('.input-group') || birthBlock;
-    const input = birthBlock.querySelector('input[type="date"], input');
-    if (!inputGroup || !input) return;
-
-    // Remove qualquer badge anterior do sistema ou das versões anteriores.
-    birthBlock.querySelectorAll('.input-group-append, .tm-birth-age-inline, .tm-birth-age-inline-final, .tm-paciente-age-badge-final')
-      .forEach((el) => el.remove());
-
-    const rawValue = String(input.value || '').trim();
-    const digits = rawValue.replace(/[^0-9]/g, '');
-
-    let day = '';
-    let month = '';
-    let year = '';
-
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(rawValue)) {
-      [day, month, year] = rawValue.split('/');
-    } else if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
-      const parts = rawValue.split('-');
-      year = parts[0];
-      month = parts[1];
-      day = parts[2];
-    } else if (digits.length === 8) {
-      day = digits.slice(0, 2);
-      month = digits.slice(2, 4);
-      year = digits.slice(4, 8);
-    } else {
-      inputGroup.style.setProperty('position', 'relative', 'important');
-      input.style.setProperty('padding-right', '48px', 'important');
-      return;
-    }
-
-    const d = Number(day);
-    const m = Number(month);
-    const y = Number(year);
-
-    if (
-      !Number.isInteger(d) || !Number.isInteger(m) || !Number.isInteger(y) ||
-      d < 1 || d > 31 || m < 1 || m > 12 || y < 1900 || y > 2100
-    ) {
-      inputGroup.style.setProperty('position', 'relative', 'important');
-      input.style.setProperty('padding-right', '48px', 'important');
-      return;
-    }
-
-    const birthDate = new Date(y, m - 1, d);
-    if (
-      birthDate.getFullYear() !== y ||
-      birthDate.getMonth() !== m - 1 ||
-      birthDate.getDate() !== d
-    ) {
-      inputGroup.style.setProperty('position', 'relative', 'important');
-      input.style.setProperty('padding-right', '48px', 'important');
-      return;
-    }
-
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const diffMonth = today.getMonth() - birthDate.getMonth();
-
-    if (diffMonth < 0 || (diffMonth === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    const badge = document.createElement('div');
-    badge.className = 'tm-paciente-age-badge-final';
-    badge.textContent = age + 'a';
-
-    inputGroup.appendChild(badge);
-
-    inputGroup.style.setProperty('position', 'relative', 'important');
-    inputGroup.style.setProperty('overflow', 'hidden', 'important');
-
-    input.style.setProperty('padding-right', '48px', 'important');
-
-    badge.style.setProperty('position', 'absolute', 'important');
-    badge.style.setProperty('top', '1px', 'important');
-    badge.style.setProperty('right', '1px', 'important');
-    badge.style.setProperty('bottom', '1px', 'important');
-    badge.style.setProperty('width', '46px', 'important');
-    badge.style.setProperty('z-index', '50', 'important');
-    badge.style.setProperty('display', 'flex', 'important');
-    badge.style.setProperty('align-items', 'center', 'important');
-    badge.style.setProperty('justify-content', 'center', 'important');
-    badge.style.setProperty('background', '#d9d9d9', 'important');
-    badge.style.setProperty('color', '#666', 'important');
-    badge.style.setProperty('border-left', '1px solid #cfd4da', 'important');
-    badge.style.setProperty('border-top-right-radius', '.25rem', 'important');
-    badge.style.setProperty('border-bottom-right-radius', '.25rem', 'important');
-    badge.style.setProperty('font-size', '14px', 'important');
-    badge.style.setProperty('line-height', '1', 'important');
-    badge.style.setProperty('pointer-events', 'none', 'important');
-    badge.style.setProperty('box-sizing', 'border-box', 'important');
-
-    if (!input.dataset.tmPaciente106BirthFix) {
-      const rerender = () => {
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 0);
-      };
-
-      input.addEventListener('input', rerender);
-      input.addEventListener('keyup', rerender);
-      input.addEventListener('change', rerender);
-      input.addEventListener('blur', rerender);
-      input.dataset.tmPaciente106BirthFix = '1';
-    }
-  }
-
-  
-  // === FIX FINAL: usar EXATAMENTE a lógica do modal Primeira Vez ===
-  function tmPaciente107MirrorFirstVisitBirth() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    const firstVisit = document.querySelector('.tm-klingo-root');
-    const pacienteBirth = root.querySelector('.tm-paciente-v91-birth input');
-
-    if (!firstVisit || !pacienteBirth) return;
-
-    const fvBirth = firstVisit.querySelector('input[type="date"], input');
-
-    if (!fvBirth) return;
-
-    // força o mesmo comportamento visual
-    pacienteBirth.style.cssText = fvBirth.style.cssText;
-
-    // remove qualquer overlay quebrado
-    const group = pacienteBirth.closest('.input-group');
-    if (group) {
-      group.querySelectorAll('.input-group-append').forEach(e => e.remove());
-    }
-
-    // reaplica badge exatamente igual Primeira Vez
-    const wrapper = document.createElement('div');
-    wrapper.className = 'input-group-append';
-
-    const badge = document.createElement('div');
-    badge.className = 'input-group-text';
-    badge.style.pointerEvents = 'none';
-
-    wrapper.appendChild(badge);
-
-    const parent = pacienteBirth.parentElement;
-    parent.appendChild(wrapper);
-
-    const calc = () => {
-      const v = pacienteBirth.value;
-      if (!v || v.length < 10) {
-        badge.textContent = '';
-        return;
-      }
-
-      let y,m,d;
-
-      if (v.includes('-')) {
-        [y,m,d] = v.split('-');
-      } else if (v.includes('/')) {
-        [d,m,y] = v.split('/');
-      }
-
-      const birth = new Date(y, m-1, d);
-      if (isNaN(birth)) return;
-
-      const today = new Date();
-      let age = today.getFullYear() - birth.getFullYear();
-
-      const md = today.getMonth() - birth.getMonth();
-      if (md < 0 || (md === 0 && today.getDate() < birth.getDate())) {
-        age--;
-      }
-
-      badge.textContent = age + 'a';
-    };
-
-    pacienteBirth.oninput = calc;
-    pacienteBirth.onchange = calc;
-
-    calc();
-  }
-
-
-  function tmPaciente108AdjustProcedureMaterial() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    const groups = Array.from(root.querySelectorAll('.input-group'));
-
-    groups.forEach((group) => {
-      const text = norm(group.innerText || group.textContent || '');
-      const input = group.querySelector('input');
-      const placeholder = input ? norm(input.getAttribute('placeholder') || '') : '';
-
-      const isAddProcedure =
-        text.includes('Adicionar procedimento') ||
-        placeholder.includes('Adicionar procedimento');
-
-      const isMaterial =
-        text.includes('Incluir material') ||
-        text.includes('medicamento') ||
-        text.includes('taxa') ||
-        placeholder.includes('Incluir material') ||
-        placeholder.includes('medicamento') ||
-        placeholder.includes('taxa');
-
-      if (isAddProcedure) {
-        group.classList.add('tm-paciente-procedimento-add');
-
-        const wrapper =
-          group.closest('.form-group') ||
-          group.closest('.col') ||
-          group.closest('[class*="col-"]') ||
-          group.parentElement;
-
-        [group, wrapper].filter(Boolean).forEach((el) => {
-          el.style.setProperty('width', '509px', 'important');
-          el.style.setProperty('max-width', '509px', 'important');
-          el.style.setProperty('min-width', '509px', 'important');
-          el.style.setProperty('margin-left', '0', 'important');
-          el.style.setProperty('margin-right', '0', 'important');
-          el.style.setProperty('box-sizing', 'border-box', 'important');
-        });
-      }
-
-      if (isMaterial) {
-        const wrapper =
-          group.closest('.form-group') ||
-          group.closest('.col') ||
-          group.closest('[class*="col-"]') ||
-          group.parentElement;
-
-        [group, wrapper].filter(Boolean).forEach((el) => {
-          el.classList.add('tm-paciente-material-hidden');
-          el.style.setProperty('display', 'none', 'important');
-        });
-      }
-    });
-  }
-
-
-  function tmPaciente109HardProcedureMaterialFix() {
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) return;
-
-    const normalizeText = (v) => String(v || '').replace(/\s+/g, ' ').trim();
-
-    const allInputs = Array.from(root.querySelectorAll('input, .form-control'));
-    allInputs.forEach((input) => {
-      const placeholder = normalizeText(input.getAttribute ? input.getAttribute('placeholder') : '');
-      const valueText = normalizeText(input.value || input.textContent || '');
-      const aroundText = normalizeText((input.closest('.input-group') || input.parentElement || input).innerText || '');
-
-      const haystack = `${placeholder} ${valueText} ${aroundText}`;
-
-      const isProcedure = /Adicionar procedimento/i.test(haystack);
-      const isMaterial = /Incluir material|medicamento|taxa/i.test(haystack);
-
-      const group = input.closest('.input-group') || input;
-      const row =
-        group.closest('.form-group') ||
-        group.closest('.col') ||
-        group.closest('[class*="col-"]') ||
-        group.closest('.row') ||
-        group.parentElement;
-
-      if (isProcedure) {
-        [row, group, input].filter(Boolean).forEach((el) => {
-          el.classList.add('tm-paciente-proc-row-final');
-          el.style.setProperty('width', '509px', 'important');
-          el.style.setProperty('max-width', '509px', 'important');
-          el.style.setProperty('min-width', '509px', 'important');
-          el.style.setProperty('margin-left', '0', 'important');
-          el.style.setProperty('margin-right', '0', 'important');
-          el.style.setProperty('box-sizing', 'border-box', 'important');
-        });
-      }
-
-      if (isMaterial) {
-        [row, group].filter(Boolean).forEach((el) => {
-          el.classList.add('tm-paciente-material-row-final');
-          el.style.setProperty('display', 'none', 'important');
-          el.style.setProperty('visibility', 'hidden', 'important');
-          el.style.setProperty('height', '0', 'important');
-          el.style.setProperty('min-height', '0', 'important');
-          el.style.setProperty('max-height', '0', 'important');
-          el.style.setProperty('overflow', 'hidden', 'important');
-          el.style.setProperty('margin', '0', 'important');
-          el.style.setProperty('padding', '0', 'important');
-        });
-      }
-    });
-
-    // Fallback por texto do input-group, mesmo quando placeholder não vem no input.
-    Array.from(root.querySelectorAll('.input-group')).forEach((group) => {
-      const text = normalizeText(group.innerText || group.textContent || '');
-      const row =
-        group.closest('.form-group') ||
-        group.closest('.col') ||
-        group.closest('[class*="col-"]') ||
-        group.closest('.row') ||
-        group.parentElement;
-
-      if (/Adicionar procedimento/i.test(text)) {
-        [row, group].filter(Boolean).forEach((el) => {
-          el.classList.add('tm-paciente-proc-row-final');
-          el.style.setProperty('width', '509px', 'important');
-          el.style.setProperty('max-width', '509px', 'important');
-          el.style.setProperty('min-width', '509px', 'important');
-          el.style.setProperty('margin-left', '0', 'important');
-          el.style.setProperty('margin-right', '0', 'important');
-        });
-      }
-
-      if (/Incluir material|medicamento|taxa/i.test(text)) {
-        [row, group].filter(Boolean).forEach((el) => {
-          el.classList.add('tm-paciente-material-row-final');
-          el.style.setProperty('display', 'none', 'important');
-          el.style.setProperty('visibility', 'hidden', 'important');
-          el.style.setProperty('height', '0', 'important');
-          el.style.setProperty('min-height', '0', 'important');
-          el.style.setProperty('max-height', '0', 'important');
-          el.style.setProperty('overflow', 'hidden', 'important');
-          el.style.setProperty('margin', '0', 'important');
-          el.style.setProperty('padding', '0', 'important');
-        });
-      }
-    });
-  }
-
-
-  function tmPaciente110ApplyBirthAgeBadge() {
-  const root = getActivePacienteSchedulingModalRoot();
-  if (!root) return;
-
-  const birthBlock =
-    root.querySelector('.tm-paciente-v91-birth') ||
-    tmPaciente91Field(root, 'Data de Nascimento');
-
-  if (!birthBlock) return;
-
-  const input = birthBlock.querySelector('input');
-  if (!input) return;
-
-  const holder = input.closest('.input-group') || input.parentElement;
-  if (!holder) return;
-
-  holder.style.setProperty('position', 'relative', 'important');
-  holder.style.setProperty('overflow', 'hidden', 'important');
-  input.style.setProperty('padding-right', '48px', 'important');
-
-  holder.querySelectorAll(
-    '.tm-paciente-age-badge-110, .tm-paciente-age-badge-final, .tm-birth-age-inline, .tm-birth-age-inline-final, .input-group-append'
-  ).forEach((el) => el.remove());
-
-  const raw = String(input.value || '').trim();
-
-  let d;
-  let m;
-  let y;
-
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-    [d, m, y] = raw.split('/');
-  } else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    const parts = raw.split('-');
-    y = parts[0];
-    m = parts[1];
-    d = parts[2];
-  } else {
-    return;
-  }
-
-  d = Number(d);
-  m = Number(m);
-  y = Number(y);
-
-  if (!d || !m || !y || d < 1 || d > 31 || m < 1 || m > 12 || y < 1900 || y > 2100) return;
-
-  const birth = new Date(y, m - 1, d);
-
-  if (
-    birth.getFullYear() !== y ||
-    birth.getMonth() !== m - 1 ||
-    birth.getDate() !== d
-  ) return;
-
-  const today = new Date();
-  let age = today.getFullYear() - y;
-
-  if (
-    today.getMonth() < (m - 1) ||
-    (today.getMonth() === (m - 1) && today.getDate() < d)
-  ) {
-    age--;
-  }
-
-  const badge = document.createElement('div');
-  badge.className = 'tm-paciente-age-badge-110';
-  badge.textContent = age + 'a';
-
-  holder.appendChild(badge);
-
-  badge.style.setProperty('position', 'absolute', 'important');
-  badge.style.setProperty('top', '1px', 'important');
-  badge.style.setProperty('right', '1px', 'important');
-  badge.style.setProperty('bottom', '1px', 'important');
-  badge.style.setProperty('width', '46px', 'important');
-  badge.style.setProperty('height', 'auto', 'important');
-  badge.style.setProperty('z-index', '9999', 'important');
-  badge.style.setProperty('display', 'flex', 'important');
-  badge.style.setProperty('align-items', 'center', 'important');
-  badge.style.setProperty('justify-content', 'center', 'important');
-  badge.style.setProperty('background', '#d9d9d9', 'important');
-  badge.style.setProperty('color', '#555', 'important');
-  badge.style.setProperty('border-left', '1px solid #cfd4da', 'important');
-  badge.style.setProperty('border-top-right-radius', '.25rem', 'important');
-  badge.style.setProperty('border-bottom-right-radius', '.25rem', 'important');
-  badge.style.setProperty('font-size', '14px', 'important');
-  badge.style.setProperty('line-height', '1', 'important');
-  badge.style.setProperty('pointer-events', 'none', 'important');
-  badge.style.setProperty('box-sizing', 'border-box', 'important');
-  badge.style.setProperty('white-space', 'nowrap', 'important');
-
-  if (!input.dataset.tmPaciente110AgeListener) {
-    const refresh = () => setTimeout(tmPaciente110ApplyBirthAgeBadge, 0);
-    input.addEventListener('input', refresh);
-    input.addEventListener('keyup', refresh);
-    input.addEventListener('change', refresh);
-    input.addEventListener('blur', refresh);
-    input.dataset.tmPaciente110AgeListener = '1';
-  }
-}
-
-function burstUpdateLite() {
-    if (!isCallCenterRoute()) return;
-
-    clearFirstVisitResidueFromPacienteModal();
-    tmPaciente91Layout();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente103NormalizeBirthBadge();
-    tmPaciente105ApplyBirthBadge();
-    tmPaciente106ApplyFinalBirthBadge();
-    tmPaciente107MirrorFirstVisitBirth();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente108AdjustProcedureMaterial();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-
-    const root = getSchedulingModalRoot();
-
-    updateModalTitle();
-    enableBirthDatePaste();
-    injectLayoutCSS();
-    injectFontFix();
-
-    if (root) {
-      hideAppointmentModalFields();
-      reorganizeSchedulingModalLayout();
-      enableBirthAgeBadgeSafe();
-      resizeSchedulingModal();
-      reorganizeHeaderStructure(root);
-    }
-
-    simplifyUnitsSafe();
-  }
-
-  function burstUpdate() {
-    if (!isCallCenterRoute()) return;
-    burstUpdateLite();
-    setTimeout(burstUpdateLite, 100);
-    setTimeout(burstUpdateLite, 250);
-    setTimeout(burstUpdateLite, 500);
-    setTimeout(burstUpdateLite, 900);
-    setTimeout(burstUpdateLite, 1400);
-  }
-
-  document.addEventListener('click', (e) => {
-    if (!isCallCenterRoute()) return;
-
-    const pacienteCard = e.target instanceof Element
-      ? e.target.closest('.card-body.atalho.bg-success')
-      : null;
-
-    if (pacienteCard) {
-      setTimeout(() => {
-        clearFirstVisitResidueFromPacienteModal();
-        tmPaciente91Layout();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-        tmPaciente103NormalizeBirthBadge();
-        tmPaciente105ApplyBirthBadge();
-        tmPaciente106ApplyFinalBirthBadge();
-    tmPaciente107MirrorFirstVisitBirth();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente108AdjustProcedureMaterial();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
-      }, 60);
-      setTimeout(() => {
-        clearFirstVisitResidueFromPacienteModal();
-        tmPaciente91Layout();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-        tmPaciente103NormalizeBirthBadge();
-        tmPaciente105ApplyBirthBadge();
-        tmPaciente106ApplyFinalBirthBadge();
-    tmPaciente107MirrorFirstVisitBirth();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente108AdjustProcedureMaterial();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
-      }, 160);
-      setTimeout(() => {
-        clearFirstVisitResidueFromPacienteModal();
-        tmPaciente91Layout();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-        tmPaciente103NormalizeBirthBadge();
-        tmPaciente105ApplyBirthBadge();
-        tmPaciente106ApplyFinalBirthBadge();
-    tmPaciente107MirrorFirstVisitBirth();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente108AdjustProcedureMaterial();
-    tmPaciente110ApplyBirthAgeBadge();
-    tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 80);
-        setTimeout(tmPaciente106ApplyFinalBirthBadge, 180);
-      }, 320);
-      schedulePaciente91Layout();
-    }
-
-    if (!e.target.closest('#minutoModal')) {
-      captureSelectionFromClick(e.target, false);
-    }
-
-    burstUpdate();
-  }, true);
-
-  document.addEventListener('focusin', () => {
-    if (!isCallCenterRoute()) return;
-    enableBirthDatePaste();
-    hideAppointmentModalFields();
-    reorganizeSchedulingModalLayout();
-    enableBirthAgeBadgeSafe();
-  }, true);
-
-  document.addEventListener('contextmenu', async (e) => {
-    if (!e.target.closest('#minutoModal')) return;
-
-    const targetEl = e.target.closest('button, a, div, span');
-    if (!targetEl || !isTimeButton(targetEl)) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    const directCopyText = buildCopyTextFromTarget(targetEl);
-    const changed = captureSelectionFromClick(e.target, true);
-    if (!changed && !directCopyText) return;
-
-    const modalContext = getModalDateContext();
-    if (modalContext.dateText) state.selectedDate = modalContext.dateText;
-    if (modalContext.weekdayText) state.selectedWeekday = modalContext.weekdayText;
-
-    burstUpdate();
-
-    setTimeout(async () => {
-      await copyText(directCopyText || getCopyText(), targetEl);
-    }, 80);
-  }, true);
-
+  /* TM 16.3: layout/modificações do modal de agendamento removidos. */
 
   function isKlingoHost() {
     return location.hostname.endsWith('klingo.app');
@@ -4903,7 +555,7 @@ function burstUpdateLite() {
         line-height: 1.2;
       }
 
-      
+
       .tm-datecalc-field input[type="date"]::-webkit-calendar-picker-indicator {
         display: none !important;
         opacity: 0 !important;
@@ -5186,7 +838,7 @@ function burstUpdateLite() {
     return panel;
   }
 
-  
+
   function positionDateCalculatorPanel() {
     const panel = document.getElementById('tm-datecalc-panel');
     const trigger = document.querySelector('[data-tm-datecalc-header-trigger="1"]');
@@ -5323,9 +975,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '13.1';
+      : '16.3';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '13.1';
+    return match ? match[0] : '16.3';
   }
 
   function ensureScriptVersionIndicator() {
@@ -5622,7 +1274,7 @@ function setDateCalculatorOpen(isOpen) {
   }
 
   function tmDateCalcMarkCopied(btn) {
-    if (!btn) return;
+    if (!btn || !tmDateCalcIsOwnCopyButton(btn)) return;
     tmDateCalcDisableCopyTooltip(btn);
 
     btn.textContent = '✅';
@@ -5664,9 +1316,7 @@ function setDateCalculatorOpen(isOpen) {
 
   const observer = new MutationObserver(() => {
     applyLoginIndicator();
-    enableBirthDatePaste();
-    burstUpdateLite();
-    scheduleDateCalculatorMenuRefresh();
+scheduleDateCalculatorMenuRefresh();
   });
 
   observer.observe(document.body, {
@@ -5679,31 +1329,10 @@ function setDateCalculatorOpen(isOpen) {
     applyLoginIndicator();
     initDateCalculatorFeature();
     if (!isCallCenterRoute()) return;
-    enableBirthDatePaste();
-    injectLayoutCSS();
-    injectFontFix();
-    hideAppointmentModalFields();
-    reorganizeSchedulingModalLayout();
-    resizeSchedulingModal();
-
-    burstUpdate();
-
-    setTimeout(() => {
-      enableBirthDatePaste();
-      burstUpdate();
-    }, 300);
-
-    setTimeout(() => {
-      enableBirthDatePaste();
-      burstUpdate();
-    }, 1000);
-
-    setTimeout(() => {
-      enableBirthDatePaste();
-      burstUpdate();
-    }, 2000);
-
-    console.log('[TM] script inicializado', location.href);
+injectFontFix();
+setTimeout(() => {
+}, 1000);
+console.log('[TM] script inicializado', location.href);
   }
 
   if (document.readyState === 'loading') {
@@ -5717,360 +1346,15 @@ function setDateCalculatorOpen(isOpen) {
   window.addEventListener('focus', () => {
     applyLoginIndicator();
     if (!isCallCenterRoute()) return;
-    enableBirthDatePaste();
-    burstUpdate();
-  });
+});
   window.addEventListener('hashchange', initScript);
 
   setInterval(() => {
     if (location.hostname.endsWith('klingo.app')) {
       applyLoginIndicator();
       if (!isCallCenterRoute()) return;
-      enableBirthDatePaste();
-      burstUpdate();
-    }
+}
   }, 1500);
-  setTimeout(tmPaciente108AdjustProcedureMaterial, 300);
-  setTimeout(tmPaciente108AdjustProcedureMaterial, 800);
-
-  setTimeout(tmPaciente109HardProcedureMaterialFix, 200);
-  setTimeout(tmPaciente109HardProcedureMaterialFix, 500);
-  setTimeout(tmPaciente109HardProcedureMaterialFix, 1000);
-  setInterval(() => {
-    if (getActivePacienteSchedulingModalRoot()) tmPaciente109HardProcedureMaterialFix();
-    tmPaciente110ApplyBirthAgeBadge();
-  }, 700);
-
-
-  setTimeout(tmPaciente110ApplyBirthAgeBadge, 100);
-  setTimeout(tmPaciente110ApplyBirthAgeBadge, 300);
-  setTimeout(tmPaciente110ApplyBirthAgeBadge, 700);
-  setTimeout(tmPaciente110ApplyBirthAgeBadge, 1200);
-
-
-  setInterval(() => {
-    try {
-      if (getActivePacienteSchedulingModalRoot()) tmPaciente110ApplyBirthAgeBadge();
-    } catch (e) {}
-  }, 300);
-
-
-  function tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez() {
-    const removeBadge = () => {
-      document.querySelectorAll('.tm-paciente-birth-age-floating').forEach((el) => el.remove());
-    };
-
-    const root = getActivePacienteSchedulingModalRoot();
-    if (!root) {
-      removeBadge();
-      return;
-    }
-
-    const birthBlock =
-      root.querySelector('.tm-paciente-v91-birth') ||
-      tmPaciente91Field(root, 'Data de Nascimento');
-
-    if (!birthBlock) {
-      removeBadge();
-      return;
-    }
-
-    const input = birthBlock.querySelector('input');
-    if (!input) {
-      removeBadge();
-      return;
-    }
-
-    const value = String(input.value || '').trim();
-
-    let day;
-    let month;
-    let year;
-
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
-      [day, month, year] = value.split('/');
-    } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      const parts = value.split('-');
-      year = parts[0];
-      month = parts[1];
-      day = parts[2];
-    } else {
-      removeBadge();
-      input.style.setProperty('padding-right', '48px', 'important');
-      return;
-    }
-
-    day = Number(day);
-    month = Number(month);
-    year = Number(year);
-
-    if (
-      !Number.isInteger(day) ||
-      !Number.isInteger(month) ||
-      !Number.isInteger(year) ||
-      day < 1 ||
-      day > 31 ||
-      month < 1 ||
-      month > 12 ||
-      year < 1900 ||
-      year > 2100
-    ) {
-      removeBadge();
-      return;
-    }
-
-    const birthDate = new Date(year, month - 1, day);
-
-    if (
-      birthDate.getFullYear() !== year ||
-      birthDate.getMonth() !== month - 1 ||
-      birthDate.getDate() !== day
-    ) {
-      removeBadge();
-      return;
-    }
-
-    const today = new Date();
-    let age = today.getFullYear() - year;
-
-    if (
-      today.getMonth() < month - 1 ||
-      (today.getMonth() === month - 1 && today.getDate() < day)
-    ) {
-      age--;
-    }
-
-    input.style.setProperty('padding-right', '48px', 'important');
-
-    let badge = document.querySelector('.tm-paciente-birth-age-floating');
-    if (!badge) {
-      badge = document.createElement('div');
-      badge.className = 'tm-paciente-birth-age-floating';
-      document.body.appendChild(badge);
-    }
-
-    const rect = input.getBoundingClientRect();
-    const style = window.getComputedStyle(input);
-
-    badge.textContent = age + 'a';
-    badge.style.setProperty('position', 'fixed', 'important');
-    badge.style.setProperty('left', Math.round(rect.right - 47) + 'px', 'important');
-    badge.style.setProperty('top', Math.round(rect.top + 1) + 'px', 'important');
-    badge.style.setProperty('width', '46px', 'important');
-    badge.style.setProperty('height', Math.max(0, Math.round(rect.height - 2)) + 'px', 'important');
-    badge.style.setProperty('z-index', '2147483647', 'important');
-    badge.style.setProperty('display', 'flex', 'important');
-    badge.style.setProperty('align-items', 'center', 'important');
-    badge.style.setProperty('justify-content', 'center', 'important');
-    badge.style.setProperty('background', '#d9d9d9', 'important');
-    badge.style.setProperty('color', '#666', 'important');
-    badge.style.setProperty('border-left', '1px solid #cfd4da', 'important');
-    badge.style.setProperty('border-top-right-radius', style.borderTopRightRadius || '.25rem', 'important');
-    badge.style.setProperty('border-bottom-right-radius', style.borderBottomRightRadius || '.25rem', 'important');
-    badge.style.setProperty('font-size', style.fontSize || '14px', 'important');
-    badge.style.setProperty('font-family', style.fontFamily || 'inherit', 'important');
-    badge.style.setProperty('font-weight', style.fontWeight || '400', 'important');
-    badge.style.setProperty('line-height', '1', 'important');
-    badge.style.setProperty('pointer-events', 'none', 'important');
-    badge.style.setProperty('box-sizing', 'border-box', 'important');
-    badge.style.setProperty('white-space', 'nowrap', 'important');
-
-    if (!input.dataset.tmPaciente113AgeListener) {
-      const refresh = () => setTimeout(tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez, 0);
-      input.addEventListener('input', refresh, true);
-      input.addEventListener('keyup', refresh, true);
-      input.addEventListener('change', refresh, true);
-      input.addEventListener('blur', refresh, true);
-      input.dataset.tmPaciente113AgeListener = '1';
-    }
-  }
-
-
-  setInterval(() => {
-    try {
-      tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
-    } catch (e) {}
-  }, 150);
-  window.addEventListener('scroll', () => {
-    try {
-      tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
-    } catch (e) {}
-  }, true);
-  window.addEventListener('resize', () => {
-    try {
-      tmPaciente113ApplyBirthAgeBadgeLikePrimeiraVez();
-    } catch (e) {}
-  }, true);
-
-
-
-
-
-
-  // =========================
-  // PACIENTE 11.6 - BADGE IDADE INTERNA, SEM FLICKER
-  // =========================
-  (function tmPaciente115InternalBirthAgeBadge() {
-    let lastInput = null;
-
-    function getBirthInput() {
-      const root = getActivePacienteSchedulingModalRoot && getActivePacienteSchedulingModalRoot();
-      if (!root) return null;
-
-      const birthBlock =
-        root.querySelector('.tm-paciente-v91-birth') ||
-        (typeof tmPaciente91Field === 'function' ? tmPaciente91Field(root, 'Data de Nascimento') : null);
-
-      if (birthBlock) {
-        const input = birthBlock.querySelector('input');
-        if (input) return input;
-      }
-
-      const labels = Array.from(root.querySelectorAll('small, label, div'));
-      for (const label of labels) {
-        const text = String(label.innerText || label.textContent || '').replace(/\s+/g, ' ').trim();
-        if (!text.includes('Data de Nascimento')) continue;
-
-        const field =
-          label.closest('.form-group') ||
-          label.closest('.col') ||
-          label.closest('[class*="col-"]') ||
-          label.parentElement;
-
-        const input = field ? field.querySelector('input') : null;
-        if (input) return input;
-      }
-
-      return null;
-    }
-
-    function parseBirth(value) {
-      const raw = String(value || '').trim();
-
-      let day;
-      let month;
-      let year;
-
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-        [day, month, year] = raw.split('/').map(Number);
-      } else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-        const parts = raw.split('-').map(Number);
-        year = parts[0];
-        month = parts[1];
-        day = parts[2];
-      } else {
-        return null;
-      }
-
-      if (
-        !Number.isInteger(day) ||
-        !Number.isInteger(month) ||
-        !Number.isInteger(year) ||
-        day < 1 ||
-        day > 31 ||
-        month < 1 ||
-        month > 12 ||
-        year < 1900 ||
-        year > 2100
-      ) {
-        return null;
-      }
-
-      const birth = new Date(year, month - 1, day);
-
-      if (
-        birth.getFullYear() !== year ||
-        birth.getMonth() !== month - 1 ||
-        birth.getDate() !== day
-      ) {
-        return null;
-      }
-
-      const today = new Date();
-      let age = today.getFullYear() - year;
-
-      if (
-        today.getMonth() < month - 1 ||
-        (today.getMonth() === month - 1 && today.getDate() < day)
-      ) {
-        age--;
-      }
-
-      return age;
-    }
-
-    function removeOldBadges() {
-      document.querySelectorAll(
-        '.tm-age-floating, .tm-paciente-birth-age-floating, .tm-paciente-age-badge-110, .tm-paciente-age-badge-final, .tm-birth-age-inline, .tm-birth-age-inline-final'
-      ).forEach((el) => el.remove());
-    }
-
-    function applyBadge() {
-      const input = getBirthInput();
-
-      if (!input) {
-        removeOldBadges();
-        lastInput = null;
-        return;
-      }
-
-      lastInput = input;
-
-      const holder = input.closest('.input-group') || input.parentElement;
-      if (!holder) return;
-
-      removeOldBadges();
-
-      const age = parseBirth(input.value);
-
-      holder.classList.add('tm-paciente-birth-holder-115');
-      holder.style.setProperty('position', 'relative', 'important');
-      holder.style.setProperty('overflow', 'hidden', 'important');
-      input.style.setProperty('padding-right', '48px', 'important');
-
-      let badge = holder.querySelector('.tm-paciente-age-badge-115');
-
-      if (age === null) {
-        if (badge) badge.remove();
-        return;
-      }
-
-      if (!badge) {
-        badge = document.createElement('div');
-        badge.className = 'tm-paciente-age-badge-115';
-        holder.appendChild(badge);
-      }
-
-      badge.textContent = age + 'a';
-
-      if (!input.dataset.tmPaciente115AgeListener) {
-        const refresh = () => setTimeout(applyBadge, 0);
-        input.addEventListener('input', refresh, true);
-        input.addEventListener('keyup', refresh, true);
-        input.addEventListener('change', refresh, true);
-        input.addEventListener('blur', refresh, true);
-        input.dataset.tmPaciente115AgeListener = '1';
-      }
-    }
-
-    setInterval(() => {
-      try {
-        applyBadge();
-      } catch (e) {}
-    }, 200);
-
-    window.addEventListener('scroll', () => {
-      try {
-        applyBadge();
-      } catch (e) {}
-    }, true);
-
-    window.addEventListener('resize', () => {
-      try {
-        applyBadge();
-      } catch (e) {}
-    }, true);
-  
 
 /* =========================
    NOTIFICAÇÃO VISUAL - NOVA MENSAGEM
@@ -6135,191 +1419,10 @@ function setDateCalculatorOpen(isOpen) {
   setInterval(checkMessages, 1500);
 })();
 
-})();
 
 
 
-  // =========================
-  // PACIENTE 11.6 - BADGE IDADE DEFINITIVA
-  // =========================
-  (function tmPaciente116BirthAgeStable() {
-    function onlyText(v) {
-      return String(v || '').replace(/\s+/g, ' ').trim();
-    }
-
-    function findBirthInput() {
-      const root =
-        (typeof getActivePacienteSchedulingModalRoot === 'function' && getActivePacienteSchedulingModalRoot()) ||
-        document.querySelector('.modal.show .modal-content');
-
-      if (!root) return null;
-
-      const marked = root.querySelector('.tm-paciente-v91-birth input');
-      if (marked) return marked;
-
-      const blocks = Array.from(root.querySelectorAll('.form-group, .col, [class*="col-"], div'));
-      for (const block of blocks) {
-        const text = onlyText(block.innerText || block.textContent || '');
-        if (!text.includes('Data de Nascimento')) continue;
-
-        const input = block.querySelector('input');
-        if (input) return input;
-      }
-
-      const labels = Array.from(root.querySelectorAll('small, label'));
-      for (const label of labels) {
-        const text = onlyText(label.innerText || label.textContent || '');
-        if (!text.includes('Data de Nascimento')) continue;
-
-        let el = label.parentElement;
-        for (let i = 0; el && i < 5; i += 1, el = el.parentElement) {
-          const input = el.querySelector && el.querySelector('input');
-          if (input) return input;
-        }
-      }
-
-      return null;
-    }
-
-    function calcAge(value) {
-      const raw = String(value || '').trim();
-
-      let d;
-      let m;
-      let y;
-
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-        [d, m, y] = raw.split('/').map(Number);
-      } else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-        const p = raw.split('-').map(Number);
-        y = p[0];
-        m = p[1];
-        d = p[2];
-      } else {
-        return null;
-      }
-
-      if (
-        !Number.isInteger(d) ||
-        !Number.isInteger(m) ||
-        !Number.isInteger(y) ||
-        d < 1 ||
-        d > 31 ||
-        m < 1 ||
-        m > 12 ||
-        y < 1900 ||
-        y > 2100
-      ) {
-        return null;
-      }
-
-      const birth = new Date(y, m - 1, d);
-      if (
-        birth.getFullYear() !== y ||
-        birth.getMonth() !== m - 1 ||
-        birth.getDate() !== d
-      ) {
-        return null;
-      }
-
-      const today = new Date();
-      let age = today.getFullYear() - y;
-
-      if (
-        today.getMonth() < m - 1 ||
-        (today.getMonth() === m - 1 && today.getDate() < d)
-      ) {
-        age -= 1;
-      }
-
-      return age;
-    }
-
-    function apply() {
-      const input = findBirthInput();
-
-      if (!input) {
-        document.querySelectorAll('.tm-paciente-age-badge-116').forEach((el) => el.remove());
-        return;
-      }
-
-      const holder = input.closest('.input-group') || input.parentElement;
-      if (!holder) return;
-
-      const age = calcAge(input.value);
-
-      holder.classList.add('tm-paciente-birth-age-holder-116');
-      holder.style.setProperty('position', 'relative', 'important');
-      holder.style.setProperty('overflow', 'hidden', 'important');
-      input.style.setProperty('padding-right', '48px', 'important');
-
-      let badge = holder.querySelector('.tm-paciente-age-badge-116');
-
-      if (age === null) {
-        if (badge) badge.remove();
-        return;
-      }
-
-      if (!badge) {
-        badge = document.createElement('div');
-        badge.className = 'tm-paciente-age-badge-116';
-        holder.appendChild(badge);
-      }
-
-      badge.textContent = age + 'a';
-
-      badge.style.setProperty('position', 'absolute', 'important');
-      badge.style.setProperty('top', '1px', 'important');
-      badge.style.setProperty('right', '1px', 'important');
-      badge.style.setProperty('bottom', '1px', 'important');
-      badge.style.setProperty('width', '46px', 'important');
-      badge.style.setProperty('z-index', '2147483647', 'important');
-      badge.style.setProperty('display', 'flex', 'important');
-      badge.style.setProperty('align-items', 'center', 'important');
-      badge.style.setProperty('justify-content', 'center', 'important');
-      badge.style.setProperty('background', '#d9d9d9', 'important');
-      badge.style.setProperty('color', '#555', 'important');
-      badge.style.setProperty('border-left', '1px solid #cfd4da', 'important');
-      badge.style.setProperty('border-top-right-radius', '.25rem', 'important');
-      badge.style.setProperty('border-bottom-right-radius', '.25rem', 'important');
-      badge.style.setProperty('font-size', '14px', 'important');
-      badge.style.setProperty('line-height', '1', 'important');
-      badge.style.setProperty('pointer-events', 'none', 'important');
-      badge.style.setProperty('box-sizing', 'border-box', 'important');
-      badge.style.setProperty('white-space', 'nowrap', 'important');
-
-      if (!input.dataset.tmPaciente116AgeListener) {
-        const refresh = () => {
-          requestAnimationFrame(apply);
-          setTimeout(apply, 60);
-        };
-
-        input.addEventListener('input', refresh, true);
-        input.addEventListener('keyup', refresh, true);
-        input.addEventListener('change', refresh, true);
-        input.addEventListener('blur', refresh, true);
-        input.dataset.tmPaciente116AgeListener = '1';
-      }
-    }
-
-    setInterval(() => {
-      try {
-        apply();
-      } catch (e) {}
-    }, 100);
-
-    window.addEventListener('scroll', () => {
-      try {
-        requestAnimationFrame(apply);
-      } catch (e) {}
-    }, true);
-
-    window.addEventListener('resize', () => {
-      try {
-        requestAnimationFrame(apply);
-      } catch (e) {}
-    }, true);
-  
+  /* TM 16.3: bloco PACIENTE 11.6 removido. */
 
 /* =========================
    NOTIFICAÇÃO VISUAL - NOVA MENSAGEM
@@ -6467,4 +1570,1578 @@ function setDateCalculatorOpen(isOpen) {
   }, true);
 
 
-})();
+
+  /* =========================
+     CHAT - ENVIO EM MASSA (CONECTADOS)
+     v13.9 - módulo leve
+  ========================= */
+  const TM_CHAT_BULK = {
+    usersByName: new Map(),
+    pendingByName: new Map(),
+    authHeaders: {},
+    loading: false,
+    loadedAt: 0,
+    sending: false,
+    lastSignature: ''
+  };
+
+  function tmChatBulkNorm(text) {
+    return (text || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function tmChatBulkStoreUsersFromList(list) {
+    if (!Array.isArray(list) || !list.length) return false;
+
+    const map = new Map(TM_CHAT_BULK.usersByName || []);
+
+    list.forEach((user) => {
+      const id = Number(user?.id_usuario);
+      const name =
+        user?.pessoa?.st_nome ||
+        user?.pessoa?.search ||
+        user?.search ||
+        '';
+
+      if (!id || !name) return;
+
+      const cleanName = String(name).replace(/\s+/g, ' ').trim();
+      const key = tmChatBulkNorm(cleanName);
+
+      map.set(key, {
+        id,
+        name: cleanName
+      });
+
+      // aliases úteis
+      if (user?.search) {
+        map.set(tmChatBulkNorm(user.search), { id, name: cleanName });
+      }
+
+      if (user?.pessoa?.search) {
+        map.set(tmChatBulkNorm(user.pessoa.search), { id, name: cleanName });
+      }
+    });
+
+    if (map.size > TM_CHAT_BULK.usersByName.size) {
+      TM_CHAT_BULK.usersByName = map;
+      TM_CHAT_BULK.loadedAt = Date.now();
+      TM_CHAT_BULK.lastSignature = '';
+      return true;
+    }
+
+    return false;
+  }
+
+  function tmChatBulkStoreUsersFromResponseJson(json) {
+    const list =
+      json?.lista?.data?.lista ||
+      json?.data?.lista ||
+      json?.lista ||
+      [];
+
+    return tmChatBulkStoreUsersFromList(list);
+  }
+
+  function tmChatBulkResolveFromMap(name) {
+    const key = tmChatBulkNorm(name);
+
+    if (!key) return null;
+
+    const exact = TM_CHAT_BULK.usersByName.get(key);
+    if (exact?.id) return exact.id;
+
+    for (const [mapKey, user] of TM_CHAT_BULK.usersByName.entries()) {
+      if (!user?.id) continue;
+
+      if (
+        mapKey === key ||
+        mapKey.includes(key) ||
+        key.includes(mapKey)
+      ) {
+        return user.id;
+      }
+    }
+
+    return null;
+  }
+
+
+  function tmChatBulkCaptureAuthHeaders(headersLike) {
+    try {
+      const h = {};
+      if (!headersLike) return;
+
+      if (headersLike instanceof Headers) {
+        headersLike.forEach((v,k) => h[String(k).toLowerCase()] = String(v));
+      } else if (Array.isArray(headersLike)) {
+        headersLike.forEach(([k,v]) => h[String(k).toLowerCase()] = String(v));
+      } else if (typeof headersLike === 'object') {
+        Object.keys(headersLike).forEach(k => h[String(k).toLowerCase()] = String(headersLike[k]));
+      }
+
+      [
+        'authorization',
+        'x-xsrf-token',
+        'x-csrf-token',
+        'x-api-token',
+        'x-domain',
+        'x-portal',
+        'x-unidade'
+      ].forEach(k => {
+        if (h[k]) TM_CHAT_BULK.authHeaders[k] = h[k];
+      });
+
+      if (Object.keys(TM_CHAT_BULK.authHeaders).length) {
+        console.info('[klingo chat bulk] auth/headers capturados', Object.keys(TM_CHAT_BULK.authHeaders));
+      }
+    } catch (e) {}
+  }
+
+  function tmChatBulkGetAuthHeaders() {
+    const headers = {
+      'Content-Type': 'application/json;charset=UTF-8',
+      'Accept': 'application/json, text/plain, */*',
+      'X-Domain': TM_CHAT_BULK.authHeaders['x-domain'] || 'samec',
+      'X-Portal': TM_CHAT_BULK.authHeaders['x-portal'] || '0',
+      'X-Unidade': TM_CHAT_BULK.authHeaders['x-unidade'] || '1'
+    };
+
+    Object.keys(TM_CHAT_BULK.authHeaders || {}).forEach((key) => {
+      const value = TM_CHAT_BULK.authHeaders[key];
+      if (!value) return;
+
+      if (key === 'authorization') headers.Authorization = value;
+      else if (key === 'x-xsrf-token') headers['X-XSRF-TOKEN'] = value;
+      else if (key === 'x-csrf-token') headers['X-CSRF-TOKEN'] = value;
+      else if (key === 'x-api-token') headers['X-API-TOKEN'] = value;
+      else if (key === 'x-domain') headers['X-Domain'] = value;
+      else if (key === 'x-portal') headers['X-Portal'] = value;
+      else if (key === 'x-unidade') headers['X-Unidade'] = value;
+    });
+
+    if (!headers.Authorization) {
+      const token = tmChatBulkFindTokenInStorage();
+      if (token) headers.Authorization = token;
+    }
+
+    return headers;
+  }
+
+  function tmChatBulkInstallPageNetworkCapture() {
+    if (window.__tmChatBulkPageCaptureInjected) return;
+    window.__tmChatBulkPageCaptureInjected = true;
+
+    try {
+      const script = document.createElement('script');
+      script.textContent = `
+        (function () {
+          if (window.__tmChatBulkNativeCaptureInstalled) return;
+          window.__tmChatBulkNativeCaptureInstalled = true;
+
+          function emit(headers) {
+            try {
+              window.dispatchEvent(new CustomEvent('tm-chat-bulk-auth-headers', { detail: headers || {} }));
+            } catch (e) {}
+          }
+
+          try {
+            const nativeFetch = window.fetch;
+            if (typeof nativeFetch === 'function') {
+              window.fetch = function () {
+                try {
+                  const input = arguments[0];
+                  const init = arguments[1] || {};
+                  const url = String((input && input.url) || input || '');
+
+                  if (url.indexOf('/api/aql') !== -1 || url.indexOf('api.klingo.app') !== -1) {
+                    emit(init.headers || (input && input.headers) || {});
+                  }
+                } catch (e) {}
+
+                return nativeFetch.apply(this, arguments);
+              };
+            }
+          } catch (e) {}
+
+          try {
+            const XHR = window.XMLHttpRequest;
+            const nativeOpen = XHR.prototype.open;
+            const nativeSetRequestHeader = XHR.prototype.setRequestHeader;
+            const nativeSend = XHR.prototype.send;
+
+            XHR.prototype.open = function (method, url) {
+              this.__tmChatBulkUrl = String(url || '');
+              this.__tmChatBulkHeaders = {};
+              return nativeOpen.apply(this, arguments);
+            };
+
+            XHR.prototype.setRequestHeader = function (key, value) {
+              try {
+                this.__tmChatBulkHeaders[String(key).toLowerCase()] = String(value);
+              } catch (e) {}
+
+              return nativeSetRequestHeader.apply(this, arguments);
+            };
+
+            XHR.prototype.send = function () {
+              try {
+                if ((this.__tmChatBulkUrl || '').indexOf('/api/aql') !== -1 || (this.__tmChatBulkUrl || '').indexOf('api.klingo.app') !== -1) {
+                  emit(this.__tmChatBulkHeaders || {});
+                }
+              } catch (e) {}
+
+              return nativeSend.apply(this, arguments);
+            };
+          } catch (e) {}
+        })();
+      `;
+
+      (document.documentElement || document.head || document.body).appendChild(script);
+      script.remove();
+
+      window.addEventListener('tm-chat-bulk-auth-headers', function (event) {
+        tmChatBulkCaptureAuthHeaders(event.detail || {});
+      });
+    } catch (e) {}
+  }
+
+  function tmChatBulkInstallNetworkCapture() {
+    if (window.__tmChatBulkNetworkCaptureInstalled) return;
+    window.__tmChatBulkNetworkCaptureInstalled = true;
+
+    try {
+      const nativeFetch = window.fetch;
+      if (typeof nativeFetch === 'function') {
+        window.fetch = async function tmChatBulkFetchProxy(...args) {
+          const response = await nativeFetch.apply(this, args);
+
+          try {
+            const url = String(args[0]?.url || args[0] || '');
+
+            if (url.includes('api.klingo.app') || url.includes('/api/aql')) {
+              tmChatBulkCaptureAuthHeaders(args[1]?.headers || args[0]?.headers || {});
+            }
+
+            if (url.includes('usuarios.listar_conectados')) {
+              response.clone().json().then((json) => {
+                if (tmChatBulkStoreUsersFromResponseJson(json)) {
+                  setTimeout(tmChatBulkApply, 50);
+                }
+              }).catch(() => {});
+            }
+          } catch (e) {}
+
+          return response;
+        };
+      }
+    } catch (e) {}
+
+    try {
+      const XHR = window.XMLHttpRequest;
+      if (!XHR || !XHR.prototype) return;
+
+      const nativeOpen = XHR.prototype.open;
+      const nativeSend = XHR.prototype.send;
+
+      XHR.prototype.open = function tmChatBulkXhrOpen(method, url, ...rest) {
+        this.__tmChatBulkUrl = String(url || '');
+        return nativeOpen.call(this, method, url, ...rest);
+      };
+
+      XHR.prototype.send = function tmChatBulkXhrSend(...args) {
+        try {
+          this.addEventListener('load', function () {
+            try {
+              const url = String(this.__tmChatBulkUrl || '');
+
+              if (!url.includes('usuarios.listar_conectados')) return;
+
+              const json = JSON.parse(this.responseText || '{}');
+
+              if (tmChatBulkStoreUsersFromResponseJson(json)) {
+                setTimeout(tmChatBulkApply, 50);
+              }
+            } catch (e) {}
+          });
+        } catch (e) {}
+
+        return nativeSend.apply(this, args);
+      };
+    } catch (e) {}
+  }
+
+
+  function tmChatBulkModal() {
+    return document.querySelector('#modalChat.show');
+  }
+
+  function tmChatBulkConnectedActive() {
+    const modal = tmChatBulkModal();
+    if (!modal) return false;
+
+    const active = Array.from(modal.querySelectorAll('.btn-group button'))
+      .find((btn) => btn.classList.contains('btn-secondary'));
+
+    return !!active && tmChatBulkNorm(active.textContent) === 'CONECTADOS';
+  }
+
+
+  function tmChatBulkApiPost(url, payload) {
+    const body = JSON.stringify(payload);
+
+    async function nativeFetchAttempt() {
+      const fetchFn =
+        (typeof unsafeWindow !== 'undefined' && typeof unsafeWindow.fetch === 'function')
+          ? unsafeWindow.fetch.bind(unsafeWindow)
+          : window.fetch.bind(window);
+
+      const headers = tmChatBulkGetAuthHeaders();
+
+      console.info('[klingo chat bulk] request API direta', {
+        url,
+        hasAuthorization: !!headers.Authorization,
+        extraHeaders: Object.keys(headers).filter((key) => !['Content-Type', 'Accept', 'Authorization'].includes(key))
+      });
+
+      const response = await fetchFn(url, {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
+        headers,
+        body
+      });
+
+      const raw = await response.text();
+      let json = {};
+
+      try {
+        json = JSON.parse(raw || '{}');
+      } catch (e) {
+        throw new Error(`Resposta inválida HTTP ${response.status}`);
+      }
+
+      return {
+        ok: response.ok,
+        status: response.status,
+        json,
+        raw,
+        via: 'native-fetch'
+      };
+    }
+
+    return nativeFetchAttempt();
+  }
+
+  async function tmChatBulkLoadUsers() {
+    if (TM_CHAT_BULK.loading) return;
+    if (TM_CHAT_BULK.usersByName.size && Date.now() - TM_CHAT_BULK.loadedAt < 60000) return;
+
+    TM_CHAT_BULK.loading = true;
+
+    try {
+      const result = await tmChatBulkApiPost('https://api.klingo.app/api/aql?a=usuarios.listar_conectados', {
+        q: [{
+          name: 'usuarios.listar_conectados',
+          id: 'lista',
+          parms: {}
+        }]
+      });
+
+      tmChatBulkStoreUsersFromResponseJson(result.json);
+    } catch (e) {
+      console.error('[klingo chat bulk] erro ao carregar conectados', e);
+    } finally {
+      TM_CHAT_BULK.loading = false;
+    }
+  }
+
+  async function tmChatBulkResolveUserIdByName(name) {
+    const key = tmChatBulkNorm(name);
+
+    if (!key) return null;
+
+    const fromMap = tmChatBulkResolveFromMap(name);
+    if (fromMap) return fromMap;
+
+    if (TM_CHAT_BULK.pendingByName.has(key)) {
+      return TM_CHAT_BULK.pendingByName.get(key);
+    }
+
+    const promise = (async () => {
+      TM_CHAT_BULK.loadedAt = 0;
+      await tmChatBulkLoadUsers();
+
+      const afterLoad = tmChatBulkResolveFromMap(name);
+      if (afterLoad) return afterLoad;
+
+      // Pequena espera para caso o KLINGO esteja fazendo a request nativa
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      return tmChatBulkResolveFromMap(name);
+    })();
+
+    TM_CHAT_BULK.pendingByName.set(key, promise);
+
+    try {
+      return await promise;
+    } finally {
+      TM_CHAT_BULK.pendingByName.delete(key);
+    }
+  }
+
+
+  function tmChatBulkCSS() {
+    if (document.getElementById('tm-chat-bulk-style')) return;
+
+    const style = document.createElement('style');
+    style.id = 'tm-chat-bulk-style';
+    style.textContent = `
+      #modalChat .tm-chat-bulk-bar {
+        margin: 0 0 10px 0;
+        padding: 8px 10px;
+        border: 1px solid #d7dbe2;
+        border-radius: 8px;
+        background: #f8f9fa;
+      }
+
+      #modalChat .tm-chat-bulk-top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: #495057;
+      }
+
+      #modalChat .tm-chat-bulk-top label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        user-select: none;
+        cursor: pointer;
+      }
+
+      #modalChat .tm-chat-bulk-row-input {
+        display: flex;
+        gap: 8px;
+      }
+
+      #modalChat .tm-chat-bulk-message {
+        flex: 1 1 auto;
+        height: 40px;
+        min-height: 40px;
+        max-height: 80px;
+        resize: vertical;
+      }
+
+      #modalChat .tm-chat-bulk-send {
+        width: 126px;
+        flex: 0 0 126px;
+      }
+
+      #modalChat .tm-chat-bulk-status {
+        display: none !important;
+      }
+
+      #modalChat ul.list-group.tm-chat-bulk-enabled li.list-group-item.tm-chat-bulk-row {
+        display: grid !important;
+        grid-template-columns: 24px minmax(0, 1fr) auto !important;
+        align-items: center !important;
+        column-gap: 8px !important;
+      }
+
+      #modalChat .tm-chat-bulk-cell {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 24px !important;
+        min-width: 24px !important;
+      }
+
+      #modalChat .tm-chat-bulk-check {
+        display: inline-block !important;
+        width: 16px !important;
+        height: 16px !important;
+        margin: 0 !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        appearance: auto !important;
+        -webkit-appearance: checkbox !important;
+        cursor: pointer !important;
+        position: static !important;
+      }
+
+      #modalChat .tm-chat-bulk-check:not(:disabled) {
+        cursor: pointer !important;
+        opacity: 1 !important;
+      }
+
+      #modalChat .tm-chat-bulk-check:disabled {
+        cursor: not-allowed !important;
+        opacity: 0.45 !important;
+      }
+
+      #modalChat ul.list-group.tm-chat-bulk-enabled li.list-group-item > a.card-link,
+      #modalChat ul.list-group.tm-chat-bulk-enabled li.list-group-item > span.text-muted {
+        min-width: 0 !important;
+      }
+
+      #modalChat .modal-content {
+        position: relative !important;
+      }
+
+      #modalChat.tm-chat-bulk-modal-sending .tm-chat-bulk-bar,
+      #modalChat.tm-chat-bulk-modal-sending ul.list-group,
+      #modalChat.tm-chat-bulk-modal-sending .modal-footer {
+        pointer-events: none !important;
+      }
+
+      #modalChat .tm-chat-bulk-sending-overlay {
+        position: absolute !important;
+        inset: 0 !important;
+        z-index: 100000001 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: rgba(255, 255, 255, 0.97) !important;
+        border-radius: 4px !important;
+        color: #343a40 !important;
+        text-align: center !important;
+        padding: 24px !important;
+      }
+
+      #modalChat .tm-chat-bulk-sending-box {
+        width: min(420px, 90%) !important;
+        padding: 18px 20px !important;
+        border: 1px solid #d7dbe2 !important;
+        border-radius: 10px !important;
+        background: #ffffff !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important;
+      }
+
+      #modalChat .tm-chat-bulk-sending-title {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        margin-bottom: 8px !important;
+      }
+
+      #modalChat .tm-chat-bulk-sending-progress {
+        font-size: 14px !important;
+        color: #6c757d !important;
+        line-height: 1.4 !important;
+        min-height: 22px !important;
+      }
+
+      #modalChat .tm-chat-bulk-sending-spinner {
+        width: 28px !important;
+        height: 28px !important;
+        border: 3px solid #d7dbe2 !important;
+        border-top-color: #007bff !important;
+        border-radius: 50% !important;
+        margin: 0 auto 12px auto !important;
+        animation: tmChatBulkSpin 0.75s linear infinite !important;
+      }
+
+      @keyframes tmChatBulkSpin {
+        to { transform: rotate(360deg); }
+      }
+
+
+      /* TM FIX 15.4 - composer fixo abaixo da lista */
+      #modalChat .modal-body {
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+
+      #modalChat ul.list-group.tm-chat-bulk-enabled {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        margin-bottom: 12px !important;
+      }
+
+      #modalChat .tm-chat-bulk-bar {
+        flex: 0 0 auto !important;
+        order: 9999 !important;
+        position: sticky !important;
+        bottom: 0 !important;
+        z-index: 5 !important;
+        margin: 0 !important;
+        padding: 10px 12px 12px 12px !important;
+        border: 1px solid #d7dbe2 !important;
+        border-radius: 8px !important;
+        background: #f8f9fa !important;
+        box-shadow: 0 -6px 16px rgba(0,0,0,0.06) !important;
+      }
+
+      #modalChat .tm-chat-bulk-top {
+        margin-bottom: 8px !important;
+      }
+
+      #modalChat .tm-chat-bulk-clear {
+        display: none !important;
+      }
+
+      #modalChat .tm-chat-bulk-row-input {
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        width: 100% !important;
+      }
+
+      #modalChat .tm-chat-bulk-message {
+        width: 100% !important;
+        min-height: 68px !important;
+        height: 68px !important;
+        max-height: 120px !important;
+        resize: vertical !important;
+        padding: 12px 70px 12px 12px !important;
+        font-size: 15px !important;
+        line-height: 1.35 !important;
+        border-radius: 6px !important;
+      }
+
+      #modalChat .tm-chat-bulk-send {
+        position: absolute !important;
+        right: 10px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 0 !important;
+        z-index: 2 !important;
+      }
+
+      #modalChat .tm-chat-bulk-send::before {
+        content: '➤' !important;
+        font-size: 18px !important;
+        line-height: 1 !important;
+      }
+
+
+      /* TM FIX 15.5 - remover flicker e separar lista/composer */
+      #modalChat .modal-body.tm-chat-bulk-active {
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        height: calc(100vh - 190px) !important;
+        max-height: calc(100vh - 190px) !important;
+        overflow: hidden !important;
+        padding-bottom: 12px !important;
+      }
+
+      #modalChat .modal-body.tm-chat-bulk-active > .input-group,
+      #modalChat .modal-body.tm-chat-bulk-active > .btn-group {
+        flex: 0 0 auto !important;
+      }
+
+      #modalChat.tm-chat-bulk-connected-active .modal-body.tm-chat-bulk-active ul.list-group.tm-chat-bulk-enabled {
+        flex: 1 1 auto !important;
+        min-height: 120px !important;
+        overflow-y: auto !important;
+        margin-bottom: 10px !important;
+        position: relative !important;
+        z-index: 1 !important;
+      }
+
+      #modalChat .modal-body.tm-chat-bulk-active .tm-chat-bulk-bar {
+        flex: 0 0 auto !important;
+        position: relative !important;
+        bottom: auto !important;
+        order: 9999 !important;
+        z-index: 2 !important;
+        margin: 0 !important;
+        background: #f8f9fa !important;
+      }
+
+      #modalChat:not(.tm-chat-bulk-connected-active) .tm-chat-bulk-bar,
+      #modalChat:not(.tm-chat-bulk-connected-active) .tm-chat-bulk-cell {
+        display: none !important;
+      }
+
+
+      /* TM FIX 15.6 - confirmação dentro do modal */
+      #modalChat .tm-chat-bulk-confirm-overlay {
+        position: absolute !important;
+        inset: 0 !important;
+        z-index: 100000002 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: rgba(0,0,0,0.38) !important;
+        border-radius: 4px !important;
+        padding: 20px !important;
+      }
+
+      #modalChat .tm-chat-bulk-confirm-box {
+        width: min(440px, 92%) !important;
+        background: #ffffff !important;
+        border: 1px solid #d7dbe2 !important;
+        border-radius: 12px !important;
+        box-shadow: 0 16px 36px rgba(0,0,0,0.22) !important;
+        padding: 18px 18px 16px 18px !important;
+      }
+
+      #modalChat .tm-chat-bulk-confirm-title {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: #212529 !important;
+        margin-bottom: 8px !important;
+      }
+
+      #modalChat .tm-chat-bulk-confirm-text {
+        font-size: 14px !important;
+        color: #495057 !important;
+        line-height: 1.45 !important;
+        margin-bottom: 14px !important;
+      }
+
+      #modalChat .tm-chat-bulk-confirm-actions {
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 10px !important;
+      }
+
+      #modalChat .tm-chat-bulk-confirm-actions .btn {
+        min-width: 96px !important;
+      }
+
+      /* TM FIX 15.7 - não renderizar composer no chat individual */
+      #modalChat.tm-chat-bulk-conversation-view .tm-chat-bulk-bar,
+      #modalChat.tm-chat-bulk-conversation-view .tm-chat-bulk-cell {
+        display: none !important;
+      }
+
+      #modalChat.tm-chat-bulk-conversation-view .modal-body {
+        display: block !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: auto !important;
+      }
+
+      #modalChat ul.list-group.tm-chat-bulk-enabled li.list-group-item:not(.tm-chat-bulk-row) {
+        display: block !important;
+      }
+
+
+      /* TM FIX 15.8 - retorno sem flicker do chat individual */
+      #modalChat.tm-chat-bulk-returning-to-list:not(.tm-chat-bulk-connected-active) ul.list-group {
+        visibility: hidden !important;
+      }
+
+      #modalChat.tm-chat-bulk-returning-to-list .tm-chat-bulk-bar {
+        visibility: hidden !important;
+      }
+
+      #modalChat.tm-chat-bulk-connected-active.tm-chat-bulk-returning-to-list ul.list-group,
+      #modalChat.tm-chat-bulk-connected-active.tm-chat-bulk-returning-to-list .tm-chat-bulk-bar {
+        visibility: visible !important;
+      }
+
+`;
+
+    document.head.appendChild(style);
+  }
+
+  function tmChatBulkRows() {
+    const modal = tmChatBulkModal();
+    if (!modal || !tmChatBulkConnectedActive()) return [];
+
+    const list = modal.querySelector('ul.list-group');
+    if (!list) return [];
+
+    return Array.from(list.querySelectorAll(':scope > li.list-group-item'));
+  }
+
+  function tmChatBulkName(row) {
+    const node = row.querySelector(':scope > a.card-link, :scope > span.text-muted');
+    return node ? node.textContent.replace(/\s+/g, ' ').trim() : '';
+  }
+
+  function tmChatBulkSelected() {
+    return tmChatBulkRows().filter((row) => {
+      const check = row.querySelector(':scope > .tm-chat-bulk-cell .tm-chat-bulk-check');
+      return check && !check.disabled && check.checked;
+    });
+  }
+
+  function tmChatBulkUpdateCounter() {
+    const modal = tmChatBulkModal();
+    if (!modal) return;
+
+    const checks = tmChatBulkRows()
+      .map((row) => row.querySelector(':scope > .tm-chat-bulk-cell .tm-chat-bulk-check'))
+      .filter((check) => check && !check.disabled);
+
+    const selected = checks.filter((check) => check.checked);
+
+    const counter = modal.querySelector('.tm-chat-bulk-counter');
+    if (counter) {
+      counter.textContent = `${selected.length} selecionado${selected.length === 1 ? '' : 's'}`;
+    }
+
+    const all = modal.querySelector('.tm-chat-bulk-select-all');
+    if (all) {
+      all.checked = checks.length > 0 && selected.length === checks.length;
+      all.indeterminate = selected.length > 0 && selected.length < checks.length;
+    }
+
+    const send = modal.querySelector('.tm-chat-bulk-send');
+    if (send) {
+      send.disabled = TM_CHAT_BULK.sending || selected.length === 0;
+    }
+  }
+
+  function tmChatBulkEnsureBar() {
+    const modal = tmChatBulkModal();
+    if (!modal || !tmChatBulkIsConnectedListView()) return;
+
+    const body = modal.querySelector('.modal-body');
+    const list = modal.querySelector('ul.list-group');
+    if (!body || !list) return;
+
+    modal.classList.remove('tm-chat-bulk-conversation-view');
+    modal.classList.remove('tm-chat-bulk-returning-to-list');
+    modal.classList.add('tm-chat-bulk-connected-active');
+    body.classList.add('tm-chat-bulk-active');
+    list.classList.add('tm-chat-bulk-enabled');
+
+    if (modal.querySelector('.tm-chat-bulk-bar')) return;
+
+    const bar = document.createElement('div');
+    bar.className = 'tm-chat-bulk-bar';
+    bar.innerHTML = `
+      <div class="tm-chat-bulk-top">
+        <label><input type="checkbox" class="tm-chat-bulk-select-all"> Selecionar todos</label>
+        <span class="tm-chat-bulk-counter">0 selecionados</span>
+      </div>
+      <div class="tm-chat-bulk-row-input">
+        <textarea class="form-control tm-chat-bulk-message" rows="2" placeholder="Mensagem para usuários selecionados..."></textarea>
+        <button type="button" class="btn btn-primary tm-chat-bulk-send" disabled title="Enviar">Enviar</button>
+      </div>
+      <div class="tm-chat-bulk-status"></div>
+    `;
+
+    body.insertBefore(bar, list.nextSibling);
+
+    bar.querySelector('.tm-chat-bulk-select-all').addEventListener('change', (event) => {
+      const checked = event.currentTarget.checked;
+
+      tmChatBulkRows().forEach((row) => {
+        const check = row.querySelector(':scope > .tm-chat-bulk-cell .tm-chat-bulk-check');
+        if (check && !check.disabled) check.checked = checked;
+      });
+
+      tmChatBulkUpdateCounter();
+    });
+
+    bar.querySelector('.tm-chat-bulk-send').addEventListener('click', tmChatBulkSendSelected);
+  }
+
+  function tmChatBulkEnsureCheckboxes() {
+    const modal = tmChatBulkModal();
+    if (!modal || !tmChatBulkConnectedActive()) return;
+
+    const list = modal.querySelector('ul.list-group');
+    if (!list) return;
+
+    list.classList.add('tm-chat-bulk-enabled');
+
+    tmChatBulkRows().forEach((row) => {
+      const directCell = row.querySelector(':scope > .tm-chat-bulk-cell');
+      if (directCell) {
+        const check = directCell.querySelector('.tm-chat-bulk-check');
+        const name = tmChatBulkName(row);
+        const userId = tmChatBulkResolveFromMap(name);
+
+        if (check && userId && !check.dataset.tmChatBulkUserId) {
+          check.dataset.tmChatBulkUserId = String(userId);
+          check.disabled = false;
+          check.title = `Selecionar ${name}`;
+        }
+
+        return;
+      }
+
+      const name = tmChatBulkName(row);
+      const link = row.querySelector(':scope > a.card-link');
+      const user = TM_CHAT_BULK.usersByName.get(tmChatBulkNorm(name));
+
+      const cell = document.createElement('span');
+      cell.className = 'tm-chat-bulk-cell';
+
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.className = 'tm-chat-bulk-check';
+      check.dataset.tmChatBulkName = name;
+
+      if (!link) {
+        check.disabled = true;
+        check.title = 'Usuário atual ou indisponível';
+      } else {
+        check.disabled = false;
+        check.title = `Selecionar ${name}`;
+
+        if (user?.id) {
+          check.dataset.tmChatBulkUserId = String(user.id);
+        }
+      }
+
+      check.addEventListener('click', (event) => {
+        event.stopPropagation();
+      }, true);
+
+      check.addEventListener('mousedown', (event) => {
+        event.stopPropagation();
+      }, true);
+
+      check.addEventListener('change', async (event) => {
+        event.stopPropagation();
+
+        const target = event.currentTarget;
+
+        if (target.checked && !target.dataset.tmChatBulkUserId) {
+          target.dataset.tmChatBulkResolving = '1';
+          target.title = 'Resolvendo usuário...';
+
+          const resolvedId = await tmChatBulkResolveUserIdByName(target.dataset.tmChatBulkName || '');
+
+          delete target.dataset.tmChatBulkResolving;
+
+          if (resolvedId) {
+            target.dataset.tmChatBulkUserId = String(resolvedId);
+            target.title = `Selecionar ${target.dataset.tmChatBulkName || ''}`;
+          } else {
+            target.checked = false;
+            target.title = 'Não foi possível identificar o ID deste usuário';
+            const status = tmChatBulkModal()?.querySelector('.tm-chat-bulk-status');
+            if (status) status.textContent = `ID não encontrado para: ${target.dataset.tmChatBulkName || ''}. Aguarde alguns segundos e tente novamente.`;
+          }
+        }
+
+        tmChatBulkUpdateCounter();
+      });
+
+      cell.appendChild(check);
+      row.classList.add('tm-chat-bulk-row');
+      row.insertBefore(cell, row.firstChild);
+    });
+  }
+
+
+  async function tmChatBulkOpenConversation(userId) {
+    const payload = {
+      q: [{
+        name: 'chat.index',
+        id: 'lista',
+        parms: {
+          to: Number(userId)
+        }
+      }]
+    };
+
+    const result = await tmChatBulkApiPost('https://api.klingo.app/api/aql?a=chat.index', payload);
+    const json = result.json;
+
+    const status =
+      json?.lista?.status ??
+      json?.status ??
+      null;
+
+    if (!result.ok || Number(status) !== 200) {
+      console.error('[klingo chat bulk] chat.index falhou', {
+        via: result.via,
+        httpStatus: result.status,
+        apiStatus: status,
+        userId,
+        payload,
+        response: json,
+        raw: result.raw
+      });
+
+      throw new Error(`chat.index HTTP ${result.status} / API ${status || 'sem status'}`);
+    }
+
+    return json;
+  }
+
+  function tmChatBulkFindMessageInIndex(indexJson, userId, message) {
+    const expectedText = String(message || '').trim();
+    if (!expectedText) return false;
+
+    const msgs =
+      indexJson?.lista?.data?.msgs ||
+      indexJson?.data?.msgs ||
+      [];
+
+    if (!Array.isArray(msgs) || !msgs.length) return false;
+
+    return msgs.some((msg) => {
+      const msgText = String(msg?.st_mensagem || '').trim();
+      const dest = Number(msg?.id_usuario_destino);
+      return msgText === expectedText && dest === Number(userId);
+    });
+  }
+
+  async function tmChatBulkValidateSentMessage(userId, message) {
+    const indexJson = await tmChatBulkOpenConversation(userId);
+    return tmChatBulkFindMessageInIndex(indexJson, userId, message);
+  }
+
+  async function tmChatBulkSendMessage(userId, message) {
+    const payload = {
+      q: [{
+        name: 'chat.send',
+        id: 'atualizar',
+        parms: {
+          to: Number(userId),
+          text: String(message || '')
+        }
+      }]
+    };
+
+    const result = await tmChatBulkApiPost('https://api.klingo.app/api/aql?a=chat.send', payload);
+    const json = result.json;
+
+    const status =
+      json?.atualizar?.status ??
+      json?.lista?.status ??
+      json?.status ??
+      null;
+
+    const data =
+      json?.atualizar?.data ??
+      json?.data ??
+      null;
+
+    if (!result.ok || Number(status) !== 200) {
+      console.error('[klingo chat bulk] chat.send falhou', {
+        via: result.via,
+        httpStatus: result.status,
+        apiStatus: status,
+        userId,
+        payload,
+        response: json,
+        raw: result.raw
+      });
+
+      if (Number(result.status) === 401) {
+        throw new Error('HTTP 401: autenticação não capturada. Abra/envie uma mensagem individual uma vez e tente novamente.');
+      }
+
+      throw new Error(`HTTP ${result.status} / API ${status || 'sem status'}`);
+    }
+
+    console.info('[klingo chat bulk] chat.send OK', {
+      via: result.via,
+      userId,
+      response: json
+    });
+
+    return json;
+  }
+
+  function tmChatBulkSleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+
+  function tmChatBulkSetNativeValue(element, value) {
+    if (!element) return;
+
+    const proto = Object.getPrototypeOf(element);
+    const descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
+
+    if (descriptor && descriptor.set) {
+      descriptor.set.call(element, value);
+    } else {
+      element.value = value;
+    }
+
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'a' }));
+  }
+
+  function tmChatBulkWaitFor(condition, timeout = 5000, step = 120) {
+    return new Promise((resolve, reject) => {
+      const started = Date.now();
+
+      const tick = () => {
+        let result = null;
+
+        try {
+          result = condition();
+        } catch (e) {}
+
+        if (result) {
+          resolve(result);
+          return;
+        }
+
+        if (Date.now() - started >= timeout) {
+          reject(new Error('tempo esgotado'));
+          return;
+        }
+
+        setTimeout(tick, step);
+      };
+
+      tick();
+    });
+  }
+
+
+  function tmChatBulkIsConversationView() {
+    const modal = tmChatBulkModal();
+    if (!modal) return false;
+
+    return !!(
+      modal.querySelector('.modal-header .modal-title a .fa-chevron-left, .modal-header .modal-title a.mr-3') ||
+      modal.querySelector('.modal-footer textarea.form-control, .modal-footer textarea')
+    );
+  }
+
+  function tmChatBulkIsConnectedListView() {
+    const modal = tmChatBulkModal();
+    if (!modal) return false;
+
+    if (tmChatBulkIsConversationView()) return false;
+    if (!tmChatBulkConnectedActive()) return false;
+
+    const list = modal.querySelector('ul.list-group');
+    if (!list) return false;
+
+    return !!list.querySelector(':scope > li.list-group-item a.card-link, :scope > li.list-group-item span.text-muted');
+  }
+
+  function tmChatBulkResetRowsOnly() {
+    const modal = tmChatBulkModal();
+    if (!modal) return;
+
+    modal.querySelectorAll('.tm-chat-bulk-cell').forEach((cell) => cell.remove());
+    modal.querySelectorAll('li.tm-chat-bulk-row').forEach((row) => row.classList.remove('tm-chat-bulk-row'));
+    modal.querySelectorAll('li.tm-chat-bulk-row').forEach((row) => row.classList.remove('tm-chat-bulk-row'));
+  }
+
+
+
+  async function tmChatBulkBackToList() {
+    const modal = tmChatBulkModal();
+    if (!modal) return;
+
+    if (!tmChatBulkIsConversationView()) return;
+
+    const back =
+      modal.querySelector('.modal-title a.mr-3') ||
+      modal.querySelector('.modal-title a');
+
+    if (back) {
+      back.click();
+    }
+
+    await tmChatBulkWaitFor(() => {
+      return tmChatBulkConnectedActive() && modal.querySelector('ul.list-group li.list-group-item a.card-link');
+    }, 5000).catch(() => null);
+
+    await tmChatBulkSleep(250);
+    await tmChatBulkApply();
+  }
+
+  function tmChatBulkFindUserLinkByName(name) {
+    const modal = tmChatBulkModal();
+    if (!modal) return null;
+
+    const target = tmChatBulkNorm(name);
+
+    return Array.from(modal.querySelectorAll('ul.list-group li.list-group-item a.card-link'))
+      .find((link) => tmChatBulkNorm(link.textContent) === target) || null;
+  }
+
+  async function tmChatBulkOpenUserNative(name) {
+    await tmChatBulkBackToList();
+
+    const link = await tmChatBulkWaitFor(() => tmChatBulkFindUserLinkByName(name), 5000)
+      .catch(() => null);
+
+    if (!link) {
+      throw new Error(`usuário não encontrado na lista: ${name}`);
+    }
+
+    link.click();
+
+    await tmChatBulkWaitFor(() => {
+      const modal = tmChatBulkModal();
+      if (!modal) return false;
+
+      const title = modal.querySelector('.modal-title span');
+      const textarea = modal.querySelector('.modal-footer textarea.form-control, .modal-footer textarea');
+
+      return textarea && title && tmChatBulkNorm(title.textContent) === tmChatBulkNorm(name);
+    }, 7000);
+
+    await tmChatBulkSleep(250);
+  }
+
+  async function tmChatBulkSendMessageNative(name, message) {
+    await tmChatBulkOpenUserNative(name);
+
+    const modal = tmChatBulkModal();
+    const textarea = modal.querySelector('.modal-footer textarea.form-control, .modal-footer textarea');
+    const sendBtn = modal.querySelector('.modal-footer button.btn-success');
+
+    if (!textarea || !sendBtn) {
+      throw new Error('campo de mensagem ou botão enviar não encontrado');
+    }
+
+    textarea.focus();
+    tmChatBulkSetNativeValue(textarea, message);
+
+    await tmChatBulkWaitFor(() => {
+      const btn = modal.querySelector('.modal-footer button.btn-success');
+      return btn && !btn.disabled ? btn : null;
+    }, 3000).catch(() => null);
+
+    if (sendBtn.disabled) {
+      throw new Error('botão nativo de envio permaneceu desabilitado');
+    }
+
+    sendBtn.click();
+
+    const delivered = await tmChatBulkWaitFor(() => {
+      const sentMessages = Array.from(modal.querySelectorAll('ul.list-group li.list-group-item-success .text-right'));
+      return sentMessages.some((node) => (node.textContent || '').trim() === message);
+    }, 7000).catch(() => false);
+
+    if (!delivered) {
+      throw new Error('mensagem não apareceu no histórico após envio nativo');
+    }
+
+    await tmChatBulkSleep(250);
+  }
+
+
+  function tmChatBulkShowSendingOverlay(total) {
+    return;
+  }
+
+  function tmChatBulkUpdateSendingOverlay(text) {
+    return;
+  }
+
+  function tmChatBulkHideSendingOverlay() {
+    return;
+  }
+
+
+  function tmChatBulkConfirmSend(total) {
+    const modal = tmChatBulkModal();
+    const content = modal?.querySelector('.modal-content');
+
+    if (!modal || !content) {
+      return Promise.resolve(window.confirm(`Enviar esta mensagem para ${total} usuário${total === 1 ? '' : 's'} conectado${total === 1 ? '' : 's'}?`));
+    }
+
+    modal.querySelector('.tm-chat-bulk-confirm-overlay')?.remove();
+
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'tm-chat-bulk-confirm-overlay';
+      overlay.innerHTML = `
+        <div class="tm-chat-bulk-confirm-box" role="dialog" aria-modal="true" aria-label="Confirmar envio em massa">
+          <div class="tm-chat-bulk-confirm-title">Confirmar envio</div>
+          <div class="tm-chat-bulk-confirm-text">Enviar esta mensagem para <strong>${total}</strong> usuário${total === 1 ? '' : 's'} conectado${total === 1 ? '' : 's'}?</div>
+          <div class="tm-chat-bulk-confirm-actions">
+            <button type="button" class="btn btn-secondary tm-chat-bulk-confirm-cancel">Cancelar</button>
+            <button type="button" class="btn btn-primary tm-chat-bulk-confirm-ok">Enviar</button>
+          </div>
+        </div>
+      `;
+
+      const finish = (value) => {
+        overlay.remove();
+        resolve(value);
+      };
+
+      overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) finish(false);
+      });
+
+      overlay.querySelector('.tm-chat-bulk-confirm-cancel')?.addEventListener('click', () => finish(false));
+      overlay.querySelector('.tm-chat-bulk-confirm-ok')?.addEventListener('click', () => finish(true));
+
+      overlay.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') finish(false);
+      });
+
+      content.appendChild(overlay);
+      overlay.tabIndex = -1;
+      overlay.focus();
+    });
+  }
+
+  async function tmChatBulkSendSelected() {
+    if (TM_CHAT_BULK.sending) return;
+
+    const modal = tmChatBulkModal();
+    if (!modal || !tmChatBulkConnectedActive()) return;
+
+    const message = (modal.querySelector('.tm-chat-bulk-message')?.value || '').trim();
+    const status = modal.querySelector('.tm-chat-bulk-status');
+
+    if (!message) {
+      if (status) status.textContent = 'Digite uma mensagem antes de enviar.';
+      modal.querySelector('.tm-chat-bulk-message')?.focus();
+      return;
+    }
+
+    const recipients = [];
+
+    for (const row of tmChatBulkSelected()) {
+      const check = row.querySelector(':scope > .tm-chat-bulk-cell .tm-chat-bulk-check');
+      const name = check?.dataset.tmChatBulkName || tmChatBulkName(row);
+      let id = Number(check?.dataset.tmChatBulkUserId);
+
+      if (!id) {
+        id = Number(await tmChatBulkResolveUserIdByName(name));
+        if (id && check) {
+          check.dataset.tmChatBulkUserId = String(id);
+        }
+      }
+
+      if (id) {
+        recipients.push({ id, name });
+      }
+    }
+
+    if (!recipients.length) {
+      if (status) status.textContent = 'Selecione pelo menos um usuário com ID resolvido.';
+      return;
+    }
+
+    const confirmed = await tmChatBulkConfirmSend(recipients.length);
+    if (!confirmed) {
+      return;
+    }
+
+    TM_CHAT_BULK.sending = true;
+    tmChatBulkUpdateCounter();
+
+
+    let ok = 0;
+    let fail = 0;
+
+    try {
+
+      const results = await Promise.allSettled(
+        recipients.map(async (item) => {
+          await tmChatBulkOpenConversation(item.id);
+          await tmChatBulkSleep(80);
+
+          const sendResponse = await tmChatBulkSendMessage(item.id, message);
+          await tmChatBulkSleep(180);
+
+          const delivered = await tmChatBulkValidateSentMessage(item.id, message);
+
+          if (!delivered) {
+            throw new Error('mensagem não encontrada no histórico após envio');
+          }
+
+          return {
+            item,
+            sendResponse
+          };
+        })
+      );
+
+      results.forEach((result, index) => {
+        const item = recipients[index];
+
+        if (result.status === 'fulfilled') {
+          ok += 1;
+          console.info('[klingo chat bulk] API direta paralela validada', {
+            user: item,
+            sendResponse: result.value?.sendResponse
+          });
+        } else {
+          fail += 1;
+          console.error('[klingo chat bulk] falha no envio paralelo em massa', item, result.reason);
+        }
+      });
+
+
+      if (!fail) {
+        const msg = modal.querySelector('.tm-chat-bulk-message');
+        if (msg) msg.value = '';
+      }
+
+      tmChatBulkRows().forEach((row) => {
+        const check = row.querySelector(':scope > .tm-chat-bulk-cell .tm-chat-bulk-check');
+        if (check) check.checked = false;
+      });
+    } finally {
+
+      TM_CHAT_BULK.sending = false;
+      tmChatBulkUpdateCounter();
+    }
+  }
+
+
+  function tmChatBulkCleanupVisualState() {
+    const modal = tmChatBulkModal();
+    if (!modal) return;
+
+    const body = modal.querySelector('.modal-body');
+
+    modal.classList.remove('tm-chat-bulk-connected-active');
+    modal.classList.remove('tm-chat-bulk-conversation-view');
+    body?.classList.remove('tm-chat-bulk-active');
+
+    modal.querySelector('.tm-chat-bulk-bar')?.remove();
+    modal.querySelectorAll('.tm-chat-bulk-cell').forEach((cell) => cell.remove());
+    modal.querySelector('ul.list-group')?.classList.remove('tm-chat-bulk-enabled');
+    TM_CHAT_BULK.lastSignature = '';
+  }
+
+  function tmChatBulkScheduleApply(delay = 80) {
+    clearTimeout(TM_CHAT_BULK.applyTimer);
+    TM_CHAT_BULK.applyTimer = setTimeout(() => {
+      tmChatBulkApply().catch((e) => {
+        console.error('[klingo chat bulk] erro ao aplicar UI agendada', e);
+      });
+    }, delay);
+  }
+
+  function tmChatBulkScheduleApplyBurst() {
+    [0, 30, 80, 150, 260, 420, 650].forEach((delay) => {
+      setTimeout(() => {
+        tmChatBulkApply().catch((e) => {
+          console.error('[klingo chat bulk] erro ao aplicar UI em rajada', e);
+        });
+      }, delay);
+    });
+  }
+
+  function tmChatBulkInstallFastUiHooks() {
+    if (window.__tmChatBulkFastUiHooksInstalled) return;
+    window.__tmChatBulkFastUiHooksInstalled = true;
+
+    document.addEventListener('click', (event) => {
+      const modal = event.target?.closest?.('#modalChat');
+      if (!modal) return;
+
+      const backButton = event.target.closest('.modal-title a, .modal-header a');
+      if (backButton && backButton.querySelector('.fa-chevron-left')) {
+        const modalEl = backButton.closest('#modalChat');
+        if (modalEl) {
+          tmChatBulkCleanupVisualState();
+          modalEl.classList.add('tm-chat-bulk-returning-to-list');
+        }
+
+        tmChatBulkScheduleApplyBurst();
+        return;
+      }
+
+      const userLink = event.target.closest('ul.list-group li.list-group-item a.card-link');
+      if (userLink) {
+        tmChatBulkCleanupVisualState();
+        return;
+      }
+
+      const tabButton = event.target.closest('.btn-group button');
+      if (!tabButton) return;
+
+      const tabText = tmChatBulkNorm(tabButton.textContent);
+
+      if (tabText !== 'CONECTADOS') {
+        tmChatBulkCleanupVisualState();
+        return;
+      }
+
+      tmChatBulkScheduleApply(30);
+    }, true);
+
+    document.addEventListener('shown.bs.modal', (event) => {
+      if (event.target?.id === 'modalChat') {
+        tmChatBulkScheduleApply(30);
+      }
+    }, true);
+
+    document.addEventListener('input', (event) => {
+      const modal = event.target?.closest?.('#modalChat');
+      if (!modal) return;
+
+      if (event.target.matches('input[placeholder*="Pesquisar"], input[placeholder*="pesquisar"]')) {
+        tmChatBulkScheduleApply(120);
+      }
+    }, true);
+  }
+
+  async function tmChatBulkApply() {
+    const modal = tmChatBulkModal();
+
+    if (!modal) {
+      TM_CHAT_BULK.lastSignature = '';
+      return;
+    }
+
+    if (!tmChatBulkIsConnectedListView()) {
+      tmChatBulkCleanupVisualState();
+      if (tmChatBulkIsConversationView()) {
+        modal.classList.add('tm-chat-bulk-conversation-view');
+      }
+      return;
+    }
+
+    const list = modal.querySelector('ul.list-group');
+    if (!list) return;
+
+    modal.classList.add('tm-chat-bulk-connected-active');
+    modal.querySelector('.modal-body')?.classList.add('tm-chat-bulk-active');
+    list.classList.add('tm-chat-bulk-enabled');
+
+    const rowNames = tmChatBulkRows().map(tmChatBulkName).join('|');
+    const signature = `${rowNames}::${TM_CHAT_BULK.usersByName.size}`;
+
+    if (signature === TM_CHAT_BULK.lastSignature && modal.querySelector('.tm-chat-bulk-bar') && modal.querySelector('.tm-chat-bulk-cell')) {
+      return;
+    }
+
+    TM_CHAT_BULK.lastSignature = signature;
+
+    tmChatBulkCSS();
+    tmChatBulkInstallPageNetworkCapture();
+    tmChatBulkInstallNetworkCapture();
+    await tmChatBulkLoadUsers();
+    tmChatBulkEnsureBar();
+    tmChatBulkEnsureCheckboxes();
+    tmChatBulkUpdateCounter();
+
+    if (modal.querySelector('.tm-chat-bulk-bar') && modal.querySelector('.tm-chat-bulk-cell')) {
+      modal.classList.remove('tm-chat-bulk-returning-to-list');
+    }
+  }
+
+  tmChatBulkInstallPageNetworkCapture();
+  tmChatBulkInstallNetworkCapture();
+  tmChatBulkInstallPageNetworkCapture();
+  tmChatBulkInstallFastUiHooks();
+  setInterval(tmChatBulkApply, 700);
+
+
+/* TM 16.3: fechamento extra removido. */
+
