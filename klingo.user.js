@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      16.3
+// @version      22.4
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -360,7 +360,7 @@
   /* =========================
      OCULTAR ELEMENTOS (CSS)
   ========================= */
-
+  
   function injectFontFix() {
     if (document.getElementById('tm-font-fix')) return;
     const style = document.createElement('style');
@@ -555,7 +555,7 @@
         line-height: 1.2;
       }
 
-
+      
       .tm-datecalc-field input[type="date"]::-webkit-calendar-picker-indicator {
         display: none !important;
         opacity: 0 !important;
@@ -838,7 +838,7 @@
     return panel;
   }
 
-
+  
   function positionDateCalculatorPanel() {
     const panel = document.getElementById('tm-datecalc-panel');
     const trigger = document.querySelector('[data-tm-datecalc-header-trigger="1"]');
@@ -975,9 +975,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '16.3';
+      : '22.4';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '16.3';
+    return match ? match[0] : '22.4';
   }
 
   function ensureScriptVersionIndicator() {
@@ -2091,7 +2091,7 @@ console.log('[TM] script inicializado', location.href);
       #modalChat ul.list-group.tm-chat-bulk-enabled li.list-group-item > span.text-muted {
         min-width: 0 !important;
       }
-
+    
       #modalChat .modal-content {
         position: relative !important;
       }
@@ -3040,7 +3040,18 @@ console.log('[TM] script inicializado', location.href);
     if (window.__tmChatBulkFastUiHooksInstalled) return;
     window.__tmChatBulkFastUiHooksInstalled = true;
 
-    document.addEventListener('click', (event) => {
+  
+  document.addEventListener('mousedown', (event) => {
+    const button = event.target instanceof Element
+      ? event.target.closest('li.list-group-item button.btn')
+      : null;
+
+    if (!button || button.closest('#minutoModal')) return;
+
+    restoreNativeHeader(document.querySelector('#minutoModal'));
+  }, true);
+
+  document.addEventListener('click', (event) => {
       const modal = event.target?.closest?.('#modalChat');
       if (!modal) return;
 
@@ -3144,4 +3155,1780 @@ console.log('[TM] script inicializado', location.href);
 
 
 /* TM 16.3: fechamento extra removido. */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* =========================
+   MODAL HORÁRIOS - COPIAR COM BOTÃO DIREITO
+   v18.4 - header temporário mascarando só a linha nativa
+========================= */
+(function () {
+  'use strict';
+
+  const OPENING = {
+    date: '',
+    weekday: '',
+    hour: '',
+    timestamp: 0
+  };
+
+  let lastModalOpen = false;
+
+  function injectStyle() {
+    if (document.getElementById('tm-slot-copy-style-18-4')) return;
+
+    const style = document.createElement('style');
+    style.id = 'tm-slot-copy-style-18-4';
+    style.textContent = `
+      #minutoModal .modal-title.tm-slot-title-masked {
+        font-size: 0 !important;
+        line-height: 0 !important;
+      }
+
+      #minutoModal .modal-title.tm-slot-title-masked > .tm-slot-copy-temp-header {
+        display: block !important;
+        color: #333333 !important;
+        font-family: "Segoe UI", Arial, sans-serif !important;
+        font-size: 18.75px !important;
+        line-height: 1.45 !important;
+        font-weight: 500 !important;
+        margin: 0 0 4px 0 !important;
+      }
+
+      #minutoModal .modal-title.tm-slot-title-masked > .small.text-muted {
+        display: block !important;
+        font-size: 15px !important;
+        line-height: 1.4 !important;
+        font-weight: 400 !important;
+        margin-top: 2px !important;
+      }
+
+      #minutoModal .tm-slot-copy-success-icon {
+        position: absolute !important;
+        right: 18px !important;
+        bottom: 18px !important;
+        z-index: 100000001 !important;
+        display: block !important;
+        width: 34px !important;
+        height: 34px !important;
+        object-fit: contain !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: none !important;
+        user-select: none !important;
+        opacity: 1 !important;
+        transition: opacity 300ms ease !important;
+      }
+
+      #minutoModal .tm-slot-copy-success-icon.tm-slot-copy-success-fade {
+        opacity: 0 !important;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function norm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function titleCase(value) {
+    const lower = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+
+    return norm(value)
+      .toLowerCase()
+      .split(' ')
+      .filter(Boolean)
+      .map((part, index) => {
+        if (index > 0 && lower.has(part)) return part;
+        return part.charAt(0).toUpperCase() + part.slice(1);
+      })
+      .join(' ');
+  }
+
+  function displayDateFromShort(value) {
+    const match = norm(value).match(/^(\d{1,2})\/(\d{2})$/);
+    const months = {
+      '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+      '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+      '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+    };
+
+    if (!match) return '';
+
+    return `${Number(match[1])} de ${months[match[2]] || match[2]}`;
+  }
+
+  function formatHourFromList(value) {
+    const text = norm(value);
+
+    let match = text.match(/^(\d{1,2})h$/i);
+    if (match) return `${Number(match[1])}h`;
+
+    match = text.match(/^(\d{1,2}):(\d{2})\s*-\s*\d{1,2}:\d{2}$/);
+    if (match) return `${Number(match[1])}h${match[2]}`;
+
+    match = text.match(/^(\d{1,2}):(\d{2})$/);
+    if (match) return `${Number(match[1])}h${match[2]}`;
+
+    return '';
+  }
+
+  function formatTimeFromModal(value) {
+    const text = norm(value);
+
+    let match = text.match(/^(\d{1,2}):(\d{2})$/);
+    if (match) return `${Number(match[1])}h${match[2]}`;
+
+    match = text.match(/^(\d{1,2}):(\d{2})\s*-\s*\d{1,2}:\d{2}$/);
+    if (match) return `${Number(match[1])}h${match[2]}`;
+
+    return '';
+  }
+
+  function getModal() {
+    const modal = document.querySelector('#minutoModal');
+    if (!modal) return null;
+
+    const style = getComputedStyle(modal);
+    const rect = modal.getBoundingClientRect();
+
+    if (style.display === 'none' || style.visibility === 'hidden' || rect.width <= 0 || rect.height <= 0) {
+      return null;
+    }
+
+    return modal;
+  }
+
+  function getTitle(modal) {
+    return modal?.querySelector?.('.modal-header .modal-title') || null;
+  }
+
+  function readConsultaText(titleEl) {
+    return norm(titleEl?.querySelector?.('.small.text-muted')?.innerText || '');
+  }
+
+  function resetOpening() {
+    OPENING.date = '';
+    OPENING.weekday = '';
+    OPENING.hour = '';
+    OPENING.timestamp = 0;
+  }
+
+  function clearTemporaryHeader(modal = document.querySelector('#minutoModal')) {
+    if (!modal) return;
+
+    modal.querySelectorAll('.tm-slot-copy-temp-header').forEach((el) => el.remove());
+    modal.querySelectorAll('.tm-slot-copy-success-icon').forEach((el) => el.remove());
+
+    const titleEl = getTitle(modal);
+    if (titleEl) {
+      titleEl.classList.remove('tm-slot-title-masked');
+    }
+  }
+
+  function captureOpeningFromListButton(button) {
+    const li = button.closest('li.list-group-item');
+    if (!li) return;
+
+    const rawDate = norm(li.querySelector('h4 .card-link, h4 a, h4')?.innerText || '');
+    const rawWeekday = norm(li.querySelector('small.text-muted')?.innerText || '');
+    const rawHour = norm(button.innerText || button.textContent || '');
+
+    const date = displayDateFromShort(rawDate);
+    const hour = formatHourFromList(rawHour);
+
+    if (!date || !rawWeekday || !hour) return;
+
+    OPENING.date = date;
+    OPENING.weekday = rawWeekday;
+    OPENING.hour = hour;
+    OPENING.timestamp = Date.now();
+  }
+
+  function headerDataFromOpeningOrNative(modal) {
+    const titleEl = getTitle(modal);
+    if (!titleEl) return null;
+
+    const consultaText = readConsultaText(titleEl);
+
+    if (OPENING.date && OPENING.weekday && OPENING.hour && Date.now() - OPENING.timestamp < 30000) {
+      return {
+        titleEl,
+        date: OPENING.date,
+        weekday: OPENING.weekday,
+        hour: OPENING.hour,
+        consultaText
+      };
+    }
+
+    const clone = titleEl.cloneNode(true);
+    clone.querySelectorAll('.small.text-muted').forEach((el) => el.remove());
+    clone.querySelectorAll('.tm-slot-copy-temp-header').forEach((el) => el.remove());
+
+    const main = norm(clone.innerText || clone.textContent || '');
+    const match = main.match(/(\d{1,2}\s+de\s+[A-Za-zÀ-ÿ]+)\s*\|\s*([^|]+)\s*\|\s*(\d{1,2}h(?:\d{2})?)/i);
+
+    if (!match) return null;
+
+    return {
+      titleEl,
+      date: norm(match[1]),
+      weekday: norm(match[2]),
+      hour: norm(match[3]),
+      consultaText
+    };
+  }
+
+  function getDoctorRow(button) {
+    return button.closest('.row');
+  }
+
+  function getDoctorName(row) {
+    if (!row) return '';
+
+    const nameEl = row.querySelector('.col.col-12.col-md-6 > div:first-child');
+    const crmEl = Array.from(row.querySelectorAll('.col.col-12.col-md-6 > div')).find((el) => {
+      return /\bCRM\b/i.test(norm(el.innerText || el.textContent || ''));
+    });
+
+    if (!nameEl || !crmEl) return '';
+
+    return titleCase(nameEl.innerText || nameEl.textContent || '');
+  }
+
+  function getUnitName(row) {
+    if (!row) return '';
+
+    const raw = norm(row.querySelector('.col.col-12.col-md-4')?.innerText || '');
+    const match = raw.match(/\(([^)]+)\)/);
+
+    if (!match) return '';
+
+    return titleCase(match[1]);
+  }
+
+  function shouldUseDoctor(data, row) {
+    return (
+      /\bCONSULTA\b/i.test(data.consultaText || '') &&
+      /\bCRM\b/i.test(norm(row?.innerText || row?.textContent || ''))
+    );
+  }
+
+  function cleanProcedureText(value) {
+    return norm(value)
+      .replace(/\s*\(\s*\d+\s*\)\s*/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  function buildDisplayLines(data, clickedTime, doctorName, unitName) {
+    const line = `${data.date} | ${data.weekday} | ${clickedTime}`;
+
+    if (doctorName) {
+      return [
+        `👨‍⚕️ Médico(a): ${doctorName}`,
+        `📅 Data: ${line}`,
+        unitName ? `📍Unidade: ${unitName}` : ''
+      ].filter(Boolean);
+    }
+
+    const procedure = cleanProcedureText(data.consultaText || '');
+
+    if (procedure) {
+      return [
+        `🔬 Exame: ${procedure}`,
+        `🗓️ Data: ${line}`,
+        unitName ? `📍Unidade: ${unitName}` : ''
+      ].filter(Boolean);
+    }
+
+    return [line];
+  }
+
+  function applyTemporaryHeader(modal, data, clickedTime, doctorName, unitName) {
+    const titleEl = data.titleEl;
+    if (!titleEl) return;
+
+    injectStyle();
+    clearTemporaryHeader(modal);
+
+    const temp = document.createElement('div');
+    temp.className = 'tm-slot-copy-temp-header';
+    temp.innerHTML = buildDisplayLines(data, clickedTime, doctorName, unitName)
+      .map((line) => `<div>${line}</div>`)
+      .join('');
+
+    // Máscara:
+    // - não remove o texto original
+    // - não substitui a estrutura nativa
+    // - esconde visualmente apenas a linha original por font-size: 0 no título
+    // - reexibe o procedimento .small.text-muted via CSS
+    titleEl.insertBefore(temp, titleEl.firstChild);
+    titleEl.classList.add('tm-slot-title-masked');
+  }
+
+  function buildCopyText(data, clickedTime, doctorName, unitName) {
+    return buildDisplayLines(data, clickedTime, doctorName, unitName).join('\n');
+  }
+
+  function clearCopySuccessIcons(modal = document.querySelector('#minutoModal')) {
+    if (!modal) return;
+    modal.querySelectorAll('.tm-slot-copy-success-icon').forEach((el) => el.remove());
+  }
+
+  function showCopySuccessIcon(button) {
+    if (!(button instanceof Element)) return;
+
+    const modal = button.closest('#minutoModal');
+    if (!modal) return;
+
+    clearCopySuccessIcons(modal);
+
+    const content = modal.querySelector('.modal-content') || modal;
+    const contentStyle = getComputedStyle(content);
+
+    if (contentStyle.position === 'static') {
+      content.style.position = 'relative';
+    }
+
+    const icon = document.createElement('img');
+    icon.className = 'tm-slot-copy-success-icon';
+    icon.src = 'https://i.imgur.com/d4xuHhG.png';
+    icon.alt = 'Copiado';
+
+    content.appendChild(icon);
+
+    window.setTimeout(() => {
+      icon.classList.add('tm-slot-copy-success-fade');
+    }, 1000);
+
+    window.setTimeout(() => {
+      icon.remove();
+    }, 1350);
+  }
+
+  async function copyText(value) {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = value;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      ta.style.top = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+  }
+
+  document.addEventListener('mousedown', (event) => {
+    const button = event.target instanceof Element
+      ? event.target.closest('li.list-group-item button.btn')
+      : null;
+
+    if (!button || button.closest('#minutoModal')) return;
+
+    clearTemporaryHeader();
+  }, true);
+
+  document.addEventListener('click', (event) => {
+    const button = event.target instanceof Element
+      ? event.target.closest('li.list-group-item button.btn')
+      : null;
+
+    if (button && !button.closest('#minutoModal')) {
+      clearTemporaryHeader();
+
+      const before = OPENING.timestamp;
+      captureOpeningFromListButton(button);
+
+      if (OPENING.timestamp === before) {
+        resetOpening();
+      }
+
+      return;
+    }
+
+    const close = event.target instanceof Element
+      ? event.target.closest('#minutoModal [data-dismiss="modal"], #minutoModal .close')
+      : null;
+
+    if (close) {
+      const modal = close.closest('#minutoModal');
+      clearTemporaryHeader(modal);
+      resetOpening();
+    }
+  }, true);
+
+  document.addEventListener('contextmenu', async (event) => {
+    const button = event.target instanceof Element
+      ? event.target.closest('#minutoModal button.btn.btn-sm')
+      : null;
+
+    if (!button) return;
+
+    const modal = getModal();
+    if (!modal || !modal.contains(button)) return;
+
+    const clickedTime = formatTimeFromModal(button.innerText || button.textContent || '');
+    const data = headerDataFromOpeningOrNative(modal);
+
+    if (!clickedTime || !data) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const row = getDoctorRow(button);
+    const doctorName = shouldUseDoctor(data, row) ? getDoctorName(row) : '';
+    const unitName = getUnitName(row);
+
+    applyTemporaryHeader(modal, data, clickedTime, doctorName, unitName);
+    await copyText(buildCopyText(data, clickedTime, doctorName, unitName));
+    showCopySuccessIcon(button);
+  }, true);
+
+  setInterval(() => {
+    const modal = document.querySelector('#minutoModal');
+    const isOpen = !!getModal();
+
+    if (!isOpen && lastModalOpen) {
+      clearTemporaryHeader(modal);
+      resetOpening();
+    }
+
+    lastModalOpen = isOpen;
+  }, 100);
+})();
+
+
+/* =========================
+   MODAL AGENDAMENTO - PRIMEIRA VEZ
+   v19.4 - reorganização visual sem mover DOM
+========================= */
+(function () {
+  'use strict';
+
+  const TM_CADASTRO_LAYOUT_ID = 'tm-cadastro-primeira-vez-layout-22-4';
+
+  function tmCadNorm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function tmCadInjectStyle() {
+    if (document.getElementById(TM_CADASTRO_LAYOUT_ID)) return;
+
+    const style = document.createElement('style');
+    style.id = TM_CADASTRO_LAYOUT_ID;
+    style.textContent = `
+      #cadastroModal.tm-primeira-vez-layout {
+        text-align: center !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .modal-dialog {
+        width: 800px !important;
+        max-width: 800px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        text-align: left !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .modal-content {
+        width: 800px !important;
+        max-width: 800px !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp {
+        display: grid !important;
+        grid-template-columns: 200px minmax(0, 1fr) 200px 200px !important;
+        column-gap: 10px !important;
+        row-gap: 4px !important;
+        align-items: start !important;
+        width: 100% !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp > .border-bottom {
+        grid-column: 1 / -1 !important;
+        grid-row: 1 !important;
+        width: 100% !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp > .form-row {
+        display: contents !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp > .tm-cad-origem-inline-row {
+        display: contents !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-col,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-col-4,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-col-6,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-col-12 {
+        flex: initial !important;
+        max-width: none !important;
+        width: auto !important;
+        min-width: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .input-group {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .input-group > .form-control,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .input-group > input.form-control,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .input-group > select.form-control {
+        flex: 1 1 auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .input-group > .input-group-prepend,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .input-group > .input-group-append {
+        display: flex !important;
+        flex: 0 0 auto !important;
+        width: auto !important;
+        max-width: none !important;
+        min-width: 0 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .input-group > .input-group-text,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .input-group > .btn,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .input-group-prepend > .input-group-text,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .input-group-append > .input-group-text,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .input-group-prepend > .btn,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .input-group-append > .btn {
+        flex: 0 0 auto !important;
+        width: auto !important;
+        max-width: none !important;
+        white-space: nowrap !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-nascimento .input-group,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-celular .input-group {
+        width: 200px !important;
+        max-width: 200px !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-nome {
+        grid-column: 1 / 3 !important;
+        grid-row: 2 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-nascimento {
+        grid-column: 3 !important;
+        grid-row: 2 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-cpf {
+        grid-column: 4 !important;
+        grid-row: 2 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-celular {
+        grid-column: 1 !important;
+        grid-row: 3 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-email {
+        grid-column: 2 / 4 !important;
+        grid-row: 3 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-sexo {
+        grid-column: 4 !important;
+        grid-row: 3 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-carteira {
+        grid-column: 1 / 3 !important;
+        grid-row: 4 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-validade {
+        grid-column: 3 !important;
+        grid-row: 4 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-origem {
+        grid-column: 4 !important;
+        grid-row: 4 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-col {
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+        min-width: 0 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-col-4 {
+        flex: 0 0 33.333333% !important;
+        max-width: 33.333333% !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-col-6 {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-hidden-field {
+        display: none !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-order-nome { order: 10 !important; }
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-order-nascimento { order: 20 !important; }
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-order-cpf { order: 30 !important; }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-order-celular { order: 40 !important; }
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-order-email { order: 50 !important; }
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-order-sexo { order: 60 !important; }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-order-carteira { order: 70 !important; }
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-order-validade { order: 80 !important; }
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-order-origem { order: 90 !important; }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-origem-col,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-origem-col .form-group,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-origem-col .input-group,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-origem-col select {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-select-row {
+        margin-top: 4px !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-col {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp > .form-row.tm-cad-observacao-row,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-row {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        width: 100% !important;
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        order: 100 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp > .form-row.tm-cad-observacao-row > .tm-cad-observacao-col,
+      #cadastroModal.tm-primeira-vez-layout #cadTemp > .form-row.tm-cad-observacao-row > .tm-cad-observacao-aux-col,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-row > .tm-cad-observacao-col,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-row > .tm-cad-observacao-aux-col {
+        display: block !important;
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-aux-col {
+        flex: 0 0 353.78px !important;
+        max-width: 353.78px !important;
+        width: 353.78px !important;
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+        margin-top: 4px !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-aux-col {
+        width: 353.78px !important;
+        max-width: 353.78px !important;
+        flex: 0 0 353.78px !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-aux-col .input-group {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        width: 353.78px !important;
+        max-width: 353.78px !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-aux-col .input-group-prepend {
+        display: flex !important;
+        flex: 0 0 auto !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-aux-col select {
+        width: auto !important;
+        max-width: none !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-select-row > .input-group {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-row > .tm-cad-observacao-col .input-group,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-row > .tm-cad-observacao-col input.form-control {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-original-input-hidden {
+        display: none !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-row > .tm-cad-observacao-col {
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+        box-sizing: border-box !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-row > .tm-cad-observacao-col .input-group {
+        width: calc(100% + 10px) !important;
+        max-width: calc(100% + 10px) !important;
+        box-sizing: border-box !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-observacao-textarea {
+        display: block !important;
+        width: calc(100% + 10px) !important;
+        max-width: calc(100% + 10px) !important;
+        height: 95px !important;
+        min-height: 95px !important;
+        resize: vertical !important;
+        overflow-y: auto !important;
+        white-space: pre-wrap !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        line-height: 1.35 !important;
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
+        box-sizing: border-box !important;
+        font: inherit !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-title,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-row,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-row small,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data small,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data span {
+        font-weight: 400 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-title {
+        margin-bottom: 6px !important;
+        font-weight: 400 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-info-wrap {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        gap: 4px !important;
+        width: 100% !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-left {
+        display: contents !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-row {
+        display: block !important;
+        width: 100% !important;
+        margin-right: 0 !important;
+        margin-bottom: 0 !important;
+        white-space: normal !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-profissional {
+        order: 2 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-convenio {
+        order: 3 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-unidade {
+        order: 4 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data {
+        order: 5 !important;
+        display: block !important;
+        width: 100% !important;
+        margin-top: 0 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data small,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data span {
+        font-size: 18.75px !important;
+        line-height: 1.35 !important;
+        font-weight: 400 !important;
+        text-transform: uppercase !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data small {
+        display: inline-flex !important;
+        align-items: center !important;
+        margin-left: 0 !important;
+        font-weight: 400 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data .fa-calendar-alt {
+        width: 1.25em !important;
+        min-width: 1.25em !important;
+        max-width: 1.25em !important;
+        text-align: center !important;
+        margin-right: 6px !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data small.mx-2 {
+        margin-left: 8px !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-sala {
+        font-size: 18.75px !important;
+        line-height: 1.35 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card blockquote {
+        margin-top: 6px !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-convenio-externo-oculto {
+        display: none !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-convenio-injetado {
+        display: block !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card .tm-cad-header-title,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card .tm-cad-header-title * {
+        font-size: 18px !important;
+        line-height: 1.3 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card .tm-cad-header-row,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card .tm-cad-header-row *,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card .tm-cad-header-data,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card .tm-cad-header-data *,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card blockquote,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card blockquote * {
+        font-size: 15px !important;
+        line-height: 1.3 !important;
+      }
+
+
+
+
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-origem-section-hidden {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function tmCadVisibleModal() {
+    const modal = document.querySelector('#cadastroModal');
+    if (!modal) return null;
+
+    const style = getComputedStyle(modal);
+    const rect = modal.getBoundingClientRect();
+
+    if (style.display === 'none' || style.visibility === 'hidden' || rect.width <= 0 || rect.height <= 0) {
+      return null;
+    }
+
+    return modal;
+  }
+
+  function tmCadFieldByLabel(modal, labelText) {
+    const labels = Array.from(modal.querySelectorAll('small.form-text.text-muted'));
+
+    for (const label of labels) {
+      if (tmCadNorm(label.innerText || label.textContent || '') !== labelText) continue;
+
+      const col = label.closest('.col');
+      if (col && modal.contains(col)) return col;
+    }
+
+    return null;
+  }
+
+  function tmCadHasLabel(modal, labelText) {
+    return !!tmCadFieldByLabel(modal, labelText);
+  }
+
+  function tmCadIsPrimeiraVez(modal) {
+    if (!modal || modal.id !== 'cadastroModal') return false;
+
+    const title = tmCadNorm(modal.querySelector('.modal-title')?.innerText || modal.querySelector('.modal-title')?.textContent || '');
+
+    if (/Remarcação de/i.test(modal.innerText || modal.textContent || '')) return false;
+    if (/Editar Marcação/i.test(title)) return false;
+    if (tmCadHasLabel(modal, 'Nome do Paciente')) return false;
+
+    return (
+      tmCadHasLabel(modal, 'Sexo') &&
+      tmCadHasLabel(modal, 'Data de Nascimento') &&
+      tmCadHasLabel(modal, 'Nome') &&
+      tmCadHasLabel(modal, 'CPF') &&
+      tmCadHasLabel(modal, 'Origem de Pacientes')
+    );
+  }
+
+  function tmCadResetFieldClass(field) {
+    if (!field) return;
+
+    field.classList.remove(
+      'col-md-1', 'col-md-2', 'col-md-3', 'col-md-4', 'col-md-5', 'col-md-6',
+      'col-md-7', 'col-md-8', 'col-md-9', 'col-md-10', 'col-md-11', 'col-md-12',
+      'tm-cad-col', 'tm-cad-col-4', 'tm-cad-col-6',
+      'tm-cad-order-nome', 'tm-cad-order-nascimento', 'tm-cad-order-cpf',
+      'tm-cad-order-celular', 'tm-cad-order-email', 'tm-cad-order-origem',
+      'tm-cad-order-sexo', 'tm-cad-order-carteira', 'tm-cad-order-validade',
+      'tm-cad-origem-col'
+    );
+
+    field.classList.add('col', 'col-12');
+  }
+
+  function tmCadSetField(field, sizeClass, orderClass) {
+    if (!field) return;
+
+    tmCadResetFieldClass(field);
+    field.classList.add('tm-cad-col', sizeClass, orderClass);
+  }
+
+  function tmCadHideField(field) {
+    if (!field) return;
+
+    field.classList.add('tm-cad-hidden-field');
+    field.style.setProperty('display', 'none', 'important');
+  }
+
+  function tmCadPlaceOrigemAfterValidade(modal, origemField) {
+    if (!modal || !origemField) return;
+
+    const cadTemp = modal.querySelector('#cadTemp');
+    const validade = tmCadFieldByLabel(modal, 'Validade da Carteira');
+
+    if (!cadTemp || !validade) return;
+
+    let inlineRow = cadTemp.querySelector(':scope > .tm-cad-origem-inline-row');
+    if (!inlineRow) {
+      inlineRow = document.createElement('div');
+      inlineRow.className = 'form-row tm-cad-origem-inline-row';
+      cadTemp.appendChild(inlineRow);
+    }
+
+    if (origemField.parentElement !== inlineRow) {
+      inlineRow.appendChild(origemField);
+    }
+  }
+
+  function tmCadFindObservacaoRow(modal) {
+    if (!modal) return null;
+
+    const rows = Array.from(modal.querySelectorAll('.form-row')).filter((row) => row instanceof HTMLElement);
+
+    for (const row of rows) {
+      const directCols = Array.from(row.children).filter((child) => {
+        return child instanceof HTMLElement && child.classList.contains('col');
+      });
+
+      if (directCols.length < 2) continue;
+
+      const obsCol = directCols.find((col) => {
+        return !!col.querySelector(':scope input.form.form-control') && !col.querySelector(':scope select');
+      });
+
+      const auxCol = directCols.find((col) => {
+        return (
+          !!col.querySelector(':scope select.form.form-control') &&
+          !!col.querySelector(':scope .fa-fw.fas.fa-question.text-muted, :scope .fa-question') &&
+          !col.querySelector(':scope small.form-text.text-muted')
+        );
+      });
+
+      if (!obsCol || !auxCol) continue;
+
+      const previousText = tmCadNorm(row.previousElementSibling?.innerText || row.previousElementSibling?.textContent || '');
+      const nearObservationTitle = previousText === 'Observação' || previousText.includes('Observação');
+
+      // Este é o HTML exato informado: primeira coluna input, segunda coluna select com ícone ?.
+      // Preferir a linha logo abaixo do título Observação, mas aceitar a primeira estrutura exata encontrada.
+      if (nearObservationTitle || !row.dataset.tmObservationCandidateChecked) {
+        row.dataset.tmObservationCandidateChecked = '1';
+        return { row, obsCol, auxCol };
+      }
+    }
+
+    return null;
+  }
+
+  function tmCadForceFullCol(col, extraClass) {
+    if (!col) return;
+
+    col.classList.remove(
+      'col-md-1', 'col-md-2', 'col-md-3', 'col-md-4', 'col-md-5', 'col-md-6',
+      'col-md-7', 'col-md-8', 'col-md-9', 'col-md-10', 'col-md-11', 'col-md-12'
+    );
+
+    col.classList.add('col', 'col-12', extraClass);
+    col.style.setProperty('display', 'block', 'important');
+
+    if (extraClass === 'tm-cad-observacao-aux-col') {
+      col.style.setProperty('flex', '0 0 353.78px', 'important');
+      col.style.setProperty('max-width', '353.78px', 'important');
+      col.style.setProperty('width', '353.78px', 'important');
+      return;
+    }
+
+    col.style.setProperty('flex', '0 0 100%', 'important');
+    col.style.setProperty('max-width', '100%', 'important');
+    col.style.setProperty('width', '100%', 'important');
+  }
+
+  function tmCadMoveObservacaoSelect(modal) {
+    const found = tmCadFindObservacaoRow(modal);
+    if (!found) return;
+
+    const { row, obsCol, auxCol } = found;
+
+    row.classList.add('tm-cad-observacao-row');
+    row.style.setProperty('display', 'flex', 'important');
+    row.style.setProperty('flex-wrap', 'wrap', 'important');
+    row.style.setProperty('width', '100%', 'important');
+    row.style.setProperty('flex', '0 0 100%', 'important');
+    row.style.setProperty('max-width', '100%', 'important');
+    row.style.setProperty('order', '100', 'important');
+
+    tmCadForceFullCol(obsCol, 'tm-cad-observacao-col');
+    tmCadForceFullCol(auxCol, 'tm-cad-observacao-aux-col');
+
+    obsCol.style.setProperty('padding-left', '5px', 'important');
+    obsCol.style.setProperty('padding-right', '5px', 'important');
+    obsCol.style.setProperty('box-sizing', 'border-box', 'important');
+
+    const obsInputGroup = obsCol.querySelector('.input-group');
+    if (obsInputGroup) {
+      obsInputGroup.style.setProperty('width', 'calc(100% + 10px)', 'important');
+      obsInputGroup.style.setProperty('max-width', 'calc(100% + 10px)', 'important');
+    }
+
+    const obsInput = obsCol.querySelector('input.form-control');
+    if (obsInput) {
+      obsInput.style.setProperty('width', '100%', 'important');
+      obsInput.style.setProperty('max-width', '100%', 'important');
+    }
+
+    obsCol.style.setProperty('order', '1', 'important');
+    auxCol.style.setProperty('order', '2', 'important');
+    auxCol.style.setProperty('margin-top', '4px', 'important');
+    auxCol.style.setProperty('flex', '0 0 353.78px', 'important');
+    auxCol.style.setProperty('max-width', '353.78px', 'important');
+    auxCol.style.setProperty('width', '353.78px', 'important');
+
+    const inputGroup = auxCol.querySelector('.input-group');
+    if (inputGroup) {
+      inputGroup.style.setProperty('display', 'flex', 'important');
+      inputGroup.style.setProperty('flex-wrap', 'nowrap', 'important');
+      inputGroup.style.setProperty('width', '353.78px', 'important');
+      inputGroup.style.setProperty('max-width', '353.78px', 'important');
+    }
+
+    const prepend = auxCol.querySelector('.input-group-prepend');
+    if (prepend) {
+      prepend.style.setProperty('display', 'flex', 'important');
+      prepend.style.setProperty('flex', '0 0 auto', 'important');
+    }
+
+    const select = auxCol.querySelector('select');
+    if (select) {
+      select.style.setProperty('flex', '1 1 auto', 'important');
+      select.style.setProperty('width', 'auto', 'important');
+      select.style.setProperty('min-width', '0', 'important');
+    }
+  }
+
+  function tmCadDispatchNativeInput(el) {
+    if (!el) return;
+
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function tmCadSetInputValue(el, value) {
+    if (!el) return;
+
+    el.value = value || '';
+    tmCadDispatchNativeInput(el);
+  }
+
+  function tmCadExtractPatientClipboard(rawText) {
+    const text = String(rawText || '').replace(/\r\n/g, '\n').trim();
+    if (!text) return null;
+
+    const wantedLabels = ['Nome', 'Nascimento', 'CPF', 'E-mail', 'Email', 'Telefone', 'Celular'];
+    const data = {};
+
+    const lines = text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    lines.forEach((line) => {
+      const match = line.match(/^(Nome|Nascimento|CPF|E-mail|Email|Telefone|Celular)\s*:?\s*(.+)$/i);
+      if (!match) return;
+
+      const key = match[1].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const value = match[2].trim();
+
+      if (key === 'nome') data.nome = value;
+      if (key === 'nascimento') data.nascimento = value;
+      if (key === 'cpf') data.cpf = value;
+      if (key === 'e-mail' || key === 'email') data.email = value;
+      if (key === 'telefone' || key === 'celular') data.celular = value;
+    });
+
+    const hasMinimumData = !!(data.nome || data.nascimento || data.cpf || data.email || data.celular);
+    const hasKnownLabel = wantedLabels.some((label) => new RegExp(`^${label}\\s*:?.+`, 'im').test(text));
+
+    if (!hasMinimumData || !hasKnownLabel) return null;
+
+    return data;
+  }
+
+  function tmCadFindInputInField(modal, labelText) {
+    const field = tmCadFieldByLabel(modal, labelText);
+    if (!field) return null;
+
+    return field.querySelector('input.form-control, input, select.form-control, select, textarea.tm-cad-observacao-textarea, textarea');
+  }
+
+  function tmCadNormalizeCpf(value) {
+    return String(value || '').trim();
+  }
+
+  function tmCadNormalizePhone(value) {
+    return String(value || '').trim();
+  }
+
+  function tmCadApplyPatientClipboard(modal, data) {
+    if (!modal || !data) return false;
+
+    const nomeInput = tmCadFindInputInField(modal, 'Nome');
+    const nascimentoInput = tmCadFindInputInField(modal, 'Data de Nascimento');
+    const cpfInput = tmCadFindInputInField(modal, 'CPF');
+    const emailInput = tmCadFindInputInField(modal, 'e-mail');
+    const celularField = tmCadFieldByLabel(modal, 'Celular');
+    const celularInput = celularField?.querySelector('input.form-control, input');
+
+    if (data.nome && nomeInput) {
+      tmCadSetInputValue(nomeInput, data.nome);
+    }
+
+    if (data.nascimento && nascimentoInput) {
+      const parsedDate = tmCadParseClipboardDate(data.nascimento);
+      tmCadSetInputValue(nascimentoInput, parsedDate || data.nascimento);
+    }
+
+    if (data.cpf && cpfInput) {
+      tmCadSetInputValue(cpfInput, tmCadNormalizeCpf(data.cpf));
+    }
+
+    if (data.email && emailInput) {
+      tmCadSetInputValue(emailInput, data.email);
+    }
+
+    if (data.celular && celularInput) {
+      tmCadSetInputValue(celularInput, tmCadNormalizePhone(data.celular));
+    }
+
+    return true;
+  }
+
+  function tmCadEnablePatientClipboardPaste(modal) {
+    if (!modal || modal.dataset.tmPatientClipboardPasteEnabled === '1') return;
+
+    modal.dataset.tmPatientClipboardPasteEnabled = '1';
+
+    modal.addEventListener('paste', (event) => {
+      if (!modal.classList.contains('tm-primeira-vez-layout')) return;
+
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const cadTemp = modal.querySelector('#cadTemp');
+      if (!cadTemp || !cadTemp.contains(target)) return;
+
+      const rawText = event.clipboardData?.getData('text/plain') || '';
+      const parsed = tmCadExtractPatientClipboard(rawText);
+
+      if (!parsed) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      tmCadApplyPatientClipboard(modal, parsed);
+
+      const nomeInput = tmCadFindInputInField(modal, 'Nome');
+      if (nomeInput) {
+        nomeInput.focus({ preventScroll: true });
+      }
+    }, true);
+  }
+
+  function tmCadParseClipboardDate(rawValue) {
+    const value = String(rawValue || '').trim();
+    if (!value) return '';
+
+    let match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (match) {
+      const [, dd, mm, yyyy] = match;
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    match = value.match(/^(\d{8})$/);
+    if (match) {
+      const compact = match[1];
+      const dd = compact.slice(0, 2);
+      const mm = compact.slice(2, 4);
+      const yyyy = compact.slice(4, 8);
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      return value;
+    }
+
+    return '';
+  }
+
+  function tmCadEnableDatePaste(field) {
+    if (!field || field.dataset.tmDatePasteEnabled === '1') return;
+
+    const input = field.querySelector('input[type="date"].form-control, input[type="date"]');
+    if (!input) return;
+
+    field.dataset.tmDatePasteEnabled = '1';
+
+    input.addEventListener('paste', (event) => {
+      const clipboardText = event.clipboardData?.getData('text/plain') || '';
+      const parsed = tmCadParseClipboardDate(clipboardText);
+
+      if (!parsed) return;
+
+      event.preventDefault();
+
+      input.value = parsed;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, true);
+  }
+
+  function tmCadEnableDatePastes(modal) {
+    tmCadEnableDatePaste(tmCadFieldByLabel(modal, 'Data de Nascimento'));
+    tmCadEnableDatePaste(tmCadFieldByLabel(modal, 'Validade da Carteira'));
+  }
+
+  function tmCadFocusableInField(field) {
+    if (!field) return null;
+
+    return field.querySelector('textarea.tm-cad-observacao-textarea, input:not([type="hidden"]), select, textarea, button');
+  }
+
+  function tmCadApplyTabOrder(modal) {
+    if (!modal) return;
+
+    const ordered = [
+      tmCadFocusableInField(tmCadFieldByLabel(modal, 'Nome')),
+      tmCadFocusableInField(tmCadFieldByLabel(modal, 'Data de Nascimento')),
+      tmCadFocusableInField(tmCadFieldByLabel(modal, 'CPF')),
+      tmCadFocusableInField(tmCadFieldByLabel(modal, 'Celular')),
+      tmCadFocusableInField(tmCadFieldByLabel(modal, 'e-mail')),
+      tmCadFocusableInField(tmCadFieldByLabel(modal, 'Sexo')),
+      tmCadFocusableInField(tmCadFieldByLabel(modal, 'No. da Carteira do Plano')),
+      tmCadFocusableInField(tmCadFieldByLabel(modal, 'Validade da Carteira')),
+      tmCadFocusableInField(tmCadFieldByLabel(modal, 'Origem de Pacientes')),
+      modal.querySelector('.tm-cad-observacao-textarea'),
+      tmCadFindObservacaoRow(modal)?.auxCol?.querySelector('select.form.form-control, select')
+    ].filter(Boolean);
+
+    ordered.forEach((el, index) => {
+      el.setAttribute('tabindex', String(index + 1));
+    });
+
+    modal.querySelectorAll('.tm-cad-hidden-field input, .tm-cad-hidden-field select, input.tm-cad-observacao-original-input-hidden').forEach((el) => {
+      el.setAttribute('tabindex', '-1');
+    });
+  }
+
+  function tmCadFocusNomeOnce(modal) {
+    if (!modal || modal.dataset.tmNomeInitialFocusDone === '1') return;
+
+    const nomeField = tmCadFieldByLabel(modal, 'Nome');
+    const nomeInput = tmCadFocusableInField(nomeField);
+    const sexoField = tmCadFieldByLabel(modal, 'Sexo');
+
+    if (!nomeInput) return;
+
+    modal.dataset.tmNomeInitialFocusDone = '1';
+    modal.dataset.tmNomeInitialFocusLock = '1';
+
+    modal.querySelectorAll('[autofocus]').forEach((el) => {
+      el.removeAttribute('autofocus');
+    });
+
+    const forceNomeFocus = () => {
+      if (!modal.classList.contains('tm-primeira-vez-layout')) return;
+      if (modal.dataset.tmNomeInitialFocusLock !== '1') return;
+      if (!document.body.contains(modal) || !document.body.contains(nomeInput)) return;
+
+      nomeInput.focus({ preventScroll: true });
+
+      try {
+        const valueLength = String(nomeInput.value || '').length;
+        nomeInput.setSelectionRange(valueLength, valueLength);
+      } catch (_) {
+        // ignore
+      }
+    };
+
+    const focusRedirect = (event) => {
+      if (modal.dataset.tmNomeInitialFocusLock !== '1') return;
+      if (!sexoField || !sexoField.contains(event.target)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      window.setTimeout(forceNomeFocus, 0);
+    };
+
+    modal.addEventListener('focusin', focusRedirect, true);
+
+    [0, 50, 100, 200, 350, 500, 750, 1000, 1300, 1700, 2200].forEach((delay) => {
+      window.setTimeout(forceNomeFocus, delay);
+    });
+
+    window.setTimeout(() => {
+      delete modal.dataset.tmNomeInitialFocusLock;
+    delete modal.dataset.tmPatientClipboardPasteEnabled;
+      modal.removeEventListener('focusin', focusRedirect, true);
+    }, 2600);
+  }
+
+  function tmCadHeaderMonthName(monthShort) {
+    const key = String(monthShort || '').trim().toLowerCase();
+
+    const map = {
+      jan: 'Janeiro',
+      fev: 'Fevereiro',
+      mar: 'Março',
+      abr: 'Abril',
+      mai: 'Maio',
+      jun: 'Junho',
+      jul: 'Julho',
+      ago: 'Agosto',
+      set: 'Setembro',
+      out: 'Outubro',
+      nov: 'Novembro',
+      dez: 'Dezembro'
+    };
+
+    return map[key] || monthShort;
+  }
+
+  function tmCadHeaderWeekdayName(dayShort) {
+    const key = String(dayShort || '').trim().toLowerCase();
+
+    const map = {
+      dom: 'Domingo',
+      seg: 'Segunda-feira',
+      ter: 'Terça-feira',
+      qua: 'Quarta-feira',
+      qui: 'Quinta-feira',
+      sex: 'Sexta-feira',
+      sab: 'Sábado',
+      sáb: 'Sábado'
+    };
+
+    return map[key] || dayShort;
+  }
+
+  function tmCadNormalizeHeaderDate(dateBlock) {
+    if (!dateBlock) return;
+
+    const calendarSmall = Array.from(dateBlock.querySelectorAll('small')).find((small) => {
+      return !!small.querySelector('.fa-calendar-alt');
+    });
+
+    if (!calendarSmall) return;
+
+    const rawText = String(calendarSmall.textContent || '').replace(/\s+/g, ' ').trim();
+    const badge = calendarSmall.querySelector('.badge');
+
+    const dayMatch = rawText.match(/(\d{1,2})\s*\/\s*([A-Za-zÀ-ÿ]{3})/i);
+    const weekday = tmCadHeaderWeekdayName(badge?.textContent || '');
+
+    if (!dayMatch) return;
+
+    const day = String(parseInt(dayMatch[1], 10));
+    const monthName = tmCadHeaderMonthName(dayMatch[2]);
+
+    const icon = calendarSmall.querySelector('i');
+
+    calendarSmall.textContent = '';
+
+    if (icon) {
+      icon.style.setProperty('width', '1.25em', 'important');
+      icon.style.setProperty('min-width', '1.25em', 'important');
+      icon.style.setProperty('max-width', '1.25em', 'important');
+      icon.style.setProperty('text-align', 'center', 'important');
+      icon.style.setProperty('margin-right', '6px', 'important');
+      calendarSmall.appendChild(icon);
+    }
+
+    calendarSmall.appendChild(document.createTextNode(`${day} de ${monthName} | ${weekday}`.toUpperCase()));
+
+    dateBlock.dataset.tmHeaderDateNormalized = '1';
+  }
+
+  function tmCadGetExternalConvenioForHeaderList(listGroup) {
+    if (!listGroup) return '';
+
+    const convenioItem = Array.from(listGroup.children).find((item) => {
+      if (!(item instanceof HTMLElement)) return false;
+      if (!item.matches('li.list-group-item')) return false;
+      if (item.querySelector('label .h4')) return false;
+      return !!item.querySelector('.fa-credit-card');
+    });
+
+    const small = convenioItem?.querySelector('small.lead');
+    const textValue = tmCadNorm(small?.innerText || small?.textContent || '');
+
+    if (textValue) {
+      convenioItem.classList.add('tm-cad-convenio-externo-oculto');
+    }
+
+    return textValue;
+  }
+
+  function tmCadBuildConvenioRowFromText(textValue) {
+    const row = document.createElement('span');
+    row.className = 'mr-3 tm-cad-header-row tm-cad-header-convenio tm-cad-header-convenio-injetado';
+    row.dataset.tmInjected = '1';
+
+    const small = document.createElement('small');
+    small.className = 'lead';
+
+    const icon = document.createElement('i');
+    icon.className = 'far fa-credit-card fa-fw mr-1';
+    icon.setAttribute('aria-hidden', 'true');
+
+    small.appendChild(icon);
+    small.appendChild(document.createTextNode(` ${textValue} `));
+    row.appendChild(small);
+
+    return row;
+  }
+
+  function tmCadApplyHeaderLayout(modal) {
+    if (!modal) return;
+
+    const listGroups = Array.from(modal.querySelectorAll('ul.list-group'));
+
+    listGroups.forEach((listGroup) => {
+      const externalConvenioText = tmCadGetExternalConvenioForHeaderList(listGroup);
+
+      const headerItems = Array.from(listGroup.children).filter((item) => {
+        return (
+          item instanceof HTMLElement &&
+          item.matches('li.list-group-item') &&
+          !!item.querySelector('label .h4') &&
+          !!item.querySelector('label .fa-user-md') &&
+          !!item.querySelector('label .fa-building') &&
+          !!item.querySelector('label .fa-calendar-alt')
+        );
+      });
+
+      if (headerItems.length > 1) {
+        modal.classList.add('tm-cad-multiple-headers');
+        listGroup.classList.add('tm-cad-multiple-headers');
+      } else {
+        listGroup.classList.remove('tm-cad-multiple-headers');
+      }
+
+      headerItems.forEach((item) => {
+        const title = item.querySelector('label .h4');
+        const infoWrap = item.querySelector('label .d-flex.justify-content-between');
+        if (!title || !infoWrap) return;
+
+        const left = infoWrap.querySelector(':scope > div:first-child');
+        const dateBlock = infoWrap.querySelector(':scope > div.lead');
+
+        if (!left || !dateBlock) return;
+
+        left.querySelectorAll('.tm-cad-header-convenio-injetado').forEach((node) => node.remove());
+
+        const spans = Array.from(left.querySelectorAll(':scope > span'));
+
+        let convenio = spans.find((span) => !!span.querySelector('.fa-credit-card'));
+        const profissional = spans.find((span) => !!span.querySelector('.fa-user-md'));
+        const unidade = spans.find((span) => !!span.querySelector('.fa-building'));
+
+        if (!profissional || !unidade) return;
+
+        if (!convenio && externalConvenioText) {
+          convenio = tmCadBuildConvenioRowFromText(externalConvenioText);
+          left.insertBefore(convenio, unidade);
+        }
+
+        item.classList.add('tm-cad-header-card');
+        title.classList.add('tm-cad-header-title');
+        infoWrap.classList.add('tm-cad-header-info-wrap');
+        left.classList.add('tm-cad-header-left');
+
+        profissional.classList.add('tm-cad-header-row', 'tm-cad-header-profissional');
+        unidade.classList.add('tm-cad-header-row', 'tm-cad-header-unidade');
+        dateBlock.classList.add('tm-cad-header-data');
+
+        if (convenio) {
+          convenio.classList.add('tm-cad-header-row', 'tm-cad-header-convenio');
+        }
+
+        unidade.querySelectorAll('small.text-muted').forEach((small) => {
+          small.classList.add('tm-cad-header-sala');
+        });
+
+        tmCadNormalizeHeaderDate(dateBlock);
+      });
+    });
+  }
+
+
+  function tmCadEnableObservacaoTextarea(modal) {
+    const found = tmCadFindObservacaoRow(modal);
+    if (!found) return;
+
+    const { obsCol } = found;
+    const inputGroup = obsCol.querySelector('.input-group');
+    const originalInput = obsCol.querySelector('input.form-control');
+
+    if (!inputGroup || !originalInput) return;
+
+    originalInput.classList.add('tm-cad-observacao-original-input-hidden');
+    originalInput.style.setProperty('display', 'none', 'important');
+
+    let textarea = inputGroup.querySelector('textarea.tm-cad-observacao-textarea');
+
+    if (!textarea) {
+      textarea = document.createElement('textarea');
+      textarea.className = 'form form-control tm-cad-observacao-textarea';
+      textarea.placeholder = originalInput.getAttribute('placeholder') || '';
+      textarea.autocomplete = originalInput.getAttribute('autocomplete') || 'off';
+      textarea.value = originalInput.value || '';
+
+      textarea.addEventListener('input', () => {
+        originalInput.value = textarea.value;
+        originalInput.dispatchEvent(new Event('input', { bubbles: true }));
+        originalInput.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+
+      inputGroup.appendChild(textarea);
+    }
+
+    if (textarea.value !== originalInput.value) {
+      textarea.value = originalInput.value || textarea.value || '';
+    }
+
+    textarea.style.setProperty('width', 'calc(100% + 10px)', 'important');
+    textarea.style.setProperty('max-width', 'calc(100% + 10px)', 'important');
+    textarea.style.setProperty('height', '95px', 'important');
+    textarea.style.setProperty('min-height', '95px', 'important');
+    textarea.style.setProperty('box-sizing', 'border-box', 'important');
+    textarea.style.setProperty('white-space', 'pre-wrap', 'important');
+    textarea.style.setProperty('overflow-wrap', 'break-word', 'important');
+    textarea.style.setProperty('word-break', 'break-word', 'important');
+  }
+
+  function tmCadHideOrigemPacientesSection(modal) {
+    if (!modal) return;
+
+    const labels = Array.from(modal.querySelectorAll('small')).filter((small) => {
+      return tmCadNorm(small.innerText || small.textContent || '') === 'ORIGEM DE PACIENTES';
+    });
+
+    labels.forEach((label) => {
+      const row = label.closest('.row');
+      if (!row || !modal.contains(row)) return;
+
+      const hasConfigModal =
+        !!row.querySelector('[id^="formularioConfigModal-fixed-"]') ||
+        !!row.querySelector('[id^="selecaoTextoModal"]') ||
+        !!row.querySelector('[id^="trocarModeloModal"]') ||
+        !!row.querySelector('[id^="anteriorModal-fixed-"]');
+
+      if (!hasConfigModal) return;
+
+      row.classList.add('tm-cad-origem-section-hidden');
+      row.style.setProperty('display', 'none', 'important');
+    });
+  }
+
+  function tmCadClearPrimeiraVezLayout(modal) {
+    if (!modal || modal.id !== 'cadastroModal') return;
+
+    modal.classList.remove('tm-primeira-vez-layout', 'tm-cad-multiple-headers');
+    delete modal.dataset.tmNomeInitialFocusDone;
+    delete modal.dataset.tmNomeInitialFocusLock;
+
+    modal.querySelectorAll('[tabindex]').forEach((el) => {
+      if (el.closest('#cadastroModal')) {
+        el.removeAttribute('tabindex');
+      }
+    });
+
+    const markedFields = modal.querySelectorAll(
+      '.tm-cad-col, .tm-cad-col-4, .tm-cad-col-6, .tm-cad-order-nome, .tm-cad-order-nascimento, .tm-cad-order-cpf, ' +
+      '.tm-cad-order-celular, .tm-cad-order-email, .tm-cad-order-origem, .tm-cad-order-sexo, .tm-cad-order-carteira, ' +
+      '.tm-cad-order-validade, .tm-cad-origem-col, .tm-cad-observacao-row, .tm-cad-observacao-col, .tm-cad-observacao-aux-col, .tm-cad-hidden-field, .tm-cad-observacao-original-input-hidden, .tm-cad-observacao-textarea, .tm-cad-header-card, .tm-cad-header-title, .tm-cad-header-info-wrap, .tm-cad-header-left, .tm-cad-header-row, .tm-cad-header-convenio, .tm-cad-header-profissional, .tm-cad-header-unidade, .tm-cad-header-data, .tm-cad-header-sala, .tm-cad-header-convenio-injetado, .tm-cad-convenio-externo-oculto, .tm-cad-multiple-headers'
+    );
+
+    modal.querySelectorAll('.tm-cad-header-convenio-injetado').forEach((node) => {
+      node.remove();
+    });
+
+    modal.querySelectorAll('textarea.tm-cad-observacao-textarea').forEach((textarea) => {
+      textarea.remove();
+    });
+
+    modal.querySelectorAll('input.tm-cad-observacao-original-input-hidden').forEach((input) => {
+      input.classList.remove('tm-cad-observacao-original-input-hidden');
+      input.style.removeProperty('display');
+    });
+
+    markedFields.forEach((el) => {
+      el.classList.remove(
+        'tm-cad-col', 'tm-cad-col-4', 'tm-cad-col-6',
+        'tm-cad-order-nome', 'tm-cad-order-nascimento', 'tm-cad-order-cpf',
+        'tm-cad-order-celular', 'tm-cad-order-email', 'tm-cad-order-origem',
+        'tm-cad-order-sexo', 'tm-cad-order-carteira', 'tm-cad-order-validade',
+        'tm-cad-origem-col', 'tm-cad-observacao-row', 'tm-cad-observacao-col',
+        'tm-cad-observacao-aux-col', 'tm-cad-hidden-field', 'tm-cad-observacao-original-input-hidden', 'tm-cad-observacao-textarea',
+        'tm-cad-header-card', 'tm-cad-header-title', 'tm-cad-header-info-wrap', 'tm-cad-header-left',
+        'tm-cad-header-row', 'tm-cad-header-convenio', 'tm-cad-header-profissional', 'tm-cad-header-unidade',
+        'tm-cad-header-data', 'tm-cad-header-sala', 'tm-cad-header-convenio-injetado', 'tm-cad-convenio-externo-oculto',
+        'tm-cad-multiple-headers'
+      );
+
+      delete el.dataset.tmHeaderDateNormalized;
+
+      [
+        'display', 'flex', 'flex-wrap', 'width', 'max-width', 'min-width',
+        'order', 'grid-column', 'grid-row', 'margin-top', 'padding-left',
+        'padding-right', 'font-size', 'line-height', 'font-weight', 'text-transform'
+      ].forEach((prop) => el.style.removeProperty(prop));
+    });
+  }
+
+  function tmCadApplyPrimeiraVezLayout() {
+    const modal = tmCadVisibleModal();
+    if (!modal) return;
+
+    if (!tmCadIsPrimeiraVez(modal)) {
+      tmCadClearPrimeiraVezLayout(modal);
+      return;
+    }
+
+    tmCadInjectStyle();
+    modal.classList.add('tm-primeira-vez-layout');
+
+    const nome = tmCadFieldByLabel(modal, 'Nome');
+    const nascimento = tmCadFieldByLabel(modal, 'Data de Nascimento');
+    const cpf = tmCadFieldByLabel(modal, 'CPF');
+
+    const celular = tmCadFieldByLabel(modal, 'Celular');
+    const email = tmCadFieldByLabel(modal, 'e-mail');
+    const origem = tmCadFieldByLabel(modal, 'Origem de Pacientes');
+
+    const sexo = tmCadFieldByLabel(modal, 'Sexo');
+    const carteira = tmCadFieldByLabel(modal, 'No. da Carteira do Plano');
+    const validade = tmCadFieldByLabel(modal, 'Validade da Carteira');
+
+    const telefone = tmCadFieldByLabel(modal, 'Telefone');
+    const nomeSocial = tmCadFieldByLabel(modal, 'Nome Social');
+
+    tmCadSetField(nome, 'tm-cad-col-4', 'tm-cad-order-nome');
+    tmCadSetField(nascimento, 'tm-cad-col-4', 'tm-cad-order-nascimento');
+    tmCadSetField(cpf, 'tm-cad-col-4', 'tm-cad-order-cpf');
+
+    tmCadSetField(celular, 'tm-cad-col-4', 'tm-cad-order-celular');
+    tmCadSetField(email, 'tm-cad-col-4', 'tm-cad-order-email');
+    tmCadSetField(sexo, 'tm-cad-col-4', 'tm-cad-order-sexo');
+
+    tmCadSetField(carteira, 'tm-cad-col-4', 'tm-cad-order-carteira');
+    tmCadSetField(validade, 'tm-cad-col-4', 'tm-cad-order-validade');
+    tmCadSetField(origem, 'tm-cad-col-4', 'tm-cad-order-origem');
+    origem?.classList.add('tm-cad-origem-col');
+
+    tmCadPlaceOrigemAfterValidade(modal, origem);
+
+    tmCadHideField(telefone);
+    tmCadHideField(nomeSocial);
+
+    tmCadApplyHeaderLayout(modal);
+    tmCadMoveObservacaoSelect(modal);
+    tmCadEnableObservacaoTextarea(modal);
+    tmCadEnableDatePastes(modal);
+    tmCadEnablePatientClipboardPaste(modal);
+    tmCadApplyTabOrder(modal);
+    tmCadFocusNomeOnce(modal);
+    tmCadHideOrigemPacientesSection(modal);
+  }
+
+  document.addEventListener('shown.bs.modal', (event) => {
+    if (event.target?.id === 'cadastroModal') {
+      window.setTimeout(tmCadApplyPrimeiraVezLayout, 0);
+      window.setTimeout(tmCadApplyPrimeiraVezLayout, 100);
+    }
+  }, true);
+
+  document.addEventListener('hidden.bs.modal', (event) => {
+    if (event.target?.id === 'cadastroModal') {
+      tmCadClearPrimeiraVezLayout(event.target);
+    }
+  }, true);
+
+  setInterval(tmCadApplyPrimeiraVezLayout, 250);
+})();
+
 
