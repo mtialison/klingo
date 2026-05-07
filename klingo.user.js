@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      22.4
+// @version      23.0
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -360,7 +360,7 @@
   /* =========================
      OCULTAR ELEMENTOS (CSS)
   ========================= */
-  
+
   function injectFontFix() {
     if (document.getElementById('tm-font-fix')) return;
     const style = document.createElement('style');
@@ -555,7 +555,7 @@
         line-height: 1.2;
       }
 
-      
+
       .tm-datecalc-field input[type="date"]::-webkit-calendar-picker-indicator {
         display: none !important;
         opacity: 0 !important;
@@ -838,7 +838,7 @@
     return panel;
   }
 
-  
+
   function positionDateCalculatorPanel() {
     const panel = document.getElementById('tm-datecalc-panel');
     const trigger = document.querySelector('[data-tm-datecalc-header-trigger="1"]');
@@ -975,9 +975,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '22.4';
+      : '23.0';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '22.4';
+    return match ? match[0] : '23.0';
   }
 
   function ensureScriptVersionIndicator() {
@@ -2091,7 +2091,7 @@ console.log('[TM] script inicializado', location.href);
       #modalChat ul.list-group.tm-chat-bulk-enabled li.list-group-item > span.text-muted {
         min-width: 0 !important;
       }
-    
+
       #modalChat .modal-content {
         position: relative !important;
       }
@@ -3040,7 +3040,7 @@ console.log('[TM] script inicializado', location.href);
     if (window.__tmChatBulkFastUiHooksInstalled) return;
     window.__tmChatBulkFastUiHooksInstalled = true;
 
-  
+
   document.addEventListener('mousedown', (event) => {
     const button = event.target instanceof Element
       ? event.target.closest('li.list-group-item button.btn')
@@ -4931,4 +4931,802 @@ console.log('[TM] script inicializado', location.href);
   setInterval(tmCadApplyPrimeiraVezLayout, 250);
 })();
 
+
+/* =========================
+   MODAL AGENDAMENTO - PACIENTE
+   v22.7 - teste layout paciente separado
+========================= */
+(function () {
+  'use strict';
+
+  const STYLE_ID = 'tm-cadastro-paciente-layout-23-0';
+
+  function norm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function injectStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      #cadastroModal.tm-paciente-layout {
+        text-align: center !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .modal-dialog {
+        width: 800px !important;
+        max-width: 800px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        text-align: left !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .modal-content {
+        width: 800px !important;
+        max-width: 800px !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-dados-grid {
+        display: grid !important;
+        grid-template-columns: 200px minmax(0, 1fr) 200px 200px !important;
+        column-gap: 10px !important;
+        row-gap: 4px !important;
+        align-items: start !important;
+        width: 100% !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-dados-grid > .form-row,
+      #cadastroModal.tm-paciente-layout .tm-paciente-dados-grid > .tm-paciente-origem-inline-row {
+        display: contents !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-field {
+        flex: initial !important;
+        max-width: none !important;
+        width: auto !important;
+        min-width: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-field input,
+      #cadastroModal.tm-paciente-layout .tm-paciente-field select,
+      #cadastroModal.tm-paciente-layout .tm-paciente-field .input-group {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-nome input,
+      #cadastroModal.tm-paciente-layout .tm-paciente-nascimento input,
+      #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group,
+      #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group-text,
+      #cadastroModal.tm-paciente-layout .tm-paciente-sexo select,
+      #cadastroModal.tm-paciente-layout .tm-paciente-celular input,
+      #cadastroModal.tm-paciente-layout .tm-paciente-email input,
+      #cadastroModal.tm-paciente-layout .tm-paciente-telefone input {
+        height: 29.18px !important;
+        min-height: 29.18px !important;
+        max-height: 29.18px !important;
+        line-height: 1.2 !important;
+        padding-top: 3px !important;
+        padding-bottom: 3px !important;
+        box-sizing: border-box !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-nome {
+        grid-column: 1 / 3 !important;
+        grid-row: 1 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-nascimento {
+        grid-column: 3 !important;
+        grid-row: 1 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-cpf {
+        grid-column: 4 !important;
+        grid-row: 4 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-celular {
+        grid-column: 1 !important;
+        grid-row: 2 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-telefone {
+        grid-column: 4 !important;
+        grid-row: 2 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group,
+      #cadastroModal.tm-paciente-layout .tm-paciente-validade .input-group {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group > .form-control,
+      #cadastroModal.tm-paciente-layout .tm-paciente-validade .input-group > .form-control {
+        flex: 1 1 auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group > .input-group-append,
+      #cadastroModal.tm-paciente-layout .tm-paciente-validade .input-group > .input-group-append {
+        display: flex !important;
+        flex: 0 0 auto !important;
+        width: auto !important;
+        max-width: none !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-email {
+        grid-column: 2 / 4 !important;
+        grid-row: 2 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-sexo {
+        grid-column: 4 !important;
+        grid-row: 1 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-carteira {
+        grid-column: 1 / 3 !important;
+        grid-row: 3 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-validade {
+        grid-column: 3 !important;
+        grid-row: 3 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-origem {
+        grid-column: 4 !important;
+        grid-row: 3 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-hidden {
+        display: none !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-origem-section-hidden {
+        display: none !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-observacao-row {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        width: 100% !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-observacao-col {
+        display: block !important;
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+        box-sizing: border-box !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-observacao-col .input-group {
+        width: calc(100% + 10px) !important;
+        max-width: calc(100% + 10px) !important;
+        box-sizing: border-box !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-observacao-original-hidden {
+        display: none !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-observacao-textarea {
+        display: block !important;
+        width: calc(100% + 10px) !important;
+        max-width: calc(100% + 10px) !important;
+        height: 95px !important;
+        min-height: 95px !important;
+        resize: vertical !important;
+        overflow-y: auto !important;
+        white-space: pre-wrap !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        line-height: 1.35 !important;
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
+        box-sizing: border-box !important;
+        font: inherit !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-observacao-aux-col {
+        display: block !important;
+        flex: 0 0 353.78px !important;
+        max-width: 353.78px !important;
+        width: 353.78px !important;
+        margin-top: 4px !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-observacao-aux-col .input-group {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        width: 353.78px !important;
+        max-width: 353.78px !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-observacao-aux-col .input-group-prepend {
+        display: flex !important;
+        flex: 0 0 auto !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-observacao-aux-col select {
+        flex: 1 1 auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card,
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-title,
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-row,
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-row small,
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data,
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data small,
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data span {
+        font-weight: 400 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-title {
+        margin-bottom: 6px !important;
+        font-weight: 400 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-info-wrap {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        gap: 4px !important;
+        width: 100% !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-left {
+        display: contents !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-row {
+        display: block !important;
+        width: 100% !important;
+        margin-right: 0 !important;
+        margin-bottom: 0 !important;
+        white-space: normal !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data,
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data small,
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data span {
+        font-size: 18.75px !important;
+        line-height: 1.35 !important;
+        font-weight: 400 !important;
+        text-transform: uppercase !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data small {
+        display: inline-flex !important;
+        align-items: center !important;
+        margin-left: 0 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data .fa-calendar-alt {
+        width: 1.25em !important;
+        min-width: 1.25em !important;
+        max-width: 1.25em !important;
+        text-align: center !important;
+        margin-right: 6px !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data small.mx-2 {
+        margin-left: 8px !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-sala {
+        font-size: 18.75px !important;
+        line-height: 1.35 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card .tm-paciente-header-title,
+      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card .tm-paciente-header-title * {
+        font-size: 18px !important;
+        line-height: 1.3 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card .tm-paciente-header-row,
+      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card .tm-paciente-header-row *,
+      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card .tm-paciente-header-data,
+      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card .tm-paciente-header-data *,
+      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card blockquote,
+      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card blockquote * {
+        font-size: 15px !important;
+        line-height: 1.3 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-convenio-externo-oculto {
+        display: none !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-convenio-injetado {
+        display: block !important;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function visibleModal() {
+    const modal = document.querySelector('#cadastroModal');
+    if (!modal) return null;
+
+    const style = getComputedStyle(modal);
+    const rect = modal.getBoundingClientRect();
+
+    if (style.display === 'none' || style.visibility === 'hidden' || rect.width <= 0 || rect.height <= 0) return null;
+
+    return modal;
+  }
+
+  function fieldByLabel(modal, labelText) {
+    const labels = Array.from(modal.querySelectorAll('small.form-text.text-muted'));
+
+    for (const label of labels) {
+      if (norm(label.innerText || label.textContent || '') !== labelText) continue;
+
+      const col = label.closest('.col');
+      if (col && modal.contains(col)) return col;
+    }
+
+    return null;
+  }
+
+  function isPacienteModal(modal) {
+    if (!modal || modal.id !== 'cadastroModal') return false;
+
+    const text = modal.innerText || modal.textContent || '';
+    const hasEditar = /Editar Marcação|Reenviar e-mail da marcação/i.test(text);
+    const hasRemarcacao = /Remarcação de/i.test(text);
+
+    if (hasEditar || hasRemarcacao) return false;
+
+    return (
+      !!fieldByLabel(modal, 'Nome do Paciente') &&
+      !!fieldByLabel(modal, 'Data de Nascimento') &&
+      !!fieldByLabel(modal, 'Celular') &&
+      !!fieldByLabel(modal, 'e-mail') &&
+      !!fieldByLabel(modal, 'No. da Carteira do Plano') &&
+      !!fieldByLabel(modal, 'Validade da Carteira')
+    );
+  }
+
+  function addField(field, className) {
+    if (!field) return;
+
+    field.classList.add('tm-paciente-field', className);
+    field.classList.remove(
+      'col-md-1', 'col-md-2', 'col-md-3', 'col-md-4', 'col-md-5', 'col-md-6',
+      'col-md-7', 'col-md-8', 'col-md-9', 'col-md-10', 'col-md-11', 'col-md-12'
+    );
+    field.classList.add('col', 'col-12');
+  }
+
+  function findDadosContainer(modal) {
+    const nome = fieldByLabel(modal, 'Nome do Paciente');
+    const mt3 = nome?.closest('.mt-3');
+    return mt3 || nome?.parentElement?.parentElement || null;
+  }
+
+  function moveOrigem(modal, dados) {
+    const origem = fieldByLabel(modal, 'Origem de Pacientes');
+    if (!origem || !dados) return;
+
+    let row = dados.querySelector(':scope > .tm-paciente-origem-inline-row');
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'form-row tm-paciente-origem-inline-row';
+      dados.appendChild(row);
+    }
+
+    if (origem.parentElement !== row) row.appendChild(origem);
+
+    addField(origem, 'tm-paciente-origem');
+  }
+
+  function hideOrigemSection(modal) {
+    Array.from(modal.querySelectorAll('small')).forEach((small) => {
+      if (norm(small.innerText || small.textContent || '') !== 'ORIGEM DE PACIENTES') return;
+
+      const row = small.closest('.row');
+      if (!row) return;
+
+      row.classList.add('tm-paciente-origem-section-hidden');
+      row.style.setProperty('display', 'none', 'important');
+    });
+  }
+
+  function findObservacaoRow(modal) {
+    const obsHeaders = Array.from(modal.querySelectorAll('small')).filter((small) => {
+      return norm(small.innerText || small.textContent || '') === 'Observação';
+    });
+
+    for (const obsHeader of obsHeaders) {
+      let headerBlock = obsHeader.closest('.border-bottom, .hover-title-bg');
+      if (!headerBlock) headerBlock = obsHeader.closest('div');
+      if (!headerBlock) continue;
+
+      let node = headerBlock.nextElementSibling;
+
+      for (let i = 0; node && i < 10; i += 1, node = node.nextElementSibling) {
+        if (!(node instanceof HTMLElement)) continue;
+        if (!node.classList.contains('form-row')) continue;
+
+        const cols = Array.from(node.children).filter((child) => child instanceof HTMLElement && child.classList.contains('col'));
+        const obsCol = cols.find((col) => !!col.querySelector('input.form-control, input.form-control') && !col.querySelector('select'));
+        const auxCol = cols.find((col) => !!col.querySelector('select.form-control, select.form-control') && !!col.querySelector('.fa-question'));
+
+        if (obsCol && auxCol) return { row: node, obsCol, auxCol };
+      }
+    }
+
+    return null;
+  }
+
+
+  function setupObservacao(modal) {
+    const found = findObservacaoRow(modal);
+    if (!found) return;
+
+    const { row, obsCol, auxCol } = found;
+
+    row.classList.add('tm-paciente-observacao-row');
+    obsCol.classList.add('tm-paciente-observacao-col');
+    auxCol.classList.add('tm-paciente-observacao-aux-col');
+
+    row.style.setProperty('display', 'flex', 'important');
+    row.style.setProperty('flex-wrap', 'wrap', 'important');
+    obsCol.style.setProperty('flex', '0 0 100%', 'important');
+    obsCol.style.setProperty('max-width', '100%', 'important');
+    obsCol.style.setProperty('width', '100%', 'important');
+    auxCol.style.setProperty('flex', '0 0 353.78px', 'important');
+    auxCol.style.setProperty('max-width', '353.78px', 'important');
+    auxCol.style.setProperty('width', '353.78px', 'important');
+    auxCol.style.setProperty('margin-top', '4px', 'important');
+
+    const inputGroup = obsCol.querySelector('.input-group');
+    const input = obsCol.querySelector('input.form-control, input');
+
+    if (!inputGroup || !input) return;
+
+    input.classList.add('tm-paciente-observacao-original-hidden');
+    input.style.setProperty('display', 'none', 'important');
+
+    let textarea = inputGroup.querySelector('textarea.tm-paciente-observacao-textarea');
+
+    if (!textarea) {
+      textarea = document.createElement('textarea');
+      textarea.className = 'form form-control tm-paciente-observacao-textarea';
+      textarea.value = input.value || '';
+
+      textarea.addEventListener('input', () => {
+        input.value = textarea.value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+
+      inputGroup.appendChild(textarea);
+    }
+
+    textarea.style.setProperty('height', '95px', 'important');
+    textarea.style.setProperty('min-height', '95px', 'important');
+    textarea.style.setProperty('white-space', 'pre-wrap', 'important');
+    textarea.style.setProperty('overflow-wrap', 'break-word', 'important');
+    textarea.style.setProperty('word-break', 'break-word', 'important');
+  }
+
+  function monthName(monthShort) {
+    const map = {
+      jan: 'Janeiro', fev: 'Fevereiro', mar: 'Março', abr: 'Abril',
+      mai: 'Maio', jun: 'Junho', jul: 'Julho', ago: 'Agosto',
+      set: 'Setembro', out: 'Outubro', nov: 'Novembro', dez: 'Dezembro'
+    };
+
+    return map[String(monthShort || '').trim().toLowerCase()] || monthShort;
+  }
+
+  function weekdayName(dayShort) {
+    const map = {
+      dom: 'Domingo', seg: 'Segunda-feira', ter: 'Terça-feira',
+      qua: 'Quarta-feira', qui: 'Quinta-feira', sex: 'Sexta-feira',
+      sab: 'Sábado', sáb: 'Sábado'
+    };
+
+    return map[String(dayShort || '').trim().toLowerCase()] || dayShort;
+  }
+
+  function normalizeHeaderDate(dateBlock) {
+    const calendarSmall = Array.from(dateBlock.querySelectorAll('small')).find((small) => !!small.querySelector('.fa-calendar-alt'));
+    if (!calendarSmall) return;
+
+    const rawText = norm(calendarSmall.textContent || '');
+    const badge = calendarSmall.querySelector('.badge');
+    const dayMatch = rawText.match(/(\d{1,2})\s*\/\s*([A-Za-zÀ-ÿ]{3})/i);
+    if (!dayMatch) return;
+
+    const icon = calendarSmall.querySelector('i');
+    const dateText = `${parseInt(dayMatch[1], 10)} de ${monthName(dayMatch[2])} | ${weekdayName(badge?.textContent || '')}`.toUpperCase();
+
+    calendarSmall.textContent = '';
+
+    if (icon) {
+      icon.style.setProperty('width', '1.25em', 'important');
+      icon.style.setProperty('min-width', '1.25em', 'important');
+      icon.style.setProperty('max-width', '1.25em', 'important');
+      icon.style.setProperty('text-align', 'center', 'important');
+      icon.style.setProperty('margin-right', '6px', 'important');
+      calendarSmall.appendChild(icon);
+    }
+
+    calendarSmall.appendChild(document.createTextNode(dateText));
+  }
+
+  function getExternalConvenioForHeaderList(listGroup) {
+    if (!listGroup) return '';
+
+    const convenioItem = Array.from(listGroup.children).find((item) => {
+      if (!(item instanceof HTMLElement)) return false;
+      if (!item.matches('li.list-group-item')) return false;
+      if (item.querySelector('label .h4')) return false;
+      return !!item.querySelector('.fa-credit-card');
+    });
+
+    const small = convenioItem?.querySelector('small.lead, small');
+    const textValue = norm(small?.innerText || small?.textContent || '');
+
+    if (textValue && convenioItem) {
+      convenioItem.classList.add('tm-paciente-convenio-externo-oculto');
+      convenioItem.style.setProperty('display', 'none', 'important');
+    }
+
+    return textValue;
+  }
+
+  function buildConvenioRowFromText(textValue) {
+    const row = document.createElement('span');
+    row.className = 'mr-3 tm-paciente-header-row tm-paciente-header-convenio tm-paciente-header-convenio-injetado';
+    row.dataset.tmInjected = '1';
+
+    const small = document.createElement('small');
+    small.className = 'lead';
+
+    const icon = document.createElement('i');
+    icon.className = 'far fa-credit-card fa-fw mr-1';
+    icon.setAttribute('aria-hidden', 'true');
+
+    small.appendChild(icon);
+    small.appendChild(document.createTextNode(` ${textValue} `));
+    row.appendChild(small);
+
+    return row;
+  }
+
+  function applyHeader(modal) {
+    const listGroups = Array.from(modal.querySelectorAll('ul.list-group'));
+
+    let totalHeaders = 0;
+
+    listGroups.forEach((listGroup) => {
+      const externalConvenioText = getExternalConvenioForHeaderList(listGroup);
+
+      const items = Array.from(listGroup.children).filter((item) => {
+        return (
+          item instanceof HTMLElement &&
+          item.matches('li.list-group-item') &&
+          !!item.querySelector('label .h4') &&
+          !!item.querySelector('label .fa-user-md') &&
+          !!item.querySelector('label .fa-building') &&
+          !!item.querySelector('label .fa-calendar-alt')
+        );
+      });
+
+      totalHeaders += items.length;
+
+      items.forEach((item) => {
+        const title = item.querySelector('label .h4');
+        const infoWrap = item.querySelector('label .d-flex.justify-content-between');
+        const left = infoWrap?.querySelector(':scope > div:first-child');
+        const dateBlock = infoWrap?.querySelector(':scope > div.lead, :scope > div:not(:first-child)');
+
+        if (!title || !infoWrap || !left || !dateBlock) return;
+
+        left.querySelectorAll('.tm-paciente-header-convenio-injetado').forEach((node) => node.remove());
+
+        const spans = Array.from(left.querySelectorAll(':scope > span'));
+        let convenio = spans.find((span) => !!span.querySelector('.fa-credit-card'));
+        const profissional = spans.find((span) => !!span.querySelector('.fa-user-md'));
+        const unidade = spans.find((span) => !!span.querySelector('.fa-building'));
+
+        if (!profissional || !unidade) return;
+
+        if (!convenio && externalConvenioText) {
+          convenio = buildConvenioRowFromText(externalConvenioText);
+          left.insertBefore(convenio, profissional);
+        }
+
+        item.classList.add('tm-paciente-header-card');
+        title.classList.add('tm-paciente-header-title');
+        infoWrap.classList.add('tm-paciente-header-info-wrap');
+        left.classList.add('tm-paciente-header-left');
+
+        profissional.classList.add('tm-paciente-header-row');
+        convenio?.classList.add('tm-paciente-header-row');
+        unidade.classList.add('tm-paciente-header-row');
+        dateBlock.classList.add('tm-paciente-header-data');
+
+        unidade.querySelectorAll('small.text-muted').forEach((small) => {
+          small.classList.add('tm-paciente-header-sala');
+        });
+
+        normalizeHeaderDate(dateBlock);
+      });
+    });
+
+    modal.classList.toggle('tm-paciente-multiple-headers', totalHeaders > 1);
+  }
+
+
+  function parseDate(rawValue) {
+    const value = String(rawValue || '').trim();
+    let match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+
+    match = value.match(/^(\d{8})$/);
+    if (match) return `${match[1].slice(4, 8)}-${match[1].slice(2, 4)}-${match[1].slice(0, 2)}`;
+
+    match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) return value;
+
+    return '';
+  }
+
+  function enableDatePaste(field) {
+    if (!field || field.dataset.tmPacienteDatePaste === '1') return;
+
+    const input = field.querySelector('input[type="date"]');
+    if (!input) return;
+
+    field.dataset.tmPacienteDatePaste = '1';
+
+    input.addEventListener('paste', (event) => {
+      const parsed = parseDate(event.clipboardData?.getData('text/plain') || '');
+      if (!parsed) return;
+
+      event.preventDefault();
+      input.value = parsed;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, true);
+  }
+
+  function applyPacienteLayout() {
+    const modal = visibleModal();
+    if (!modal) return;
+
+    if (!isPacienteModal(modal)) {
+      clearPacienteLayout(modal);
+      return;
+    }
+
+    injectStyle();
+
+    modal.classList.add('tm-paciente-layout');
+
+    const dados = findDadosContainer(modal);
+    if (!dados) return;
+
+    dados.classList.add('tm-paciente-dados-grid');
+
+    const nome = fieldByLabel(modal, 'Nome do Paciente');
+    const nascimento = fieldByLabel(modal, 'Data de Nascimento');
+    const cpf = fieldByLabel(modal, 'CPF');
+    const celular = fieldByLabel(modal, 'Celular');
+    const email = fieldByLabel(modal, 'e-mail');
+    const sexo = fieldByLabel(modal, 'Sexo');
+    const carteira = fieldByLabel(modal, 'No. da Carteira do Plano');
+    const validade = fieldByLabel(modal, 'Validade da Carteira');
+    const telefone = fieldByLabel(modal, 'Telefone');
+    const nomeSocial = fieldByLabel(modal, 'Nome Social');
+
+    addField(nome, 'tm-paciente-nome');
+    addField(nascimento, 'tm-paciente-nascimento');
+    addField(cpf, 'tm-paciente-cpf');
+    addField(celular, 'tm-paciente-celular');
+    addField(email, 'tm-paciente-email');
+    addField(telefone, 'tm-paciente-telefone');
+    addField(sexo, 'tm-paciente-sexo');
+    addField(carteira, 'tm-paciente-carteira');
+    addField(validade, 'tm-paciente-validade');
+
+    nomeSocial?.classList.add('tm-paciente-hidden');
+
+    moveOrigem(modal, dados);
+    hideOrigemSection(modal);
+    setupObservacao(modal);
+    applyHeader(modal);
+
+    [
+      nome, nascimento, sexo, celular, email, telefone
+    ].filter(Boolean).forEach((field) => {
+      field.querySelectorAll('input, select, .input-group, .input-group-text').forEach((el) => {
+        el.style.setProperty('height', '29.18px', 'important');
+        el.style.setProperty('min-height', '29.18px', 'important');
+        el.style.setProperty('max-height', '29.18px', 'important');
+        el.style.setProperty('line-height', '1.2', 'important');
+        el.style.setProperty('box-sizing', 'border-box', 'important');
+
+        if (el.matches('input, select, .input-group-text')) {
+          el.style.setProperty('padding-top', '3px', 'important');
+          el.style.setProperty('padding-bottom', '3px', 'important');
+        }
+      });
+    });
+
+    enableDatePaste(nascimento);
+    enableDatePaste(validade);
+  }
+
+  function clearPacienteLayout(modal) {
+    if (!modal || modal.id !== 'cadastroModal') return;
+
+    modal.classList.remove('tm-paciente-layout', 'tm-paciente-multiple-headers');
+
+    modal.querySelectorAll('.tm-paciente-header-convenio-injetado').forEach((el) => el.remove());
+
+    modal.querySelectorAll('textarea.tm-paciente-observacao-textarea').forEach((el) => el.remove());
+
+    modal.querySelectorAll('input.tm-paciente-observacao-original-hidden').forEach((input) => {
+      input.classList.remove('tm-paciente-observacao-original-hidden');
+      input.style.removeProperty('display');
+    });
+
+    modal.querySelectorAll('[class*="tm-paciente-"]').forEach((el) => {
+      el.className = String(el.className)
+        .split(/\s+/)
+        .filter((cls) => !cls.startsWith('tm-paciente-'))
+        .join(' ');
+
+      [
+        'display', 'flex', 'flex-wrap', 'width', 'max-width', 'min-width',
+        'order', 'grid-column', 'grid-row', 'margin-top', 'padding-left',
+        'padding-right', 'font-size', 'line-height', 'font-weight',
+        'text-transform'
+      ].forEach((prop) => el.style.removeProperty(prop));
+    });
+  }
+
+  document.addEventListener('shown.bs.modal', (event) => {
+    if (event.target?.id === 'cadastroModal') {
+      window.setTimeout(applyPacienteLayout, 0);
+      window.setTimeout(applyPacienteLayout, 120);
+    }
+  }, true);
+
+  document.addEventListener('hidden.bs.modal', (event) => {
+    if (event.target?.id === 'cadastroModal') {
+      clearPacienteLayout(event.target);
+    }
+  }, true);
+
+  setInterval(applyPacienteLayout, 400);
+})();
 
