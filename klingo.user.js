@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      23.4
+// @version      25.5
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -790,6 +790,77 @@
     document.head.appendChild(style);
   }
 
+
+  function injectDateCalculatorFinalBaseCSS24_0() {
+    if (document.getElementById('tm-datecalc-final-base-24-0')) return;
+
+    const style = document.createElement('style');
+    style.id = 'tm-datecalc-final-base-24-0';
+    style.textContent = `
+      .tm-datecalc-final-root {
+        position: relative !important;
+      }
+
+      .tm-datecalc-final-close-row {
+        display: flex !important;
+        justify-content: flex-end !important;
+        align-items: center !important;
+        width: 100% !important;
+        height: 18px !important;
+        margin: -2px 0 4px 0 !important;
+        padding: 0 !important;
+      }
+
+      .tm-datecalc-final-close {
+        position: static !important;
+        z-index: 100000 !important;
+        border: 0 !important;
+        border-color: transparent !important;
+        outline: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        color: #dc3545 !important;
+        font-size: 20px !important;
+        font-weight: 700 !important;
+        line-height: 1 !important;
+        padding: 0 2px !important;
+        cursor: pointer !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+      }
+
+      .tm-datecalc-final-close:hover,
+      .tm-datecalc-final-close:focus,
+      .tm-datecalc-final-close:active,
+      .tm-datecalc-final-close:focus-visible {
+        color: #b02a37 !important;
+        border: 0 !important;
+        border-color: transparent !important;
+        outline: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+      }
+
+      .tm-datecalc-final-root input[type="number"]::-webkit-outer-spin-button,
+      .tm-datecalc-final-root input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none !important;
+        margin: 0 !important;
+      }
+
+      .tm-datecalc-final-root input[type="number"] {
+        appearance: textfield !important;
+        -moz-appearance: textfield !important;
+      }
+
+      .tm-datecalc-final-hide {
+        display: none !important;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+
   function getDateCalculatorPanel() {
     return document.getElementById('tm-datecalc-panel');
   }
@@ -805,31 +876,21 @@
         <div class="tm-datecalc-section">
           <div class="tm-datecalc-grid">
             <div class="tm-datecalc-field">
-              <label for="tm-datecalc-start">Data inicial</label>
+              <label for="tm-datecalc-start">Data do pedido médico</label>
               <div style="display:flex;align-items:center;">
               <input id="tm-datecalc-start" type="date" style="flex:1;">
               <button type="button" class="tm-datecalc-hoje-btn" data-tm-hoje="1">Hoje</button>
             </div>
             </div>
             <div class="tm-datecalc-field">
-              <label for="tm-datecalc-days">Adicionar dias</label>
+              <label for="tm-datecalc-days">Prazo do convênio</label>
               <input id="tm-datecalc-days" type="number" step="1" placeholder="">
             </div>
           </div>
-          <div class="tm-datecalc-result-box"><span class="tm-datecalc-result-value" id="tm-datecalc-result-date"></span><button type="button" class="tm-datecalc-copy-result" data-tm-copy-date-result="1" title="Copiar resultado" aria-label="Copiar resultado" disabled>📋</button></div>
-        </div>
-
-        <div class="tm-datecalc-section">
-          <div class="tm-datecalc-grid">
-            <div class="tm-datecalc-field" style="grid-column: 1 / -1;">
-              <label for="tm-datecalc-end">Data final</label>
-              <div style="display:flex;align-items:center;">
-              <input id="tm-datecalc-end" type="date" style="flex:1;">
-              <button type="button" class="tm-datecalc-hoje-btn" data-tm-hoje-end="1">Hoje</button>
-            </div>
-            </div>
+          <div class="tm-datecalc-field tm-datecalc-result-field-final" style="grid-column: 1 / -1;">
+            <label for="tm-datecalc-result-date">Validade do pedido médico</label>
+            <div class="tm-datecalc-result-box"><span class="tm-datecalc-result-value" id="tm-datecalc-result-date"></span><button type="button" class="tm-datecalc-copy-result" data-tm-copy-date-result="1" title="Copiar resultado" aria-label="Copiar resultado" disabled>📋</button></div>
           </div>
-          <div class="tm-datecalc-days-box" id="tm-datecalc-result-days"></div>
         </div>
       </div>
     `;
@@ -940,10 +1001,9 @@ function setDateCalculatorOpen(isOpen) {
     const resultDays = panel.querySelector('#tm-datecalc-result-days');
     const copyDateBtn = panel.querySelector('[data-tm-copy-date-result="1"]');
 
-    if (!startInput || !daysInput || !endInput || !resultDate || !resultDays) return;
+    if (!startInput || !daysInput || !resultDate) return;
 
     const startDate = parseIsoDateSafe(startInput.value);
-    const endDate = parseIsoDateSafe(endInput.value);
     const daysValue = norm(daysInput.value);
 
     if (startDate && daysValue !== '' && !Number.isNaN(Number(daysValue))) {
@@ -959,25 +1019,30 @@ function setDateCalculatorOpen(isOpen) {
       copyDateBtn.disabled = !norm(resultDate.textContent);
     }
 
-    if (startDate && endDate) {
-      const totalDays = diffDaysSafe(startDate, endDate);
-      if (totalDays === null) {
-        resultDays.textContent = 'Não foi possível calcular a diferença.';
+    if (endInput && resultDays) {
+      const endDate = parseIsoDateSafe(endInput.value);
+
+      if (startDate && endDate) {
+        const totalDays = diffDaysSafe(startDate, endDate);
+        if (totalDays === null) {
+          resultDays.textContent = 'Não foi possível calcular a diferença.';
+        } else {
+          const label = Math.abs(totalDays) === 1 ? 'dia' : 'dias';
+          resultDays.textContent = `${totalDays} ${label}`;
+        }
       } else {
-        const label = Math.abs(totalDays) === 1 ? 'dia' : 'dias';
-        resultDays.textContent = `${totalDays} ${label}`;
+        resultDays.textContent = '';
       }
-    } else {
-      resultDays.textContent = '';
     }
   }
+
 
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '23.4';
+      : '25.5';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '23.4';
+    return match ? match[0] : '25.5';
   }
 
   function ensureScriptVersionIndicator() {
@@ -4174,5 +4239,900 @@ console.log('[TM] script inicializado', location.href);
   }, true);
 
   setInterval(cleanupBulkChatDom, 700);
+})();
+
+
+/* =========================
+   CALCULADORA DE DATAS - BASE FINAL
+   v24.0
+========================= */
+(function () {
+  'use strict';
+
+  function norm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function injectFinalDateCalcCss24_1() {
+    if (document.getElementById('tm-datecalc-final-fix-24-1')) return;
+
+    const style = document.createElement('style');
+    style.id = 'tm-datecalc-final-fix-24-1';
+    style.textContent = `
+      .tm-datecalc-final-root {
+        position: relative !important;
+      }
+
+      .tm-datecalc-final-close-row {
+        display: flex !important;
+        justify-content: flex-end !important;
+        align-items: center !important;
+        width: 100% !important;
+        height: 18px !important;
+        margin: -2px 0 4px 0 !important;
+        padding: 0 !important;
+      }
+
+      .tm-datecalc-final-close {
+        position: static !important;
+        z-index: 100000 !important;
+        border: 0 !important;
+        border-color: transparent !important;
+        outline: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        color: #dc3545 !important;
+        font-size: 20px !important;
+        font-weight: 700 !important;
+        line-height: 1 !important;
+        padding: 0 2px !important;
+        cursor: pointer !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+      }
+
+      .tm-datecalc-final-close:hover,
+      .tm-datecalc-final-close:focus,
+      .tm-datecalc-final-close:active,
+      .tm-datecalc-final-close:focus-visible {
+        color: #b02a37 !important;
+        border: 0 !important;
+        border-color: transparent !important;
+        outline: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+      }
+
+      .tm-datecalc-final-root input[type="number"]::-webkit-outer-spin-button,
+      .tm-datecalc-final-root input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        margin: 0 !important;
+      }
+
+      .tm-datecalc-final-root input[type="number"],
+      .tm-datecalc-final-root input#tm-datecalc-days {
+        appearance: textfield !important;
+        -moz-appearance: textfield !important;
+      }
+
+      .tm-datecalc-result-field-final {
+        display: block !important;
+        width: 100% !important;
+        margin-top: 13px !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-datecalc-result-field-final > label {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 0 6px 0 !important;
+        padding: 0 !important;
+        color: #6c757d !important;
+        font-size: 13px !important;
+        line-height: 1.2 !important;
+        font-weight: 400 !important;
+        text-align: left !important;
+      }
+
+      .tm-datecalc-result-field-final .tm-datecalc-result-box {
+        position: relative !important;
+        width: 100% !important;
+        margin-top: 0 !important;
+        padding: 10px 46px 10px 12px !important;
+        box-sizing: border-box !important;
+      }
+
+      .tm-datecalc-result-field-final .tm-datecalc-copy-result {
+        position: absolute !important;
+        right: 10px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+      }
+
+      .tm-datecalc-final-root .tm-datecalc-hoje-btn,
+      .tm-datecalc-final-root .tm-datecalc-copy-result {
+        outline: none !important;
+        box-shadow: none !important;
+      }
+
+      .tm-datecalc-final-root .tm-datecalc-hoje-btn:hover,
+      .tm-datecalc-final-root .tm-datecalc-hoje-btn:focus,
+      .tm-datecalc-final-root .tm-datecalc-hoje-btn:active,
+      .tm-datecalc-final-root .tm-datecalc-hoje-btn:focus-visible,
+      .tm-datecalc-final-root .tm-datecalc-copy-result:hover,
+      .tm-datecalc-final-root .tm-datecalc-copy-result:focus,
+      .tm-datecalc-final-root .tm-datecalc-copy-result:active,
+      .tm-datecalc-final-root .tm-datecalc-copy-result:focus-visible {
+        outline: none !important;
+        box-shadow: none !important;
+      }
+
+      .tm-datecalc-final-hide {
+        display: none !important;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function findRoot() {
+    const candidates = Array.from(document.querySelectorAll('div, section, aside'))
+      .filter((el) => {
+        if (!(el instanceof HTMLElement)) return false;
+
+        const text = norm(el.innerText || el.textContent || '');
+        if (!text.includes('Data do pedido médico') || !text.includes('Prazo do convênio')) return false;
+
+        const rect = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
+
+        return (
+          rect.width >= 300 &&
+          rect.width <= 560 &&
+          rect.height >= 90 &&
+          rect.height <= 330 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        );
+      });
+
+    if (!candidates.length) return null;
+
+    candidates.sort((a, b) => {
+      const ar = a.getBoundingClientRect();
+      const br = b.getBoundingClientRect();
+      return (ar.width * ar.height) - (br.width * br.height);
+    });
+
+    return candidates[0];
+  }
+
+  function findCalculatorButton(root) {
+    return Array.from(document.querySelectorAll('button, a, [role="button"], .btn'))
+      .find((el) => {
+        if (root && root.contains(el)) return false;
+
+        const text = norm(el.innerText || el.textContent || '');
+        const title = norm(el.getAttribute('title') || el.getAttribute('aria-label') || '');
+
+        return /calculadora/i.test(text + ' ' + title);
+      }) || null;
+  }
+
+  function clearCalculatorFields(root) {
+    if (!root) return;
+
+    const startInput = root.querySelector('#tm-datecalc-start');
+    const daysInput = root.querySelector('#tm-datecalc-days');
+    const resultDate = root.querySelector('#tm-datecalc-result-date');
+    const copyButton = root.querySelector('[data-tm-copy-date-result="1"]');
+
+    [startInput, daysInput].filter(Boolean).forEach((input) => {
+      input.value = '';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    if (resultDate) {
+      resultDate.textContent = '';
+    }
+
+    if (copyButton) {
+      copyButton.disabled = true;
+      copyButton.textContent = '📋';
+      copyButton.blur();
+    }
+  }
+
+  function closeRoot(root) {
+    clearCalculatorFields(root);
+
+    const button = findCalculatorButton(root);
+
+    if (button) {
+      button.click();
+      return;
+    }
+
+    root.style.removeProperty('display');
+    root.hidden = true;
+  }
+
+  function cleanupOldResultLabelNodes(root) {
+    if (!root) return;
+
+    root.querySelectorAll('.tm-datecalc-final-result-label-outside').forEach((node) => node.remove());
+
+    root.querySelectorAll('.tm-datecalc-final-result-label, .tm-datecalc-final-result-value').forEach((node) => {
+      const textValue = norm(node.innerText || node.textContent || '');
+
+      if (node.classList.contains('tm-datecalc-final-result-label')) {
+        node.remove();
+        return;
+      }
+
+      if (node.classList.contains('tm-datecalc-final-result-value')) {
+        const parent = node.parentElement;
+        if (parent && textValue && !parent.querySelector('#tm-datecalc-result-date')) {
+          parent.textContent = textValue;
+        } else {
+          node.remove();
+        }
+      }
+    });
+  }
+
+
+  function bindDryClickButtons(root) {
+    if (!root) return;
+
+    root.querySelectorAll('.tm-datecalc-hoje-btn, .tm-datecalc-copy-result').forEach((button) => {
+      if (button.dataset.tmDatecalcDryClickBound === '1') return;
+
+      button.dataset.tmDatecalcDryClickBound = '1';
+
+      button.addEventListener('mousedown', () => {
+        button.style.setProperty('outline', 'none', 'important');
+        button.style.setProperty('box-shadow', 'none', 'important');
+      }, true);
+
+      button.addEventListener('click', () => {
+        window.setTimeout(() => {
+          button.blur();
+          button.style.setProperty('outline', 'none', 'important');
+          button.style.setProperty('box-shadow', 'none', 'important');
+        }, 0);
+      }, true);
+    });
+  }
+
+  function bindCalculatorButtonReset() {
+    if (document.documentElement.dataset.tmDatecalcResetButtonBound === '1') return;
+    document.documentElement.dataset.tmDatecalcResetButtonBound = '1';
+
+    document.addEventListener('click', (event) => {
+      const target = event.target instanceof Element ? event.target.closest('button, a, [role="button"], .btn') : null;
+      if (!target) return;
+
+      const text = norm(target.innerText || target.textContent || '');
+      const title = norm(target.getAttribute('title') || target.getAttribute('aria-label') || '');
+
+      if (!/calculadora/i.test(text + ' ' + title)) return;
+
+      const root = findRoot();
+      if (!root || !root.classList.contains('tm-datecalc-final-root')) return;
+
+      clearCalculatorFields(root);
+    }, true);
+  }
+
+  function ensureFinalStructure() {
+    bindCalculatorButtonReset();
+
+    injectFinalDateCalcCss24_1();
+
+    const root = findRoot();
+    if (!root) return;
+
+    root.classList.add('tm-datecalc-final-root');
+
+    bindDryClickButtons(root);
+
+    cleanupOldResultLabelNodes(root);
+    root.querySelectorAll('.tm-datecalc-close-btn, .tm-datecalc-close-main, .tm-datecalc-safe-close, .tm-datecalc-safe-close-row')
+      .forEach((node) => node.remove());
+
+    const prazoInput = root.querySelector('#tm-datecalc-days, input[type="number"]');
+    if (prazoInput) {
+      prazoInput.setAttribute('type', 'text');
+      prazoInput.setAttribute('inputmode', 'numeric');
+      prazoInput.style.setProperty('appearance', 'textfield', 'important');
+      prazoInput.style.setProperty('-moz-appearance', 'textfield', 'important');
+    }
+
+    root.querySelectorAll('.tm-datecalc-section').forEach((section) => {
+      const hasFinal = !!section.querySelector('#tm-datecalc-end, #tm-datecalc-result-days');
+      const text = norm(section.innerText || section.textContent || '');
+
+      if (hasFinal || text.includes('Data final')) {
+        section.classList.add('tm-datecalc-final-hide');
+        section.style.setProperty('display', 'none', 'important');
+      }
+    });
+
+    let row = root.querySelector(':scope > .tm-datecalc-final-close-row');
+
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'tm-datecalc-final-close-row';
+      root.insertBefore(row, root.firstElementChild || null);
+    }
+
+    let btn = row.querySelector(':scope > .tm-datecalc-final-close');
+
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tm-datecalc-final-close';
+      btn.textContent = '×';
+      btn.title = 'Fechar';
+      row.appendChild(btn);
+    }
+
+    row.style.setProperty('display', 'flex', 'important');
+    row.style.setProperty('justify-content', 'flex-end', 'important');
+    row.style.setProperty('align-items', 'center', 'important');
+    row.style.setProperty('width', '100%', 'important');
+    row.style.setProperty('height', '18px', 'important');
+    row.style.setProperty('margin', '-2px 0 4px 0', 'important');
+    row.style.setProperty('padding', '0', 'important');
+
+    btn.style.setProperty('position', 'static', 'important');
+    btn.style.setProperty('border', '0', 'important');
+    btn.style.setProperty('border-color', 'transparent', 'important');
+    btn.style.setProperty('outline', 'none', 'important');
+    btn.style.setProperty('box-shadow', 'none', 'important');
+    btn.style.setProperty('background', 'transparent', 'important');
+    btn.style.setProperty('color', '#dc3545', 'important');
+    btn.style.setProperty('font-size', '20px', 'important');
+    btn.style.setProperty('font-weight', '700', 'important');
+    btn.style.setProperty('line-height', '1', 'important');
+    btn.style.setProperty('padding', '0 2px', 'important');
+    btn.style.setProperty('cursor', 'pointer', 'important');
+    btn.style.setProperty('appearance', 'none', 'important');
+
+    if (btn.dataset.tmDatecalcFinalBound !== '1') {
+      btn.dataset.tmDatecalcFinalBound = '1';
+
+      btn.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }, true);
+
+      btn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        btn.blur();
+        closeRoot(root);
+      }, true);
+    }
+  }
+
+  document.addEventListener('click', () => {
+    window.setTimeout(ensureFinalStructure, 0);
+    window.setTimeout(ensureFinalStructure, 60);
+    window.setTimeout(ensureFinalStructure, 160);
+  }, true);
+
+  setInterval(ensureFinalStructure, 600);
+})();
+
+
+/* =========================
+   AUTORIZAÇÕES - FILTRO POR ANEXO
+   v25.3
+========================= */
+(function () {
+  'use strict';
+
+  const FILTER_ID = 'tm-auth-attachment-filter';
+  const SELECT_ID = 'tm-auth-attachment-select';
+  const STYLE_ID = 'tm-auth-attachment-filter-style-25-3';
+
+  function norm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function injectAuthAttachmentStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      .tm-auth-attachment-hidden {
+        display: none !important;
+      }
+
+      #${FILTER_ID} .input-group,
+      #${FILTER_ID} .input-group-prepend,
+      #${FILTER_ID} .input-group-text,
+      #${FILTER_ID} select {
+        height: 35.75px !important;
+        min-height: 35.75px !important;
+        max-height: 35.75px !important;
+        box-sizing: border-box !important;
+      }
+
+      #${FILTER_ID} select {
+        min-width: 0 !important;
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
+      }
+
+      .tm-auth-recepcao-filter-hidden {
+        display: none !important;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function isAutorizacoesTabActive() {
+    const active = Array.from(document.querySelectorAll('.nav.nav-pills .nav-link.active, .nav-pills .nav-link.active'))
+      .find((link) => norm(link.innerText || link.textContent || '') === 'Autorizações');
+
+    if (active) return true;
+
+    const breadcrumbText = Array.from(document.querySelectorAll('.breadcrumb, nav, body'))
+      .map((el) => norm(el.innerText || el.textContent || ''))
+      .join(' ');
+
+    return /\/\s*Autorizações/.test(breadcrumbText);
+  }
+
+  function getAuthFilterCardBody() {
+    if (!isAutorizacoesTabActive()) return null;
+
+    const refresh = document.querySelector('#refresh-button');
+    if (!refresh) return null;
+
+    const card = refresh.closest('.card.dashcard, .card');
+    const cardBody = card?.querySelector(':scope > .card-body') || refresh.closest('.card-body');
+
+    if (!cardBody) return null;
+
+    const cardText = norm(cardBody.innerText || cardBody.textContent || '');
+    const hasAuthFilters =
+      cardText.includes('Todas as Operadoras') &&
+      cardText.includes('Todos os Status Ativos') &&
+      cardText.includes('Sem filtro por fila de autorização');
+
+    return hasAuthFilters ? cardBody : null;
+  }
+
+  function getAuthRefreshButton() {
+    const body = getAuthFilterCardBody();
+    if (!body) return null;
+
+    return body.querySelector('#refresh-button');
+  }
+
+  function getAuthListCards() {
+    if (!isAutorizacoesTabActive()) return [];
+
+    return Array.from(document.querySelectorAll('.card.mb-2.dashcard'))
+      .filter((card) => {
+        if (!(card instanceof HTMLElement)) return false;
+        if (card.closest(`#${FILTER_ID}`)) return false;
+
+        const text = norm(card.innerText || card.textContent || '');
+        const hasAuthActions =
+          text.includes('Clonar Solicitação') ||
+          text.includes('Realizar Outra Marcação') ||
+          !!card.querySelector('[data-original-title="Editar Solicitação de Autorização"], [title="Imprimir Solicitação"]');
+
+        const hasDateAttachmentArea =
+          !!card.querySelector('a[title*="arquivos anexados ao atendimento"], a[title*="arquivo anexado ao atendimento"]');
+
+        return hasAuthActions || hasDateAttachmentArea;
+      });
+  }
+
+  function cardHasAttendanceAttachment(card) {
+    if (!card) return false;
+
+    const links = Array.from(card.querySelectorAll('a[title*="arquivos anexados ao atendimento"], a[title*="arquivo anexado ao atendimento"]'));
+
+    return links.some((link) => {
+      const title = norm(link.getAttribute('title') || '');
+      const icon = link.querySelector('i');
+
+      if (/^0\s+arquivos?\s+anexados?\s+ao\s+atendimento/i.test(title)) return false;
+      if (/\b[1-9]\d*\s+arquivos?\s+anexados?\s+ao\s+atendimento/i.test(title)) return true;
+
+      return !!icon && icon.classList.contains('fa-paperclip') && !icon.classList.contains('fa-plus');
+    });
+  }
+
+  function getCurrentAttachmentFilterValue() {
+    const select = document.getElementById(SELECT_ID);
+    return select ? select.value : '';
+  }
+
+  function applyAttachmentFilter() {
+    if (!isAutorizacoesTabActive()) {
+      document.querySelectorAll('.tm-auth-attachment-hidden').forEach((card) => {
+        card.classList.remove('tm-auth-attachment-hidden');
+      });
+      return;
+    }
+
+    const value = getCurrentAttachmentFilterValue();
+
+    getAuthListCards().forEach((card) => {
+      const hasAttachment = cardHasAttendanceAttachment(card);
+
+      const shouldHide =
+        value === 'com' ? !hasAttachment :
+        value === 'sem' ? hasAttachment :
+        false;
+
+      card.classList.toggle('tm-auth-attachment-hidden', shouldHide);
+    });
+  }
+
+  function scheduleApplyAttachmentFilter() {
+    window.setTimeout(applyAttachmentFilter, 0);
+    window.setTimeout(applyAttachmentFilter, 150);
+    window.setTimeout(applyAttachmentFilter, 400);
+    window.setTimeout(applyAttachmentFilter, 900);
+    window.setTimeout(applyAttachmentFilter, 1500);
+  }
+
+  function createAttachmentFilterElement() {
+    const col = document.createElement('div');
+    col.id = FILTER_ID;
+    col.className = 'col col-12 col-md-3';
+
+    col.innerHTML = `
+      <div class="form-group mb-1">
+        <div class="input-group">
+          <div class="input-group-prepend">
+            <span class="input-group-text text-outline-secondary" data-toggle="tooltip" data-placement="top" title="Filtrar por anexo">
+              <i class="fa fa-paperclip fa-fw"></i>
+            </span>
+          </div>
+          <select id="${SELECT_ID}" class="form form-control">
+            <option value="">Todos os anexos...</option>
+            <option value="com">Com anexo</option>
+            <option value="sem">Sem anexo</option>
+          </select>
+        </div>
+      </div>
+    `;
+
+    const select = col.querySelector(`#${SELECT_ID}`);
+    select.addEventListener('change', () => {
+      scheduleApplyAttachmentFilter();
+    }, true);
+
+    return col;
+  }
+
+  function hideRecepcaoAuthorizationFilter(cardBody) {
+    if (!cardBody) return;
+
+    Array.from(cardBody.querySelectorAll('label'))
+      .filter((label) => norm(label.innerText || label.textContent || '') === 'Incluir autorizações da recepção')
+      .forEach((label) => {
+        const col = label.closest('.col');
+        if (!col) return;
+
+        col.classList.add('tm-auth-recepcao-filter-hidden');
+        col.style.setProperty('display', 'none', 'important');
+      });
+  }
+
+  function ensureAttachmentFilter() {
+    injectAuthAttachmentStyle();
+
+    const cardBody = getAuthFilterCardBody();
+
+    if (cardBody) {
+      hideRecepcaoAuthorizationFilter(cardBody);
+    }
+
+    if (!cardBody) {
+      const existing = document.getElementById(FILTER_ID);
+      if (existing) existing.remove();
+      applyAttachmentFilter();
+      return;
+    }
+
+    if (document.getElementById(FILTER_ID)) {
+      scheduleApplyAttachmentFilter();
+      return;
+    }
+
+    const rows = Array.from(cardBody.querySelectorAll(':scope > .form-row'));
+    let targetRow = rows.find((row) => {
+      const text = norm(row.innerText || row.textContent || '');
+      return text.includes('Todos...') && text.includes('Selecionar paciente') && text.includes('Sem filtro por fila de autorização');
+    });
+
+    if (!targetRow) {
+      targetRow = rows[rows.length - 1] || null;
+    }
+
+    if (!targetRow) return;
+
+    targetRow.appendChild(createAttachmentFilterElement());
+    scheduleApplyAttachmentFilter();
+  }
+
+  document.addEventListener('change', (event) => {
+    if (event.target && event.target.id === SELECT_ID) {
+      scheduleApplyAttachmentFilter();
+    }
+  }, true);
+
+  document.addEventListener('click', () => {
+    window.setTimeout(ensureAttachmentFilter, 60);
+    window.setTimeout(scheduleApplyAttachmentFilter, 500);
+    window.setTimeout(scheduleApplyAttachmentFilter, 1200);
+  }, true);
+
+  setInterval(() => {
+    ensureAttachmentFilter();
+    applyAttachmentFilter();
+  }, 800);
+})();
+
+
+/* =========================
+   CHAT DIRETO - ENTER ENVIA / SHIFT+ENTER QUEBRA LINHA
+   v25.4
+========================= */
+(function () {
+  'use strict';
+
+  function norm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function isDirectChatTextarea(textarea) {
+    if (!(textarea instanceof HTMLTextAreaElement)) return false;
+
+    const footer = textarea.closest('.modal-footer.d-flex.flex-column');
+    if (!footer) return false;
+
+    const group = textarea.closest('.input-group');
+    if (!group || !footer.contains(group)) return false;
+
+    const sendButton = group.querySelector('.input-group-append button.btn.btn-success, .input-group-append button.btn-success');
+    if (!sendButton) return false;
+
+    const hasPlaneIcon = !!sendButton.querySelector('.fa-paper-plane, .fas.fa-paper-plane');
+    if (!hasPlaneIcon) return false;
+
+    const modalContent = textarea.closest('.modal-content');
+    if (!modalContent) return false;
+
+    const headerText = norm(modalContent.querySelector('.modal-header')?.innerText || modalContent.querySelector('.modal-header')?.textContent || '');
+    const hasChatHeader = !!headerText && !/Chat$/i.test(headerText);
+
+    return hasChatHeader;
+  }
+
+  function getSendButton(textarea) {
+    const group = textarea.closest('.input-group');
+    if (!group) return null;
+
+    return group.querySelector('.input-group-append button.btn-success');
+  }
+
+  function sendDirectChatMessage(textarea) {
+    const sendButton = getSendButton(textarea);
+    if (!sendButton) return;
+
+    const value = norm(textarea.value);
+    if (!value) return;
+
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.dispatchEvent(new Event('change', { bubbles: true }));
+
+    window.setTimeout(() => {
+      if (sendButton.disabled || sendButton.getAttribute('disabled') !== null) {
+        sendButton.disabled = false;
+        sendButton.removeAttribute('disabled');
+      }
+
+      sendButton.click();
+    }, 0);
+  }
+
+  function bindDirectChatTextarea(textarea) {
+    if (!isDirectChatTextarea(textarea)) return;
+    if (textarea.dataset.tmDirectChatEnterBound === '1') return;
+
+    textarea.dataset.tmDirectChatEnterBound = '1';
+
+    textarea.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+
+      if (event.shiftKey) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      sendDirectChatMessage(textarea);
+    }, true);
+  }
+
+  function scanDirectChatTextareas() {
+    document.querySelectorAll('.modal-footer.d-flex.flex-column textarea.form.form-control')
+      .forEach((textarea) => bindDirectChatTextarea(textarea));
+  }
+
+  document.addEventListener('focusin', (event) => {
+    if (event.target instanceof HTMLTextAreaElement) {
+      bindDirectChatTextarea(event.target);
+    }
+  }, true);
+
+  document.addEventListener('shown.bs.modal', () => {
+    window.setTimeout(scanDirectChatTextareas, 50);
+    window.setTimeout(scanDirectChatTextareas, 200);
+  }, true);
+
+  setInterval(scanDirectChatTextareas, 700);
+})();
+
+
+/* =========================
+   CALCULADORA DE DATAS - COR DA VALIDADE
+   v25.5
+========================= */
+(function () {
+  'use strict';
+
+  const STYLE_ID = 'tm-datecalc-validade-color-style-25-5';
+
+  function injectValidityColorStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      .tm-datecalc-validade-vencida {
+        background-color: #f8d7da !important;
+        border-color: #f1aeb5 !important;
+      }
+
+      .tm-datecalc-validade-vigente {
+        background-color: #d1e7dd !important;
+        border-color: #a3cfbb !important;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function parseDateInput(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+
+    const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) {
+      const y = Number(iso[1]);
+      const m = Number(iso[2]) - 1;
+      const d = Number(iso[3]);
+      const date = new Date(y, m, d);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    const br = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (br) {
+      const d = Number(br[1]);
+      const m = Number(br[2]) - 1;
+      const y = Number(br[3]);
+      const date = new Date(y, m, d);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    return null;
+  }
+
+  function addDays(date, days) {
+    const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    result.setDate(result.getDate() + Number(days));
+    return result;
+  }
+
+  function clearValidityColor(resultBox) {
+    if (!resultBox) return;
+
+    resultBox.classList.remove('tm-datecalc-validade-vencida');
+    resultBox.classList.remove('tm-datecalc-validade-vigente');
+  }
+
+  function updateValidityColor(root) {
+    if (!root) return;
+
+    const startInput = root.querySelector('#tm-datecalc-start');
+    const daysInput = root.querySelector('#tm-datecalc-days');
+    const resultBox = root.querySelector('.tm-datecalc-result-box');
+
+    if (!startInput || !daysInput || !resultBox) return;
+
+    clearValidityColor(resultBox);
+
+    const startDate = parseDateInput(startInput.value);
+    const daysRaw = String(daysInput.value || '').trim();
+
+    if (!startDate || daysRaw === '' || Number.isNaN(Number(daysRaw))) return;
+
+    const validityDate = addDays(startDate, Number(daysRaw));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    validityDate.setHours(0, 0, 0, 0);
+
+    if (validityDate < today) {
+      resultBox.classList.add('tm-datecalc-validade-vencida');
+    } else {
+      resultBox.classList.add('tm-datecalc-validade-vigente');
+    }
+  }
+
+  function findDateCalculatorRoots() {
+    return Array.from(document.querySelectorAll('.tm-datecalc-final-root, div, section, aside'))
+      .filter((root) => {
+        if (!(root instanceof HTMLElement)) return false;
+        if (!root.querySelector('#tm-datecalc-start')) return false;
+        if (!root.querySelector('#tm-datecalc-days')) return false;
+        if (!root.querySelector('.tm-datecalc-result-box')) return false;
+
+        const style = getComputedStyle(root);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+      });
+  }
+
+  function applyValidityColors() {
+    injectValidityColorStyle();
+
+    findDateCalculatorRoots().forEach(updateValidityColor);
+  }
+
+  document.addEventListener('input', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    if (target.id === 'tm-datecalc-start' || target.id === 'tm-datecalc-days') {
+      window.setTimeout(applyValidityColors, 0);
+      window.setTimeout(applyValidityColors, 80);
+    }
+  }, true);
+
+  document.addEventListener('change', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    if (target.id === 'tm-datecalc-start' || target.id === 'tm-datecalc-days') {
+      window.setTimeout(applyValidityColors, 0);
+      window.setTimeout(applyValidityColors, 80);
+    }
+  }, true);
+
+  document.addEventListener('click', () => {
+    window.setTimeout(applyValidityColors, 120);
+  }, true);
+
+  setInterval(applyValidityColors, 700);
 })();
 
