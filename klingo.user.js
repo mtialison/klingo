@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      25.5
+// @version      25.7
 // @description  envenenado
 // @match        *://*.klingo.app/*
 // @match        *://samec.klingo.app/*
@@ -1040,9 +1040,9 @@ function setDateCalculatorOpen(isOpen) {
   function getCurrentScriptVersion() {
     const version = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version)
       ? String(GM_info.script.version)
-      : '25.5';
+      : '25.7';
     const match = version.match(/\d+(?:\.\d+)?/);
-    return match ? match[0] : '25.5';
+    return match ? match[0] : '25.7';
   }
 
   function ensureScriptVersionIndicator() {
@@ -2534,9 +2534,14 @@ console.log('[TM] script inicializado', location.href);
 
   function tmCadFieldByLabel(modal, labelText) {
     const labels = Array.from(modal.querySelectorAll('small.form-text.text-muted'));
+    const allowedLabels = String(labelText || '')
+      .split('|')
+      .map((item) => tmCadNorm(item))
+      .filter(Boolean);
 
     for (const label of labels) {
-      if (tmCadNorm(label.innerText || label.textContent || '') !== labelText) continue;
+      const currentLabel = tmCadNorm(label.innerText || label.textContent || '');
+      if (!allowedLabels.includes(currentLabel)) continue;
 
       const col = label.closest('.col');
       if (col && modal.contains(col)) return col;
@@ -2563,7 +2568,7 @@ console.log('[TM] script inicializado', location.href);
       tmCadHasLabel(modal, 'Data de Nascimento') &&
       tmCadHasLabel(modal, 'Nome') &&
       tmCadHasLabel(modal, 'CPF') &&
-      tmCadHasLabel(modal, 'Origem de Pacientes')
+      tmCadHasLabel(modal, 'Origem de Pacientes|Origem do Agendamento')
     );
   }
 
@@ -2942,7 +2947,7 @@ console.log('[TM] script inicializado', location.href);
       tmCadFocusableInField(tmCadFieldByLabel(modal, 'Sexo')),
       tmCadFocusableInField(tmCadFieldByLabel(modal, 'No. da Carteira do Plano')),
       tmCadFocusableInField(tmCadFieldByLabel(modal, 'Validade da Carteira')),
-      tmCadFocusableInField(tmCadFieldByLabel(modal, 'Origem de Pacientes')),
+      tmCadFocusableInField(tmCadFieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento')),
       modal.querySelector('.tm-cad-observacao-textarea'),
       tmCadFindObservacaoRow(modal)?.auxCol?.querySelector('select.form.form-control, select')
     ].filter(Boolean);
@@ -3248,7 +3253,7 @@ console.log('[TM] script inicializado', location.href);
     if (!modal) return;
 
     const labels = Array.from(modal.querySelectorAll('small')).filter((small) => {
-      return tmCadNorm(small.innerText || small.textContent || '') === 'ORIGEM DE PACIENTES';
+      return ['ORIGEM DE PACIENTES', 'ORIGEM DO AGENDAMENTO'].includes(tmCadNorm(small.innerText || small.textContent || ''));
     });
 
     labels.forEach((label) => {
@@ -3342,7 +3347,7 @@ console.log('[TM] script inicializado', location.href);
 
     const celular = tmCadFieldByLabel(modal, 'Celular');
     const email = tmCadFieldByLabel(modal, 'e-mail');
-    const origem = tmCadFieldByLabel(modal, 'Origem de Pacientes');
+    const origem = tmCadFieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
 
     const sexo = tmCadFieldByLabel(modal, 'Sexo');
     const carteira = tmCadFieldByLabel(modal, 'No. da Carteira do Plano');
@@ -3744,9 +3749,14 @@ console.log('[TM] script inicializado', location.href);
 
   function fieldByLabel(modal, labelText) {
     const labels = Array.from(modal.querySelectorAll('small.form-text.text-muted'));
+    const allowedLabels = String(labelText || '')
+      .split('|')
+      .map((item) => norm(item))
+      .filter(Boolean);
 
     for (const label of labels) {
-      if (norm(label.innerText || label.textContent || '') !== labelText) continue;
+      const currentLabel = norm(label.innerText || label.textContent || '');
+      if (!allowedLabels.includes(currentLabel)) continue;
 
       const col = label.closest('.col');
       if (col && modal.contains(col)) return col;
@@ -3792,7 +3802,7 @@ console.log('[TM] script inicializado', location.href);
   }
 
   function moveOrigem(modal, dados) {
-    const origem = fieldByLabel(modal, 'Origem de Pacientes');
+    const origem = fieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
     if (!origem || !dados) return;
 
     let row = dados.querySelector(':scope > .tm-paciente-origem-inline-row');
@@ -3809,7 +3819,7 @@ console.log('[TM] script inicializado', location.href);
 
   function hideOrigemSection(modal) {
     Array.from(modal.querySelectorAll('small')).forEach((small) => {
-      if (norm(small.innerText || small.textContent || '') !== 'ORIGEM DE PACIENTES') return;
+      if (!['ORIGEM DE PACIENTES', 'ORIGEM DO AGENDAMENTO'].includes(norm(small.innerText || small.textContent || ''))) return;
 
       const row = small.closest('.row');
       if (!row) return;
@@ -5135,4 +5145,3 @@ console.log('[TM] script inicializado', location.href);
 
   setInterval(applyValidityColors, 700);
 })();
-
