@@ -2,7 +2,7 @@
 // @name         klingo
 // @namespace    http://tampermonkey.net/
 // @version      26.6
-// @description  Ajustes de interface, cadastro, chat e autorizações do Klingo
+// @description  #
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
 // @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
