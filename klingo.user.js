@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.2
-// @description  zoro > sanji
+// @version      26.6
+// @description  Ajustes de interface, cadastro, chat e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
 // @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
@@ -4530,6 +4530,12 @@ function setDateCalculatorOpen(isOpen) {
   'use strict';
 
   const SEPARATOR = '----------------------------------';
+  const UNIT_REFERENCES = {
+    SAMEC: 'A clínica está localizada na rua do fórum regional de Bangu e ao lado da CIA do Médico.',
+    BANGU: 'A clínica está localizada no prédio comercial Centro Profissional de Bangu, ao lado da casa lotérica e próximo ao ponto final do ônibus 864',
+    BARRA: 'Unidade localizada próxima à concessionária Mercedes-Benz em frente ao Shopping Downtown | (Estação BRT - Bosque Marapendi)',
+    COPACABANA: 'Unidade localizada ao lado da Brinka Brinquedos, entre a rua Bolivar e Barão de Ipanema, próximo ao antigo cinema Roxy | (Estação Metro - Canta Galo)'
+  };
 
   function clean(value) {
     return String(value ?? '').trim();
@@ -4556,6 +4562,13 @@ function setDateCalculatorOpen(isOpen) {
     if (number) parts.push(`No. ${number}`);
     if (complement) parts.push(complement);
     return `${parts.join(', ')} - CEP: ${cepDigits.slice(0, 5)}-${cepDigits.slice(5)}`;
+  }
+
+  function referenceForUnit(name) {
+    const normalized = clean(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    const unit = Object.keys(UNIT_REFERENCES).find(key =>
+      new RegExp(`\\b${key}\\b`).test(normalized));
+    return unit ? UNIT_REFERENCES[unit] : '';
   }
 
   function formatAppointment(item, component) {
@@ -4596,7 +4609,7 @@ function setDateCalculatorOpen(isOpen) {
       // Se a unidade não puder ser associada com segurança, manter a cópia nativa.
       if (!unit || !name || !address || !appointment) return '';
 
-      if (!groups.has(key)) groups.set(key, { name, address, appointments: [] });
+      if (!groups.has(key)) groups.set(key, { name, address, reference: referenceForUnit(name), appointments: [] });
       groups.get(key).appointments.push(appointment);
     }
 
@@ -4604,7 +4617,8 @@ function setDateCalculatorOpen(isOpen) {
     const oneUnit = groups.size === 1;
     const groupTexts = Array.from(groups.values(), (group) => {
       const appointmentsText = group.appointments.join(`\n${SEPARATOR}\n`);
-      const unitText = `🏥 Unidade: ${group.name}\n📍 Endereço: ${group.address}`;
+      const unitText = `🏥 Unidade: ${group.name}\n📍 Endereço: ${group.address}` +
+        (group.reference ? `\n🚏 Referência: ${group.reference}` : '');
       return `${appointmentsText}\n${oneUnit ? `${SEPARATOR}\n` : ''}${unitText}`;
     });
 
@@ -4644,11 +4658,11 @@ function setDateCalculatorOpen(isOpen) {
   const STYLE_ID = 'tm-recepcao-novo-atendimento-layout';
   let observedModal = null;
   let modalObserver = null;
-  let lockedCheckbox = null;
-  let checkedBeforeToday = false;
   let observationWindowStart = 0;
   let observationCount = 0;
   let observationStopped = false;
+  let extraWasVisible = false;
+  let extraDefaultApplied = false;
 
   function setClass(element, className, active) {
     if (element.classList.contains(className) !== active) {
@@ -4763,10 +4777,6 @@ function setDateCalculatorOpen(isOpen) {
         display: none !important;
       }
 
-      #${MODAL_ID}.tm-recepcao-horario-hoje .tm-recepcao-extra-checkbox {
-        cursor: not-allowed !important;
-      }
-
       @media (min-width: 768px) {
         #${MODAL_ID}.tm-recepcao-primeira-vez .tm-recepcao-dados-row > .col.col-md-3:not(.tm-recepcao-hidden-field) {
           flex: 0 0 33.333333% !important;
@@ -4804,48 +4814,26 @@ function setDateCalculatorOpen(isOpen) {
     return column?.querySelector('input[type="checkbox"]') || null;
   }
 
-  function isSelectedDateToday() {
-    const selected = document.querySelector('input#ref-data[type="date"]')?.value;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(selected || '')) return false;
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    return selected === today;
-  }
+  function applyExtraDefault(modal) {
+    const visible = modal.classList.contains('show') || getComputedStyle(modal).display !== 'none';
+    if (!visible) {
+      extraWasVisible = false;
+      extraDefaultApplied = false;
+      return;
+    }
+    if (!extraWasVisible) {
+      extraWasVisible = true;
+      extraDefaultApplied = false;
+    }
+    if (extraDefaultApplied) return;
 
-  function setExtraChecked(checkbox, checked) {
-    if (checkbox.checked === checked) return;
-    checkbox.checked = checked;
+    const checkbox = extraCheckbox(modal);
+    if (!checkbox) return;
+    extraDefaultApplied = true;
+    if (checkbox.checked) return;
+    checkbox.checked = true;
     checkbox.dispatchEvent(new Event('input', { bubbles: true }));
     checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  function syncExtraCheckbox(modal) {
-    const checkbox = extraCheckbox(modal);
-    const today = !!checkbox && isSelectedDateToday();
-    setClass(modal, 'tm-recepcao-horario-hoje', today);
-
-    if (today) {
-      if (lockedCheckbox !== checkbox) {
-        lockedCheckbox = checkbox;
-        checkedBeforeToday = checkbox.checked;
-      }
-      setClass(checkbox, 'tm-recepcao-extra-checkbox', true);
-      if (checkbox.getAttribute('aria-readonly') !== 'true') {
-        checkbox.setAttribute('aria-readonly', 'true');
-      }
-      setExtraChecked(checkbox, true);
-    } else {
-      if (checkbox && lockedCheckbox === checkbox) {
-        setExtraChecked(checkbox, checkedBeforeToday);
-      }
-      if (lockedCheckbox) {
-        setClass(lockedCheckbox, 'tm-recepcao-extra-checkbox', false);
-        if (lockedCheckbox.hasAttribute('aria-readonly')) {
-          lockedCheckbox.removeAttribute('aria-readonly');
-        }
-      }
-      lockedCheckbox = null;
-    }
   }
 
   function applyReceptionLayout() {
@@ -4869,7 +4857,7 @@ function setDateCalculatorOpen(isOpen) {
     setClass(modal, 'tm-recepcao-voltar-apos-concluir',
       !!backButton?.closest('.row.w3-animate-opacity') && !!concludeButton);
 
-    syncExtraCheckbox(modal);
+    applyExtraDefault(modal);
 
     const social = fieldByLabel(modal, 'Nome Social');
     const phone = fieldByLabel(modal, 'Telefone');
@@ -4943,10 +4931,11 @@ function setDateCalculatorOpen(isOpen) {
   function observeModal(modal) {
     if (modal === observedModal) return;
     modalObserver?.disconnect();
-    lockedCheckbox = null;
     observationStopped = false;
     observationCount = 0;
     observationWindowStart = performance.now();
+    extraWasVisible = false;
+    extraDefaultApplied = false;
     observedModal = modal;
     if (!modal) return;
     modalObserver = new MutationObserver(onReceptionMutations);
@@ -4960,31 +4949,11 @@ function setDateCalculatorOpen(isOpen) {
   }
 
   injectStyle();
-  document.addEventListener('click', (event) => {
-    if (observationStopped || !observedModal?.isConnected || !isSelectedDateToday() ||
-        event.target !== extraCheckbox(observedModal)) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    queueMicrotask(() => syncExtraCheckbox(observedModal));
-  }, true);
-
-  document.addEventListener('keydown', (event) => {
-    if (observationStopped || !observedModal?.isConnected || !isSelectedDateToday() ||
-        event.target !== extraCheckbox(observedModal) ||
-        ![' ', 'Enter'].includes(event.key)) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    syncExtraCheckbox(observedModal);
-  }, true);
-
   for (const eventName of ['input', 'change']) {
     document.addEventListener(eventName, (event) => {
       if (observationStopped) return;
       if (event.target?.matches?.('input#ref-data[type="date"]')) {
         applyReceptionLayout();
-      } else if (observedModal?.isConnected && event.target === extraCheckbox(observedModal) &&
-          isSelectedDateToday() && !event.target.checked) {
-        setExtraChecked(event.target, true);
       }
     }, true);
   }
