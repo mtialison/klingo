@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.19
+// @version      26.20
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -4916,12 +4916,11 @@ function setDateCalculatorOpen(isOpen) {
     vue.buscadoAte = dayBefore(preferred.date);
     vue.buscarHorarios();
     await waitForSearch(vue);
-    if (typeof vue.listaPacientes === 'function' && (vue.datas || []).includes(preferred.date)) {
-      vue.listaPacientes(preferred.date);
-    }
-    if (!preferred.time) return 'Data preferida aberta. Escolha um horário disponível.';
+    // listaPacientes abre a agenda completa do dia, não o cadastro do paciente.
+    // A vaga já está na busca; selecioná-la diretamente abre apenas o cadastro.
+    if (!preferred.time) return 'Horários atualizados. Escolha uma vaga disponível na lista.';
     const slot = matchingSlot(vue, preferred);
-    if (!slot) return 'A vaga anterior não está livre. Selecione outro horário na data exibida.';
+    if (!slot) return 'A vaga anterior não está livre. Selecione outro horário na lista.';
     vue.selecionar_horario(slot);
     for (let attempt = 0; attempt < 120; attempt++) {
       if (document.querySelector('#cadastroModal.show')) {

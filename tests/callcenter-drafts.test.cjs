@@ -106,7 +106,7 @@ test('mantém vários rascunhos independentes na mesma aba', async () => {
   assert.equal(vm.runInContext('drafts[0].snapshot.dados.plano.search', context), 'Plano B');
 });
 
-test('retomada confere novamente a vaga e reabre o modal com os dados preservados', async () => {
+test('retomada confere a vaga e abre só o cadastro com os dados preservados', async () => {
   const context = setup();
   const vue = booking();
   vue.dados.plano = { id_plano: 100, search: 'Particular' };
@@ -120,7 +120,7 @@ test('retomada confere novamente a vaga e reabre o modal com os dados preservado
   vm.runInContext('component = () => vue;', context);
   await vm.runInContext('save()', context);
   let modalOpen = false;
-  let selectedDay = null;
+  let openedDayAgenda = false;
   let selectedSlot = null;
   context.document.querySelector = selector => selector === '#cadastroModal.show' && modalOpen ? {} : null;
   vue.datas = [];
@@ -133,13 +133,31 @@ test('retomada confere novamente a vaga e reabre o modal com os dados preservado
     vue.datas = ['2026-10-20'];
     vue.buscando = false;
   };
-  vue.listaPacientes = date => { selectedDay = date; };
+  vue.listaPacientes = () => { openedDayAgenda = true; };
   vue.selecionar_horario = slot => { selectedSlot = slot; modalOpen = true; };
   await vm.runInContext('resume(1)', context);
-  assert.equal(selectedDay, '2026-10-20');
+  assert.equal(openedDayAgenda, false);
   assert.equal(selectedSlot.id_agenda, 300);
   assert.equal(vue.cadastro_temporario.st_nome, 'Paciente de teste');
   assert.equal(vm.runInContext('drafts.length', context), 0);
+});
+
+test('sem horário salvo, atualiza a lista sem abrir a agenda completa do dia', async () => {
+  const context = setup();
+  const vue = booking();
+  vue.procedimentos.push({ procedimento: { search: 'Consulta' } });
+  let openedDayAgenda = false;
+  vue.listaPacientes = () => { openedDayAgenda = true; };
+  vue.buscarHorarios = () => {
+    vue.horarios = [];
+    vue.datas = ['2026-10-20'];
+    vue.buscando = false;
+  };
+  context.vue = vue;
+  vm.runInContext('component = () => vue;', context);
+  const status = await vm.runInContext("restoreDate(vue, { date: '2026-10-20' })", context);
+  assert.equal(openedDayAgenda, false);
+  assert.match(status, /Escolha uma vaga disponível na lista/);
 });
 
 test('vaga ocupada não é reservada automaticamente', async () => {
