@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.32
+// @version      26.33
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -6820,25 +6820,29 @@ let tmAppointmentCalendarCore;
 })();
 
 /* =========================
-   RECEPÇÃO - OCULTAR PRÉVIA DE DIAS DA AGENDA
+   RECEPÇÃO E CONFIRMAÇÃO - OCULTAR PRÉVIA DE DIAS DA AGENDA
 ========================= */
 (function () {
   'use strict';
 
-  const HIDDEN_CLASS = 'tm-recepcao-agenda-previa-oculta';
-  const STYLE_ID = 'tm-recepcao-agenda-previa-style';
+  const HIDDEN_CLASS = 'tm-agenda-previa-oculta';
+  const STYLE_ID = 'tm-agenda-previa-style';
 
   function hideSchedulePreview() {
     document.getElementById('tm-recepcao-agenda-resumo')?.remove();
     document.getElementById('tm-recepcao-agenda-resumo-style')?.remove();
-    if (window.location.hash !== '#/recepcao') {
+    const route = window.location.hash;
+    if (route !== '#/recepcao' && route !== '#/call-center/confirmacao') {
       document.querySelectorAll(`.${HIDDEN_CLASS}`).forEach((element) =>
         element.classList.remove(HIDDEN_CLASS));
       document.getElementById(STYLE_ID)?.remove();
       return;
     }
 
-    const source = Array.from(document.querySelectorAll('.card-group'))
+    const scope = route === '#/call-center/confirmacao'
+      ? document.querySelector('#refresh-button')?.closest('.card.dashcard')?.parentElement
+      : document;
+    const source = Array.from(scope?.querySelectorAll('.card-group') || [])
       .find((group) => group.querySelector(':scope > .card > .card-body.small.p-2 a.card-link'));
     if (!source) return;
 
@@ -6856,7 +6860,7 @@ let tmAppointmentCalendarCore;
     }
   }
 
-  tmRuntime.register('ocultar prévia da agenda na Recepção', hideSchedulePreview);
+  tmRuntime.register('ocultar prévia da agenda na Recepção e Confirmação', hideSchedulePreview);
 })();
 
 
