@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.6
-// @description  #
+// @version      26.34
+// @description  xd
 // @match        https://*.klingo.app/*
-// @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
-// @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
+// @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
+// @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
 // @author       alison
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -476,32 +476,6 @@ function tmParseDateInput(rawValue) {
         display: none !important;
       }
 
-      .tm-datecalc-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 12px 14px;
-        background: #1679e8;
-        color: #fff;
-      }
-
-      .tm-datecalc-title {
-        font-size: 16px;
-        font-weight: 400;
-        line-height: 1.2;
-      }
-
-      .tm-datecalc-close {
-        border: 0;
-        background: transparent;
-        color: inherit;
-        font-size: 22px;
-        line-height: 1;
-        cursor: pointer;
-        padding: 0;
-      }
-
       .tm-datecalc-body {
         padding: 14px;
       }
@@ -830,6 +804,8 @@ function setDateCalculatorOpen(isOpen) {
     panel.classList.toggle('tm-datecalc-hidden', !isOpen);
     if (isOpen) positionDateCalculatorPanel();
 
+    if (isOpen) document.dispatchEvent(new Event('tm-datecalc-opened'));
+
     if (!isOpen) {
       panel.querySelectorAll('#tm-datecalc-start, #tm-datecalc-days, #tm-datecalc-end')
         .forEach((input) => {
@@ -1046,6 +1022,11 @@ function setDateCalculatorOpen(isOpen) {
         return;
       }
 
+      const panel = getDateCalculatorPanel();
+      if (panel && !panel.classList.contains('tm-datecalc-hidden') && !panel.contains(e.target)) {
+        setDateCalculatorOpen(false);
+      }
+
       const copyDateResultBtn = e.target.closest('[data-tm-copy-date-result="1"]');
       if (copyDateResultBtn) {
         e.preventDefault();
@@ -1086,14 +1067,6 @@ function setDateCalculatorOpen(isOpen) {
           input.value = `${yyyy}-${mm}-${dd}`;
           input.dispatchEvent(new Event('input', {bubbles:true}));
         }
-        return;
-      }
-
-            const closeBtn = e.target.closest('[data-tm-datecalc-close="1"]');
-      if (closeBtn) {
-        e.preventDefault();
-        e.stopPropagation();
-        setDateCalculatorOpen(false);
         return;
       }
 
@@ -4649,6 +4622,681 @@ function setDateCalculatorOpen(isOpen) {
 })();
 
 /* =========================
+   CALL CENTER - FOCO E SUGESTÕES INICIAIS
+========================= */
+(function () {
+  'use strict';
+
+  const PLAN = 'input[placeholder="Operadora/Plano..."]';
+  const STYLE_ID = 'tm-callcenter-initial-suggestions-style';
+  const manuallyFocused = new WeakSet();
+  let keyboardIntentUntil = 0;
+
+  function isCallCenter() {
+    return window.location.hash === '#/call-center';
+  }
+
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    // Estas listas são as sugestões fixas do formulário. O autocomplete
+    // pesquisável fica dentro de .form-group e continua disponível.
+    style.textContent = `
+      .row:has(> .col > .form-group ${PLAN}) > .col > ul.list-group,
+      .row:has(> .col > .form-group input[placeholder="Selecione o Procedimento..."]) > .col > ul.list-group {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.addEventListener('pointerdown', (event) => {
+    if (!isCallCenter() || !(event.target instanceof Element)) return;
+    const input = event.target.closest(PLAN);
+    if (input) manuallyFocused.add(input);
+  }, true);
+
+  document.addEventListener('keydown', (event) => {
+    if (isCallCenter() && event.key === 'Tab') keyboardIntentUntil = Date.now() + 500;
+  }, true);
+
+  document.addEventListener('focusin', (event) => {
+    const input = event.target;
+    if (!isCallCenter() || !(input instanceof Element) || !input.matches(PLAN)) return;
+    if (Date.now() <= keyboardIntentUntil) manuallyFocused.add(input);
+    if (!manuallyFocused.has(input)) input.blur();
+  }, true);
+
+  document.addEventListener('focusout', (event) => {
+    if (event.target instanceof Element && event.target.matches(PLAN)) {
+      manuallyFocused.delete(event.target);
+    }
+  }, true);
+
+  tmRuntime.register('Call Center sem foco e sugestões iniciais', () => {
+    if (!isCallCenter()) return;
+    ensureStyle();
+    const input = document.querySelector(PLAN);
+    if (input && document.activeElement === input && !manuallyFocused.has(input)) input.blur();
+  });
+})();
+
+/* =========================
+   CALL CENTER - RASCUNHOS EM ESPERA
+========================= */
+(function () {
+  'use strict';
+
+  const DOCK_ID = 'tm-callcenter-drafts';
+  const STYLE_ID = 'tm-callcenter-drafts-style';
+  const MODAL_BUTTON_ID = 'tm-callcenter-draft-modal-save';
+  const MAX_DRAFTS = 20;
+  // Dados de pacientes ficam apenas na memória desta aba; não usar storage persistente.
+  const drafts = [];
+  const savedFields = ['dados', 'procedimentos', 'cadastro_temporario', 'st_observacoes',
+    'campos_customizados_base', 'fl_tele_atendimento', 'sinalizador_atendimento',
+    'extra', 'ordem_chegada', 'slots', 'confirm_docs', 'espera'];
+  let nextId = 1;
+  let owner = null;
+  let open = false;
+  let notice = '';
+  let pendingResume = null;
+  let restoring = false;
+  let saving = false;
+  let rendered = '';
+  let lastRoute = '';
+  let unloadGuardAttached = false;
+
+  function confirmLeavingWithDrafts(event) {
+    if (!drafts.length) return;
+    event.preventDefault();
+    // Compatibilidade com navegadores que ainda exigem returnValue.
+    event.returnValue = true;
+  }
+
+  function syncUnloadGuard() {
+    const shouldAttach = drafts.length > 0;
+    if (shouldAttach === unloadGuardAttached) return;
+    if (shouldAttach) window.addEventListener('beforeunload', confirmLeavingWithDrafts);
+    else window.removeEventListener('beforeunload', confirmLeavingWithDrafts);
+    unloadGuardAttached = shouldAttach;
+  }
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value, (key, item) => {
+      if (key === '__ob__' || typeof item === 'function') return undefined;
+      if (typeof File !== 'undefined' && item instanceof File) throw new Error('Anexos não podem ficar em espera.');
+      if (typeof Blob !== 'undefined' && item instanceof Blob) throw new Error('Anexos não podem ficar em espera.');
+      return item;
+    }));
+  }
+
+  function component() {
+    if (window.location.hash !== '#/call-center') return null;
+    const input = document.querySelector('input[placeholder="Operadora/Plano..."]');
+    const firstVisit = input || [...document.querySelectorAll('a')]
+      .find((item) => item.textContent.trim() === 'Primeira Vez');
+    // O formulário inicial some quando o usuário passa para horários. O modal
+    // continua dentro da árvore do mesmo componente em todas as etapas.
+    for (const start of [document.getElementById('cadastroModal'), firstVisit]) {
+      for (let element = start; element; element = element.parentElement) {
+        const vue = element.__vue__;
+        if (vue?.$route?.path === '/call-center' &&
+            typeof vue.$options?.methods?.marcar === 'function' &&
+            typeof vue.startFluxo === 'function') return vue;
+      }
+    }
+    return null;
+  }
+
+  function hasWork(vue) {
+    return !!(vue?.dados?.paciente || vue?.dados?.plano || vue?.dados?.procedimento ||
+      vue?.procedimentos?.length || vue?.cadastro_temporario?.st_nome || vue?.st_observacoes?.trim());
+  }
+
+  function safeFlow(vue) {
+    return [1, 2].includes(vue?.fluxo) && !vue?.remarcacao && !vue?.orcamento &&
+      !vue?.id_infusao && vue?.$route?.path === '/call-center';
+  }
+
+  function userId(vue) {
+    return String(vue?.$store?.state?.user?.id_usuario || '');
+  }
+
+  function headerUserId() {
+    for (let element = document.querySelector('nav.navbar'); element; element = element.parentElement) {
+      const id = userId(element.__vue__);
+      if (id) return id;
+    }
+    return '';
+  }
+
+  function checkOwner(vue) {
+    const current = userId(vue) || headerUserId();
+    if (!current) return false;
+    if (owner && owner !== current) {
+      drafts.length = 0;
+      pendingResume = null;
+      open = false;
+      notice = '';
+    }
+    owner = current;
+    return true;
+  }
+
+  function label(snapshot) {
+    const data = snapshot.dados || {};
+    const patient = data.paciente?.st_nome || snapshot.cadastro_temporario?.st_nome || '';
+    const procedures = snapshot.procedimentos || [];
+    const name = procedures.map((item) => item.procedimento?.search).filter(Boolean).slice(0, 2).join(' · ');
+    const display = (value) => typeof value === 'string' ? value.trim() :
+      ['search', 'st_nome_exibicao', 'st_nome', 'nome', 'nm_pessoa', 'descricao', 'st_descricao']
+        .map((key) => value?.[key]).find((text) => typeof text === 'string' && text.trim())?.trim() || '';
+    const professional = procedures.map((item) => display(item.medico || item.profissional))
+      .find(Boolean) || display(data.medico || data.profissional);
+    const operator = display(data.plano || data.operadora || procedures[0]?.plano);
+    return { patient, procedure: name || data.procedimento?.search || '',
+      professional, operator };
+  }
+
+  function displayDate(date) {
+    const value = String(date || '');
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)}` : '';
+  }
+
+  function selectedTimes(snapshot) {
+    return (snapshot.procedimentos || []).filter((item) => item.data && item.hora)
+      .map((item) => {
+        const date = displayDate(item.data);
+        return date ? `${date} • ${item.hora}` : '';
+      }).filter(Boolean).slice(0, 3);
+  }
+
+  function preferredSlot(vue) {
+    const selected = (vue.procedimentos || []).find((item) => item.data && item.hora);
+    const source = selected || vue.horario_selecionado || null;
+    const date = String(source?.data || Object.keys(vue.exibicao || {})[vue.selecao?.dia] || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    if (!source?.hora) return { date };
+    return {
+      date,
+      time: String(source.hora),
+      agendaId: Number(source.id_agenda) || null,
+      procedureIndex: Number.isInteger(source.index) ? source.index : null,
+      doctorId: Number(source.medico?.id_pessoa || source.id_medico) || null,
+      procedureId: Number(source.procedimento?.id_procedimento) || null,
+      unitId: Number(source.id_unidade_operacao) || null
+    };
+  }
+
+  function capture(vue) {
+    if (!safeFlow(vue) || !hasWork(vue)) throw new Error('Preencha ao menos paciente, plano ou procedimento.');
+    if (vue.buscando || vue.buscando_paciente || vue.buscando_procedimento ||
+        vue.$store?.state?.loading) throw new Error('Aguarde a busca em andamento terminar.');
+    if ([...document.querySelectorAll('input[type="file"]')].some((input) => input.files?.length) ||
+        vue.marcacao_anexo) {
+      throw new Error('Anexos não podem ficar em espera.');
+    }
+    const values = Object.fromEntries(savedFields.map((field) => [field, vue[field]]));
+    const snapshot = clone(values);
+    if (JSON.stringify(snapshot).length > 250000) throw new Error('Este preenchimento é grande demais para ficar em espera.');
+    return { flow: vue.fluxo, snapshot, preferred: preferredSlot(vue) };
+  }
+
+  function clearTimes(snapshot) {
+    // A seleção anterior pode ter criado uma reserva temporária no servidor; nunca a reutilizar.
+    const copy = clone(snapshot);
+    for (const item of copy.procedimentos || []) {
+      for (const field of ['hora', 'data', 'hg', 'vg', 'base', 'id_agenda', 'slots',
+        'duracao', 'local_nome', 'id_local', 'doc_pre_atends']) {
+        if (field in item) item[field] = null;
+      }
+      if (item.repeticao && typeof item.repeticao === 'object') {
+        item.repeticao.hora = null;
+        if ('base' in item.repeticao) item.repeticao.base = null;
+      }
+      item.selected = true;
+      item.novo = true;
+    }
+    for (const field of ['hora', 'data', 'id_agenda']) {
+      if (field in (copy.dados || {})) copy.dados[field] = null;
+    }
+    if (copy.dados) {
+      copy.dados.selected = false;
+      if (copy.dados.repeticao && typeof copy.dados.repeticao === 'object') {
+        copy.dados.repeticao.hora = null;
+        if ('base' in copy.dados.repeticao) copy.dados.repeticao.base = null;
+      }
+    }
+    return copy;
+  }
+
+  function notify(message) {
+    notice = message;
+    open = true;
+    render();
+  }
+
+  async function save() {
+    if (saving || restoring) return;
+    const vue = component();
+    if (!vue || !checkOwner(vue)) return notify('Abra uma marcação para colocá-la em espera.');
+    if (drafts.length >= MAX_DRAFTS) return notify(`Limite de ${MAX_DRAFTS} rascunhos nesta aba.`);
+    let captured;
+    try { captured = capture(vue); }
+    catch (error) { return notify(error.message); }
+    saving = true;
+    const description = label(captured.snapshot);
+    drafts.unshift({ id: nextId++, user: owner, created: Date.now(), ...captured,
+      ...description, times: selectedTimes(captured.snapshot) });
+    open = true;
+    notice = '';
+    render();
+    try {
+      const modal = document.querySelector('#cadastroModal.show');
+      if (modal) {
+        const jq = window.jQuery || window.$;
+        if (jq?.fn?.modal) jq('#cadastroModal').modal('hide');
+        else modal.querySelector('[data-dismiss="modal"]')?.click();
+      }
+      if (vue.horarios && vue.procedimentos?.some((item) => item.data && item.hora)) vue.voltar();
+      await vue.reiniciar();
+    }
+    catch (error) {
+      console.error('[TM] Rascunho salvo, mas não foi possível reiniciar a marcação.', error);
+      notice = 'Rascunho salvo; reinicie a marcação manualmente para começar outra.';
+    } finally {
+      saving = false;
+      render();
+    }
+  }
+
+  async function fetchPatient(vue, snapshot) {
+    const id = snapshot.dados?.paciente?.id_pessoa;
+    if (!(Number(id) > 0)) return;
+    const response = await vue.axios.post('/aql?a=pacientes.show', {
+      q: [{ name: 'pacientes.show', id: 'paciente', parms: { id } }]
+    });
+    if (response?.data?.paciente?.status !== 200 || !response.data.paciente.data) {
+      throw new Error('Não foi possível confirmar o cadastro do paciente.');
+    }
+    snapshot.dados.paciente = response.data.paciente.data;
+  }
+
+  async function waitForDefaultPlan(vue, flow) {
+    const defaultId = flow === 1 ? Number(vue.$store?.state?.user?.id_plano) : 0;
+    if (!(defaultId > 0)) return;
+    for (let attempt = 0; attempt < 40; attempt++) {
+      if (Number(vue.dados?.plano?.id_plano) === defaultId) return;
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+    throw new Error('O plano padrão ainda não carregou. Aguarde e tente retomar novamente.');
+  }
+
+  function dayBefore(date) {
+    const value = new Date(`${date}T12:00:00`);
+    value.setDate(value.getDate() - 1);
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  }
+
+  async function waitForSearch(vue) {
+    for (let attempt = 0; attempt < 150; attempt++) {
+      if (!vue.buscando && Array.isArray(vue.horarios)) return;
+      if (component() !== vue) throw new Error('A página mudou durante a busca.');
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+    throw new Error('A busca de horários demorou demais. Use Buscar Horários para tentar novamente.');
+  }
+
+  function matchingSlot(vue, preferred) {
+    return (vue.horarios || []).find((slot) =>
+      slot.status === 'livre' && !slot.bloqueado && !slot.restricao &&
+      Number.isInteger(slot.index) &&
+      slot.data === preferred.date &&
+      String(slot.hora) === preferred.time &&
+      (preferred.procedureIndex === null || slot.index === preferred.procedureIndex) &&
+      (!preferred.agendaId || Number(slot.id_agenda) === preferred.agendaId) &&
+      (!preferred.doctorId || Number(slot.medico?.id_pessoa || slot.id_medico) === preferred.doctorId) &&
+      (!preferred.procedureId || Number(slot.procedimento?.id_procedimento) === preferred.procedureId) &&
+      (!preferred.unitId || Number(slot.id_unidade_operacao) === preferred.unitId));
+  }
+
+  async function restoreDate(vue, preferred) {
+    if (typeof vue.buscarHorarios !== 'function') return '';
+    if (!preferred) {
+      if (!vue.procedimentos?.length && !vue.dados?.procedimento) {
+        return 'Preenchimento retomado. Adicione um procedimento para buscar horários.';
+      }
+      vue.buscarHorarios();
+      await waitForSearch(vue);
+      return 'Horários atualizados. Escolha uma data e uma vaga disponíveis.';
+    }
+    const today = new Date();
+    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    if (preferred.date < todayIso) return 'A data preferida já passou. Escolha uma nova data.';
+    vue.buscadoAte = dayBefore(preferred.date);
+    vue.buscarHorarios();
+    await waitForSearch(vue);
+    // listaPacientes abre a agenda completa do dia, não o cadastro do paciente.
+    // A vaga já está na busca; selecioná-la diretamente abre apenas o cadastro.
+    if (!preferred.time) return 'Horários atualizados. Escolha uma vaga disponível na lista.';
+    const slot = matchingSlot(vue, preferred);
+    if (!slot) return 'A vaga anterior não está livre. Selecione outro horário na lista.';
+    vue.selecionar_horario(slot);
+    for (let attempt = 0; attempt < 120; attempt++) {
+      if (document.querySelector('#cadastroModal.show')) {
+        return '';
+      }
+      if (component() !== vue) throw new Error('A página mudou durante a reserva da vaga.');
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+    return 'A vaga não pôde ser reaberta. Confira os horários exibidos.';
+  }
+
+  async function resume(id) {
+    const draft = drafts.find((item) => item.id === id);
+    if (!draft || restoring || saving) return;
+    const vue = component();
+    if (!vue) {
+      pendingResume = id;
+      window.location.hash = '#/call-center';
+      tmRuntime.schedule(0);
+      return;
+    }
+    if (!checkOwner(vue) || draft.user !== owner) return notify('Este rascunho pertence a outra sessão.');
+    if (safeFlow(vue) && hasWork(vue)) {
+      return notify('Guarde ou reinicie a marcação atual antes de retomar outra.');
+    }
+    pendingResume = null;
+    restoring = true;
+    notify('Restaurando rascunho...');
+    try {
+      const snapshot = clearTimes(draft.snapshot);
+      await fetchPatient(vue, snapshot);
+      if (window.location.hash !== '#/call-center' || component() !== vue || userId(vue) !== draft.user) {
+        throw new Error('A página mudou durante a restauração. Tente novamente.');
+      }
+      vue.startFluxo(draft.flow);
+      await new Promise((resolve) => vue.$nextTick(resolve));
+      await waitForDefaultPlan(vue, draft.flow);
+      for (const field of savedFields) {
+        if (Object.hasOwn(snapshot, field) && Object.hasOwn(vue.$data, field)) vue[field] = snapshot[field];
+      }
+      if (snapshot.dados?.plano && typeof vue.selecionarPlano === 'function') {
+        vue.selecionarPlano(snapshot.dados.plano);
+        if (!vue.dados.plano) throw new Error('O plano salvo não está mais disponível. Reinicie e escolha outro plano.');
+      }
+      vue.$forceUpdate();
+      if (snapshot.dados?.paciente) await vue.selecionarPaciente(true);
+      drafts.splice(drafts.indexOf(draft), 1);
+      open = false;
+      notice = '';
+      try {
+        const status = await restoreDate(vue, draft.preferred);
+        if (status) notify(status);
+      } catch (error) {
+        notify(error.message || 'Preenchimento retomado; faça a busca de horários manualmente.');
+      }
+    } catch (error) {
+      console.warn('[TM] Falha ao retomar rascunho:', error);
+      notice = error.message || 'Não foi possível retomar o rascunho.';
+    } finally {
+      restoring = false;
+      render();
+    }
+  }
+
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      #${DOCK_ID} { position: relative; display: flex; align-items: center;
+        font-family: "Open Sans", "Helvetica Neue", sans-serif; font-size: 13px;
+        color: #343a40; margin-right: 8px; }
+      #${DOCK_ID} .tm-draft-trigger { position: relative; display: inline-flex;
+        align-items: center; justify-content: center; width: 38px; height: 38px;
+        min-width: 38px; min-height: 38px; padding: 0; border-radius: 13px;
+        border: 1px solid rgba(255,255,255,.34); background: rgba(255,255,255,.12);
+        color: #fff; line-height: 1; box-shadow: 0 4px 10px rgba(0,0,0,.10);
+        backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+        transition: transform .16s ease, background .16s ease, border-color .16s ease,
+          box-shadow .16s ease; }
+      #${DOCK_ID} .tm-draft-trigger:hover, #${DOCK_ID} .tm-draft-trigger:focus,
+      #${DOCK_ID} .tm-draft-trigger[aria-expanded="true"] { background: rgba(255,255,255,.22);
+        border-color: rgba(255,255,255,.58); box-shadow: 0 7px 16px rgba(0,0,0,.18);
+        transform: translateY(-1px); }
+      #${DOCK_ID} .tm-draft-trigger:active { transform: translateY(0); }
+      #${DOCK_ID} .tm-draft-icon { font-size: 20px; line-height: 1; }
+      #${DOCK_ID} .tm-draft-count { position: absolute; top: -5px; right: -5px;
+        min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px;
+        display: flex; align-items: center; justify-content: center;
+        background: #fff; color: #075d48; border: 1px solid #075d48;
+        font-size: 10px; font-weight: 700; line-height: 1; }
+      #${DOCK_ID} button { border: 1px solid #adb5bd; background: #fff; color: #344054;
+        border-radius: 5px; padding: 7px 10px; cursor: pointer; font: inherit; }
+      #${DOCK_ID} button:hover { background: #f1f4f7; }
+      #${DOCK_ID} button:disabled { opacity: .55; cursor: default; }
+      #${DOCK_ID} .tm-draft-panel { position: absolute; top: calc(100% + 8px); right: 0;
+        width: min(370px, calc(100vw - 24px)); z-index: 1100; max-height: min(460px, 75vh);
+        overflow: auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 7px;
+        box-shadow: 0 8px 24px #0003; padding: 10px; }
+      #${DOCK_ID} .tm-draft-item { position: relative; border-top: 1px solid #e6e9ed;
+        padding: 11px 0; cursor: pointer; }
+      #${DOCK_ID} .tm-draft-item:first-of-type { border-top: 0; }
+      #${DOCK_ID} .tm-draft-name { display: block; color: #273444; }
+      #${DOCK_ID} .tm-draft-line { min-height: 1.45em; color: #526171;
+        line-height: 1.45; overflow-wrap: anywhere; }
+      #${DOCK_ID} .tm-draft-date { padding-right: 36px; }
+      #${DOCK_ID} .tm-draft-resume-hitbox { position: absolute; inset: 0; z-index: 1;
+        width: 100%; height: 100%; padding: 0; border: 0 !important;
+        background: transparent !important; box-shadow: none !important; }
+      #${DOCK_ID} .tm-draft-resume-hitbox:focus:not(:focus-visible) {
+        outline: none !important; }
+      #${DOCK_ID} .tm-draft-resume-hitbox:focus-visible { outline: 2px solid #007bff !important;
+        outline-offset: -2px; }
+      #${DOCK_ID} .tm-draft-discard { position: absolute; right: 3px; bottom: 7px;
+        z-index: 2; width: 28px; height: 28px; padding: 0; border: 0;
+        background: transparent; color: #dc3545; font-size: 16px;
+        opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+      #${DOCK_ID} .tm-draft-discard:hover { background: #fff1f2; color: #bd2130; }
+      #${DOCK_ID} .tm-draft-item:hover .tm-draft-discard,
+      #${DOCK_ID} .tm-draft-item:focus-within .tm-draft-discard {
+        opacity: 1; pointer-events: auto; }
+      @media (hover: none) {
+        #${DOCK_ID} .tm-draft-discard { opacity: 1; pointer-events: auto; }
+      }
+      #${DOCK_ID} .tm-draft-note { margin-top: 7px; color: #6b4d00; }
+      #${DOCK_ID} .tm-draft-empty { color: #667085; }
+      #cadastroModal #${MODAL_BUTTON_ID}.btn-primary { background: #007bff;
+        border-color: #007bff; color: #fff; }
+      #cadastroModal #${MODAL_BUTTON_ID}.btn-primary:hover { background: #0069d9;
+        border-color: #0062cc; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function ensureModalSave(canSave) {
+    const modal = document.getElementById('cadastroModal');
+    const existing = document.getElementById(MODAL_BUTTON_ID);
+    if (!canSave || !modal) { existing?.remove(); return; }
+    // Há outros modais aninhados no cadastro; o primeiro .modal-footer é oculto.
+    const footer = modal.querySelector(':scope > .modal-dialog > .modal-content > .modal-footer');
+    if (!footer || existing?.parentElement === footer) {
+      if (existing) existing.disabled = saving || restoring;
+      return;
+    }
+    existing?.remove();
+    const button = document.createElement('button');
+    button.id = MODAL_BUTTON_ID;
+    button.type = 'button';
+    button.className = 'btn btn-primary mr-auto';
+    button.textContent = 'Colocar em espera';
+    button.disabled = saving || restoring;
+    button.addEventListener('click', save);
+    footer.prepend(button);
+  }
+
+  function render() {
+    const vue = component();
+    const canSave = safeFlow(vue);
+    const headerHost = document.querySelector('nav.navbar ul.navbar-nav.ml-auto');
+    const currentUser = headerUserId();
+    if (currentUser) checkOwner(vue || { $store: { state: { user: { id_usuario: currentUser } } } });
+    syncUnloadGuard();
+    ensureModalSave(canSave);
+    let dock = document.getElementById(DOCK_ID);
+    if (!headerHost || !currentUser) {
+      dock?.remove();
+      rendered = '';
+      return;
+    }
+    ensureStyle();
+    if (!dock || dock.parentElement !== headerHost) {
+      dock?.remove();
+      dock = document.createElement('li');
+      dock.id = DOCK_ID;
+      dock.className = 'nav-item';
+      dock.setAttribute('aria-label', 'Rascunhos de agendamento');
+      dock.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+        const action = button.dataset.action, id = Number(button.dataset.id);
+        if (action === 'toggle') { open = !open; notice = ''; render(); }
+        if (action === 'resume') resume(id);
+        if (action === 'discard' && !saving && !restoring) {
+          const item = drafts.find((draft) => draft.id === id);
+          if (!item || !window.confirm(`Descartar o rascunho de ${item.patient}?`)) return;
+          drafts.splice(drafts.indexOf(item), 1);
+          notice = 'Rascunho descartado.';
+          render();
+        }
+      });
+      const calculator = headerHost.querySelector('[data-tm-datecalc-header-trigger="1"]')?.closest('li');
+      headerHost.insertBefore(dock, calculator || headerHost.firstElementChild);
+      rendered = '';
+    }
+    const signature = JSON.stringify([canSave, drafts.map((draft) => draft.id), open, notice, restoring, saving]);
+    if (rendered === signature) return;
+    rendered = signature;
+    dock.replaceChildren();
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'tm-draft-trigger';
+    toggle.dataset.action = 'toggle';
+    toggle.title = `Em espera (${drafts.length})`;
+    toggle.setAttribute('aria-label', `Em espera (${drafts.length})`);
+    toggle.setAttribute('aria-expanded', String(open));
+    const icon = document.createElement('span');
+    icon.className = 'tm-draft-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '📅';
+    toggle.appendChild(icon);
+    if (drafts.length) {
+      const count = document.createElement('span');
+      count.className = 'tm-draft-count';
+      count.setAttribute('aria-hidden', 'true');
+      count.textContent = String(drafts.length);
+      toggle.appendChild(count);
+    }
+    dock.appendChild(toggle);
+    if (open) {
+      const panel = document.createElement('div');
+      panel.className = 'tm-draft-panel';
+      if (!drafts.length) {
+        const empty = document.createElement('div');
+        empty.className = 'tm-draft-empty';
+        empty.textContent = 'Nenhuma marcação em espera';
+        panel.appendChild(empty);
+      }
+      for (const draft of drafts) {
+        const item = document.createElement('div');
+        item.className = 'tm-draft-item';
+        const name = document.createElement('strong');
+        name.className = 'tm-draft-name';
+        name.textContent = draft.patient;
+        const line = (text) => {
+          const element = document.createElement('div');
+          element.className = 'tm-draft-line';
+          element.textContent = text;
+          return element;
+        };
+        const date = line(draft.times.length ? draft.times.join(' · ') :
+          displayDate(draft.preferred?.date));
+        date.classList.add('tm-draft-date');
+        const resumeButton = document.createElement('button');
+        resumeButton.type = 'button';
+        resumeButton.className = 'tm-draft-resume-hitbox';
+        resumeButton.dataset.action = 'resume';
+        resumeButton.dataset.id = String(draft.id);
+        resumeButton.setAttribute('aria-label', `Retomar agendamento de ${draft.patient}`);
+        resumeButton.disabled = saving || restoring;
+        const discard = document.createElement('button');
+        discard.type = 'button';
+        discard.className = 'tm-draft-discard';
+        discard.dataset.action = 'discard';
+        discard.dataset.id = String(draft.id);
+        discard.setAttribute('aria-label', `Descartar rascunho de ${draft.patient}`);
+        discard.title = 'Descartar rascunho';
+        discard.disabled = saving || restoring;
+        const trash = document.createElement('i');
+        trash.className = 'far fa-trash-alt';
+        trash.setAttribute('aria-hidden', 'true');
+        discard.appendChild(trash);
+        item.append(name, line(draft.procedure), line(draft.professional),
+          line(draft.operator), date, resumeButton, discard);
+        panel.appendChild(item);
+      }
+      if (notice) {
+        const message = document.createElement('div');
+        message.className = 'tm-draft-note';
+        message.setAttribute('role', 'status');
+        message.textContent = notice;
+        panel.appendChild(message);
+      }
+      dock.appendChild(panel);
+    }
+  }
+
+  function ensureDrafts() {
+    const route = window.location.hash;
+    if (route !== lastRoute) {
+      lastRoute = route;
+      open = false;
+      rendered = '';
+    }
+    if (pendingResume && !restoring && component()) resume(pendingResume);
+    render();
+  }
+
+  document.addEventListener('click', (event) => {
+    // O render troca o botão durante o clique; target.closest() deixa de achar
+    // o dock depois da remoção, mas composedPath() preserva o caminho original.
+    const inside = event.composedPath().some((node) =>
+      node?.id === DOCK_ID || node?.id === MODAL_BUTTON_ID);
+    if (open && !inside) {
+      open = false;
+      render();
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (open && event.key === 'Escape') {
+      open = false;
+      render();
+    }
+  });
+  document.addEventListener('tm-datecalc-opened', () => {
+    if (open) {
+      open = false;
+      render();
+    }
+  });
+
+  tmRuntime.register('rascunhos de agendamento do Call Center', ensureDrafts);
+})();
+
+/* =========================
    RECEPÇÃO - NOVO ATENDIMENTO
 ========================= */
 (function () {
@@ -5159,182 +5807,1479 @@ function setDateCalculatorOpen(isOpen) {
 
 
 /* =========================
-   RECEPÇÃO - AGENDA COM DATA SELECIONADA E PRÓXIMA DATA
+   RECEPÇÃO - CALENDÁRIO COM DIAS DE ATENDIMENTO E BLOQUEIO
+========================= */
+let tmAppointmentCalendarCore;
+(function () {
+  'use strict';
+
+  const BUTTON_ID = 'tm-recepcao-calendario-botao';
+  const BUTTON_HOST_ID = 'tm-recepcao-calendario-host';
+  const POPOVER_ID = 'tm-recepcao-calendario-popover';
+  const STYLE_ID = 'tm-recepcao-calendario-style';
+  const HIDDEN_TURNO_CLASS = 'tm-recepcao-turno-oculto';
+  const monthNames = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const CACHE_MS = 120000;
+  const METADATA_CACHE_MS = CACHE_MS;
+  const RETAIN_MS = 15 * 60000;
+  const BACKGROUND_REFRESH_MS = 90000;
+  let automaticRefresh = false;
+  let boundComponent = null;
+  let detachContext = null;
+  let mountedInput = null;
+  let mountedContext = '';
+  const state = { month: null, days: new Map(), loading: false, error: '', request: 0, context: '' };
+
+  function isReceptionPage() {
+    return window.location.hash === '#/recepcao' &&
+      !!document.querySelector('input#ref-data[type="date"]');
+  }
+
+  function iso(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  function selectedMonth() {
+    const raw = document.querySelector('#ref-data')?.value || '';
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const date = match ? new Date(Number(match[1]), Number(match[2]) - 1, 1, 12) : new Date();
+    return new Date(date.getFullYear(), date.getMonth(), 1, 12);
+  }
+
+  function receptionComponent() {
+    let element = document.querySelector('#filtro-medico');
+    while (element) {
+      const component = element.__vue__;
+      if (component && typeof component.$http?.post === 'function' &&
+          component.unidade_operacao !== undefined) return component;
+      element = element.parentElement;
+    }
+    return null;
+  }
+
+  function weekAnchor(date) {
+    const cursor = new Date(`${date}T12:00:00`);
+    cursor.setDate(cursor.getDate() - (cursor.getDay() + 6) % 7);
+    return iso(cursor);
+  }
+
+  function calendarDates(month) {
+    const first = new Date(month.getFullYear(), month.getMonth(), 1, 12);
+    first.setDate(first.getDate() - first.getDay());
+    return Array.from({ length: 42 }, (_, index) =>
+      iso(new Date(first.getFullYear(), first.getMonth(), first.getDate() + index, 12)));
+  }
+
+  function matchesUnit(agenda, unit) {
+    if (!unit) return true;
+    const agendaUnit = agenda?.id_unidade_operacao ??
+      agenda?.local?.centro_custo?.id_unidade_operacao;
+    return agendaUnit != null && String(agendaUnit) === unit;
+  }
+
+  function minutes(value) {
+    const match = String(value || '').match(/^(\d{1,2}):(\d{2})/);
+    return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+  }
+
+  function blockCoversSchedule(block, appointments) {
+    if (!block || [false, 0, '0'].includes(block.fl_ativo)) return false;
+    const start = minutes(block.hora_inicio);
+    const end = minutes(block.hora_termino);
+    if (start == null || end == null) return false;
+    if (start === 0 && end >= 23 * 60 + 59) return true;
+    const times = appointments.map((entry) => minutes(entry.hora));
+    return times.length > 0 && times.every((time) => time != null && time >= start && time <= end);
+  }
+
+  function monthKey(month, doctor, unit) {
+    return doctor + '|' + unit + '|' + iso(month).slice(0, 7);
+  }
+
+  // Núcleo independente da interface. Só conserva resumos; nunca pacientes.
+  function createCalendarSource({ post, busy = () => false, paused = () => false, changed = () => {}, now = Date.now }) {
+    const days = new Map(), weeks = new Map(), holidays = new Map();
+    const runs = new Map(), pendingDays = new Map(), pendingMetadata = new Map(), listeners = new Set();
+    let activeContext = '', sequence = 0, invalidatedAt = 0, active = 0, wake = null;
+    const stats = { requests: 0, queries: 0, joined: 0, cacheHits: 0 };
+    const queue = [];
+    const cancelled = () => Object.assign(new Error('Busca substituída.'), { cancelled: true });
+    const contextKey = (doctor, unit) => String(doctor) + '|' + String(unit);
+    const dayKey = (context, date) => context + '|' + date;
+    function fresh(map, key) {
+      const entry = map.get(key);
+      if (entry && now() - entry.time < (map === days ? CACHE_MS : METADATA_CACHE_MS)) return entry.value;
+      if (entry && now() - entry.time >= RETAIN_MS) map.delete(key);
+      return undefined;
+    }
+    function retained(map, key) {
+      const entry = map.get(key);
+      if (!entry) return undefined;
+      if (now() - entry.time < RETAIN_MS) return entry.value;
+      map.delete(key);
+      return undefined;
+    }
+    function needsDay(run, date) {
+      const key = dayKey(run.context, date);
+      return fresh(days, key) === undefined ||
+        (run.refresh && (days.get(key)?.stamp || 0) < run.stamp);
+    }
+    function remember(map, key, value, stamp, limit) {
+      if ((map.get(key)?.stamp || 0) > stamp) return;
+      map.delete(key);
+      map.set(key, { value, time: now(), stamp });
+      while (map.size > limit) map.delete(map.keys().next().value);
+    }
+    function read(dates, doctor, unit) {
+      const context = contextKey(doctor, unit), result = new Map();
+      for (const date of dates) {
+        const value = retained(days, dayKey(context, date));
+        if (value !== undefined) result.set(date, value);
+      }
+      return result;
+    }
+    function freshCount(dates, doctor, unit) {
+      const context = contextKey(doctor, unit);
+      return dates.filter((date) => fresh(days, dayKey(context, date)) !== undefined).length;
+    }
+    function stop() {
+      runs.forEach((run) => {
+        run.cancelled = true;
+        run.cancels.forEach((cancel) => cancel());
+      });
+      runs.clear();
+      pendingDays.clear();
+      pendingMetadata.clear();
+      while (queue.length) queue.shift().reject(cancelled());
+      clearTimeout(wake);
+      wake = null;
+      activeContext = '';
+    }
+    function notify(event = 'days') {
+      changed(event);
+      listeners.forEach((listener) => listener(event));
+    }
+    function promote(run, priority) {
+      run.priority = Math.min(run.priority, priority);
+      run.dependencies.forEach((dependency) => promote(dependency, priority));
+    }
+    function pump() {
+      clearTimeout(wake);
+      wake = null;
+      queue.sort((a, b) => a.run.priority - b.run.priority);
+      while (active < 2 && queue.length) {
+        const job = queue[0];
+        if (job.run.cancelled) { queue.shift().reject(cancelled()); continue; }
+        // A seleção do médico começa imediatamente, mesmo durante a busca nativa.
+        // Nessa situação e nos meses secundários usamos só uma conexão própria.
+        const limit = busy(job.run.component) || job.run.priority > 0 ? 1 : 2;
+        if (paused()) {
+          wake = setTimeout(pump, 200);
+          return;
+        }
+        if (active >= limit) return; // A conclusão da consulta ativa já acorda a fila.
+        queue.shift();
+        active++;
+        Promise.resolve().then(() => {
+          if (job.run.cancelled) throw cancelled();
+          stats.requests++;
+          stats.queries += job.q.length;
+          return post(job.run.component, job.q, job.run.cancels);
+        }).then((response) => {
+          if (job.run.cancelled) throw cancelled();
+          job.resolve(response);
+        }).catch(job.reject).finally(() => { active--; pump(); });
+      }
+    }
+    function query(run, q) {
+      if (run.cancelled) return Promise.reject(cancelled());
+      return new Promise((resolve, reject) => {
+        queue.push({ run, q, resolve, reject });
+        pump();
+      });
+    }
+    function result(response, id) {
+      const item = response?.data?.[id];
+      if (item?.status !== 200 || !item.data) throw new Error('Consulta recusada: ' + id);
+      return item.data;
+    }
+    function scheduleMap(data, unit) {
+      if (!data || !data.agendas || typeof data.agendas !== 'object') {
+        throw new Error('Agenda semanal incompleta.');
+      }
+      const map = new Map();
+      Object.entries(data.agendas).forEach(([date, list]) => {
+        if (!Array.isArray(list)) throw new Error('Agenda semanal inválida.');
+        const matching = list.filter((agenda) => matchesUnit(agenda, unit));
+        if (matching.length) map.set(date, {
+          holidayAllowed: matching.some((agenda) => [true, 1, '1'].includes(agenda.fl_pode_feriado))
+        });
+      });
+      return map;
+    }
+    function compact(data) {
+      if (!Array.isArray(data?.agendas) || data.paginate) throw new Error('Agenda incompleta.');
+      return {
+        agendas: data.agendas.map((entry) => ({
+          hora: entry.hora, status: entry.status,
+          id_agenda: entry.id_agenda, marcacao: !!entry.marcacao
+        })),
+        bloqueio: data.bloqueio && {
+          fl_ativo: data.bloqueio.fl_ativo,
+          hora_inicio: data.bloqueio.hora_inicio, hora_termino: data.bloqueio.hora_termino
+        },
+        feriado: data.feriado && {
+          fl_ativo: data.feriado.fl_ativo, fl_pode_agendar: data.feriado.fl_pode_agendar,
+          st_descricao: data.feriado.st_descricao
+        }
+      };
+    }
+    function classify(data, schedule) {
+      const appointments = data.agendas, block = data.bloqueio, holiday = data.feriado;
+      const hasPatient = appointments.some((entry) => !!entry.marcacao);
+      const hasFree = appointments.some((entry) => entry.status === 'livre');
+      const hasRegular = appointments.some((entry) => entry.status === 'ocupado' && entry.id_agenda != null);
+      const hasBlocked = appointments.some((entry) => entry.status === 'bloqueado');
+      const hasBlock = !!block && ![false, 0, '0'].includes(block.fl_ativo);
+      const holidayActive = !!holiday && ![false, 0, '0'].includes(holiday.fl_ativo);
+      const holidayClosed = holidayActive && ![true, 1, '1'].includes(holiday.fl_pode_agendar) &&
+        !schedule?.holidayAllowed;
+      const usable = !holidayClosed && !blockCoversSchedule(block, appointments) && (hasFree || hasRegular);
+      return {
+        kind: usable ? 'attendance' : hasPatient ? 'booked' :
+          holidayClosed || (!!schedule && (hasBlock || hasBlocked)) ? 'blocked' : '',
+        holiday: holidayActive ? holiday.st_descricao || 'Feriado' : '',
+        holidayClosed: !!holidayClosed, block: hasBlock || hasBlocked
+      };
+    }
+    function put(run, date, data, schedule) {
+      if (run.cancelled) return;
+      remember(days, dayKey(run.context, date), classify(data, schedule), run.stamp, 1008);
+      notify();
+    }
+    function holidayCandidate(date, records) {
+      return records.some((holiday) => {
+        if ([false, 0, '0'].includes(holiday.fl_ativo)) return false;
+        const start = holiday.dt_inicio?.slice(0, 10), end = holiday.dt_termino?.slice(0, 10);
+        // Um cadastro inesperado deve aumentar a conferência, não ocultar feriados.
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(start || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end || '')) return true;
+        if (![true, 1, '1'].includes(holiday.fl_recorrente)) return date >= start && date <= end;
+        const year = Number(date.slice(0, 4));
+        return [year - 1, year].some((base) => {
+          const first = base + start.slice(4);
+          const last = (base + (end.slice(5) < start.slice(5) ? 1 : 0)) + end.slice(4);
+          return date >= first && date <= last;
+        });
+      });
+    }
+    async function metadata(run, dates) {
+      const anchors = [...new Set(dates.map(weekAnchor))];
+      const years = [...new Set(dates.map((date) => date.slice(0, 4)))];
+      const holidayKey = (year) => run.unit + '|' + year;
+      const missingWeeks = anchors.filter((date) => fresh(weeks, dayKey(run.context, date)) === undefined);
+      const missingYears = years.filter((year) => fresh(holidays, holidayKey(year)) === undefined);
+      const flightKey = (type, key) => type + '|' + key;
+      const dependencies = [];
+      const ownWeeks = missingWeeks.filter((date) => {
+        const flight = pendingMetadata.get(flightKey('week', dayKey(run.context, date)));
+        if (flight) { promote(flight.run, run.priority); dependencies.push(flight.promise); }
+        return !flight;
+      });
+      const ownYears = missingYears.filter((year) => {
+        const flight = pendingMetadata.get(flightKey('holiday', holidayKey(year)));
+        if (flight) { promote(flight.run, run.priority); dependencies.push(flight.promise); }
+        return !flight;
+      });
+      const q = ownWeeks.map((date, i) => ({
+        name: 'medicos.agenda_semanal', id: 'week' + i,
+        parms: { id_medico: Number(run.doctor), data: date }
+      })).concat(ownYears.map((year, i) => ({
+        name: 'agenda_feriados.index', id: 'holiday' + i, parms: { ano: Number(year), cadastro: true }
+      })));
+      if (q.length) {
+        const response = query(run, q);
+        function track(key, consume) {
+          const flight = { run, promise: null };
+          flight.promise = response.then(consume).finally(() => {
+            if (pendingMetadata.get(key) === flight) pendingMetadata.delete(key);
+          });
+          pendingMetadata.set(key, flight);
+          dependencies.push(flight.promise);
+        }
+        ownWeeks.forEach((date, i) => track(flightKey('week', dayKey(run.context, date)), (value) =>
+          remember(weeks, dayKey(run.context, date), scheduleMap(result(value, 'week' + i), run.unit), run.stamp, 168)));
+        ownYears.forEach((year, i) => track(flightKey('holiday', holidayKey(year)), (value) => {
+          const records = result(value, 'holiday' + i);
+          if (!Array.isArray(records)) throw new Error('Cadastro de feriados incompleto.');
+          remember(holidays, holidayKey(year), records.map((h) => ({
+            dt_inicio: h.dt_inicio, dt_termino: h.dt_termino,
+            fl_recorrente: h.fl_recorrente, fl_ativo: h.fl_ativo
+          })), run.stamp, 12);
+        }));
+      }
+      const outcomes = await Promise.allSettled(dependencies);
+      if (run.cancelled) throw cancelled();
+      const failure = outcomes.find((item) => item.status === 'rejected');
+      if (failure) throw failure.reason;
+      const scheduled = new Map();
+      anchors.forEach((date) => {
+        const week = fresh(weeks, dayKey(run.context, date));
+        if (!week) throw new Error('Agenda semanal expirada.');
+        week.forEach((value, key) => scheduled.set(key, value));
+      });
+      const records = years.flatMap((year) => {
+        const value = fresh(holidays, holidayKey(year));
+        if (!value) throw new Error('Cadastro de feriados expirado.');
+        return value;
+      });
+      return { scheduled, records };
+    }
+    function parms(run) {
+      return { medico: Number(run.doctor), unidade_operacao: run.unit,
+        group: 'none', livres: 1, status: 'T', tipo_proced: 'T', na_recepcao: true };
+    }
+    async function daily(run, dates, scheduled) {
+      const jobs = [];
+      for (let start = 0; start < dates.length; start += 7) {
+        const batch = dates.slice(start, start + 7).filter((date) =>
+          needsDay(run, date));
+        if (!batch.length) continue;
+        jobs.push(query(run, batch.map((date, i) => ({
+          name: 'agendas.index', id: 'day' + i, parms: { ...parms(run), data: date }
+        }))).then((response) => batch.forEach((date, i) => {
+          const data = result(response, 'day' + i);
+          if (data.parms?.data && data.parms.data.slice(0, 10) !== date) throw new Error('Data diária inesperada.');
+          put(run, date, compact(data), scheduled.get(date));
+        })));
+      }
+      const settled = await Promise.allSettled(jobs);
+      const failure = settled.find((item) => item.status === 'rejected');
+      if (failure) throw failure.reason;
+    }
+    async function ranges(run, chunks, meta) {
+      const response = await query(run, chunks.map((dates, i) => ({
+        name: 'agendas.index', id: 'range' + i,
+        parms: { ...parms(run), inicio: dates[0], fim: dates[dates.length - 1] }
+      })));
+      const { scheduled, records } = meta;
+      const exceptions = [];
+      chunks.forEach((dates, i) => {
+        const data = result(response, 'range' + i);
+        if (!Array.isArray(data.agendas) || data.paginate) throw new Error('Período incompleto.');
+        if ((data.parms?.inicio && data.parms.inicio.slice(0, 10) > dates[0]) ||
+            (data.parms?.fim && data.parms.fim.slice(0, 10) < dates[dates.length - 1])) {
+          throw new Error('Período limitado pelo servidor.');
+        }
+        const grouped = new Map(dates.map((date) => [date, []]));
+        data.agendas.forEach((entry) => {
+          if (!grouped.has(entry.data)) throw new Error('Data inesperada no período.');
+          grouped.get(entry.data).push(entry);
+        });
+        dates.forEach((date) => {
+          if (!needsDay(run, date)) return;
+          const rows = grouped.get(date), schedule = scheduled.get(date);
+          const hasFree = rows.some((entry) => entry.status === 'livre');
+          const hasRegular = rows.some((entry) => entry.id_agenda != null);
+          // Uma divergência entre semana e período exige a confirmação diária.
+          if (holidayCandidate(date, records) ||
+              rows.some((entry) => entry.bloqueio || entry.status === 'bloqueado') ||
+              ((!hasFree) && (schedule || hasRegular))) {
+            exceptions.push(date);
+          } else {
+            put(run, date, compact({ agendas: rows }), schedule);
+          }
+        });
+        // Somente a consulta própria é descartada; nunca a resposta nativa.
+        grouped.clear();
+        data.agendas = null;
+      });
+      await daily(run, exceptions, scheduled);
+    }
+    function ensure(dates, doctor, unit, component, { refresh = false, priority = 0 } = {}) {
+      dates = [...new Set(dates)].sort();
+      doctor = String(doctor || ''); unit = String(unit || '');
+      if (!doctor || !component || !dates.length) return Promise.resolve(new Map());
+      const context = contextKey(doctor, unit), key = context + '|' + dates.join(',');
+      if (activeContext && activeContext !== context) stop();
+      activeContext = context;
+      if (priority === 0) runs.forEach((run) => { run.priority = 1; });
+      const existing = runs.get(key);
+      if (existing) {
+        stats.joined++;
+        promote(existing, priority);
+        pump();
+        return existing.promise;
+      }
+      const needed = dates.filter((date) => refresh || fresh(days, dayKey(context, date)) === undefined);
+      stats.cacheHits += dates.length - needed.length;
+      if (!needed.length) return Promise.resolve(read(dates, doctor, unit));
+      const dependencies = new Set();
+      const missing = needed.filter((date) => {
+        const owner = pendingDays.get(dayKey(context, date));
+        if (owner) { dependencies.add(owner); promote(owner, priority); stats.joined++; }
+        return !owner;
+      });
+      const run = { key, context, doctor, unit, component, stamp: ++sequence,
+        refresh, priority, dependencies, cancelled: false, cancels: new Set(), promise: null };
+      runs.set(key, run);
+      missing.forEach((date) => pendingDays.set(dayKey(context, date), run));
+      // As datas são reservadas antes da primeira microtarefa. Abrir o popup ou
+      // pedir um mês sobreposto adere à consulta existente, sem reiniciá-la.
+      const own = Promise.resolve().then(async () => {
+        if (run.cancelled) throw cancelled();
+        if (!missing.length) return;
+        // Se feriados não forem acessíveis, usa a consulta diária já autorizada.
+        // As semanas continuam obrigatórias para as exceções de feriado/expediente.
+        let meta;
+        try {
+          meta = await metadata(run, missing);
+        } catch (error) {
+          if (run.cancelled) throw cancelled();
+          const scheduled = new Map();
+          for (const anchor of new Set(missing.map(weekAnchor))) {
+            const week = fresh(weeks, dayKey(context, anchor));
+            if (!week) throw error;
+            week.forEach((value, date) => scheduled.set(date, value));
+          }
+          await daily(run, missing, scheduled);
+          return read(dates, doctor, unit);
+        }
+        // Dias previstos (inclusive lotados/bloqueados) e feriados são lidos
+        // diretamente UMA vez. O período agrega somente as lacunas: evita
+        // baixar o mesmo conjunto de pacientes na busca e na conferência.
+        const direct = missing.filter((date) => meta.scheduled.has(date) || holidayCandidate(date, meta.records));
+        const directSet = new Set(direct);
+        const chunks = [];
+        for (const date of missing.filter((date) => !directSet.has(date))) {
+          const last = chunks[chunks.length - 1];
+          const next = last && new Date(last[last.length - 1] + 'T12:00:00');
+          if (next) next.setDate(next.getDate() + 1);
+          if (!last || last.length >= 14 || iso(next) !== date) chunks.push([date]);
+          else last.push(date);
+        }
+        const jobs = [daily(run, direct, meta.scheduled)];
+        for (let start = 0; start < chunks.length; start += 7) {
+          jobs.push(ranges(run, chunks.slice(start, start + 7), meta));
+        }
+        const outcomes = await Promise.allSettled(jobs);
+        if (run.cancelled) throw cancelled();
+        if (outcomes.some((item) => item.status === 'rejected')) {
+          const scheduled = new Map();
+          for (const anchor of new Set(missing.map(weekAnchor))) {
+            const week = fresh(weeks, dayKey(context, anchor));
+            if (!week) throw new Error('Não foi possível conferir as agendas.');
+            week.forEach((value, date) => scheduled.set(date, value));
+          }
+          await daily(run, missing, scheduled);
+        }
+      });
+      run.promise = Promise.allSettled([own, ...[...dependencies].map((owner) => owner.promise)])
+        .then((outcomes) => {
+          if (run.cancelled) throw cancelled();
+          const failure = outcomes.find((item) => item.status === 'rejected');
+          // Uma falha em datas de outro mês não invalida as datas já completas deste.
+          if (failure && needed.some((date) => fresh(days, dayKey(context, date)) === undefined)) throw failure.reason;
+          if (outcomes[0].status === 'rejected') throw outcomes[0].reason;
+          return read(dates, doctor, unit);
+        }).finally(() => {
+          if (runs.get(key) === run) runs.delete(key);
+          missing.forEach((date) => {
+            const key = dayKey(context, date);
+            if (pendingDays.get(key) === run) pendingDays.delete(key);
+          });
+        });
+      return run.promise;
+    }
+    function invalidate(doctor, unit) {
+      stop();
+      invalidatedAt = ++sequence;
+      const prefix = doctor == null ? '' : contextKey(doctor, unit) + '|';
+      [days, weeks].forEach((map) => {
+        for (const key of map.keys()) if (key.startsWith(prefix)) map.delete(key);
+      });
+      holidays.clear();
+      notify('invalidate');
+    }
+    function nativeTicket() { return ++sequence; }
+    function ingestNative(queries, response, stamp = nativeTicket()) {
+      if (stamp < invalidatedAt) return;
+      for (const q of queries) {
+        if (q.name !== 'agendas.index') continue;
+        const p = q.parms || {}, data = response?.[q.id]?.data;
+        // Uma busca filtrada/paginada não prova ausência de pacientes no dia.
+        if (response?.[q.id]?.status !== 200 || !p.na_recepcao || !p.data || !p.medico || p.group !== 'none' ||
+            !p.livres || (p.status && p.status !== 'T') || (p.turno && p.turno !== 'G') ||
+            (p.tipo_proced && p.tipo_proced !== 'T') || p.search || p.especialidade ||
+            p.recepcao || p.id_recepcao || p.view_status || p.id_atendimento || p.id_fila_laudo ||
+            p.editados || p.agora || p.te_max || p.block_view_pacotes || p.filtro_teleatend ||
+            p.procedimento || p.plano || p.paciente || p.id_paciente || p.para_marcar ||
+            p.confirmacao || p.detalhe || p.recursos?.length || p.id_regiao_cd ||
+            p.consultorio || p.logado || p.local ||
+            (p.faixa_hora && p.faixa_hora !== 'D') || p.medicos?.length || data?.paginate ||
+            (data?.parms?.data && data.parms.data.slice(0, 10) !== p.data)) continue;
+        try {
+          const context = contextKey(p.medico, p.unidade_operacao || '');
+          const weekQuery = queries.find((item) => item.name === 'medicos.agenda_semanal' &&
+            String(item.parms?.id_medico) === String(p.medico) && weekAnchor(item.parms.data) === weekAnchor(p.data));
+          if (weekQuery && response[weekQuery.id]?.status === 200) {
+            remember(weeks, dayKey(context, weekAnchor(p.data)),
+              scheduleMap(response[weekQuery.id].data, String(p.unidade_operacao || '')), stamp, 168);
+          }
+          const week = fresh(weeks, dayKey(context, weekAnchor(p.data)));
+          if (!week) continue;
+          const value = classify(compact(data), week.get(p.data));
+          remember(days, dayKey(context, p.data), value, stamp, 1008);
+          notify();
+        } catch (_) { /* Resposta nativa desconhecida: conserva a busca independente. */ }
+      }
+    }
+    return { read, freshCount, ensure, stop, invalidate, ingestNative, nativeTicket, classify, holidayCandidate,
+      subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+      diagnostics: () => ({ ...stats, active, queued: queue.length, cachedDays: days.size, running: runs.size }) };
+  }
+
+  // Uma única fila e um único cache para as duas telas. Nenhum dado de paciente é persistido.
+  const source = createCalendarSource({
+    busy: (component) => !!component?.$store?.state?.loading,
+    paused: () => document.hidden,
+    post: (component, q, cancels) => {
+      const axios = component.axios || component.$http;
+      const token = axios.CancelToken?.source();
+      // O interceptor global do Klingo mostra qualquer mensagem de erro,
+      // exceto "#BC#", usado pelo próprio sistema ao substituir uma busca.
+      // Cancelar só a nossa requisição, sem modificar/silenciar erros globais.
+      const cancel = () => token?.cancel('#BC#');
+      cancels.add(cancel);
+      return component.$http.post('aql?a=agendas.index&page=1', { q, modulo: 4 }, {
+        tmAppointmentCalendar: true, timeout: 20000,
+        ...(token ? { cancelToken: token.token } : {})
+      }).finally(() => cancels.delete(cancel));
+    }
+  });
+
+  let nativeClient = null, detachNative = null, account = null;
+  function prepare(component) {
+    if (!component) return;
+    const nextAccount = String(component.$store?.state?.user?.id_usuario || '');
+    if (account !== null && nextAccount !== account) source.invalidate();
+    account = nextAccount;
+    const client = component.axios || component.$http;
+    if (client === nativeClient) return;
+    detachNative?.();
+    nativeClient = client;
+    const interceptors = client?.interceptors;
+    if (!interceptors?.request || !interceptors?.response) return;
+    const requestId = interceptors.request.use((config) => {
+      if (!config.tmAppointmentCalendar) config.tmCalendarNativeTicket = source.nativeTicket();
+      return config;
+    });
+    const responseId = interceptors.response.use((response) => {
+      try {
+        if (response.config?.tmAppointmentCalendar) return response;
+        const body = typeof response.config?.data === 'string'
+          ? JSON.parse(response.config.data) : response.config?.data;
+        if (!Array.isArray(body?.q)) return response;
+        const mutated = body.q.some((q) =>
+          /^(agendas|marcacoes|bloqueios|agenda_feriados|cadastro_agendas|agenda_grupos|agenda_grupo_datas|reserva_horarios)\./.test(q.name) &&
+          !/\.(index|show|stats|agenda_semanal|horarios|verificar_horarios_agenda|get_doc_pre_atends|campos_customizados)$/.test(q.name) &&
+          response.data?.[q.id]?.status >= 200 && response.data?.[q.id]?.status < 300);
+        if (mutated) source.invalidate();
+        if (Number.isFinite(response.config?.tmCalendarNativeTicket)) {
+          source.ingestNative(body.q, response.data, response.config.tmCalendarNativeTicket);
+        }
+      } catch (_) { /* Nunca interfere no retorno/erro da requisição nativa. */ }
+      return response;
+    });
+    detachNative = () => {
+      interceptors.request.eject(requestId);
+      interceptors.response.eject(responseId);
+    };
+  }
+
+  // O mês solicitado começa agora; vizinhos usam uma única conexão e nunca
+  // cancelam o mês que o usuário abriu. Reabrir aproveita promessas e dias já prontos.
+  function createCalendarPreloader({ source, active, context, onError = () => {} }) {
+    let key = '', generation = 0, timer = null, pending = null;
+    function stop() {
+      generation++;
+      clearTimeout(timer);
+      timer = null;
+      key = '';
+      pending = null;
+    }
+    function sync({ force = false, refresh = false } = {}) {
+      if (!active()) return Promise.resolve();
+      const current = context();
+      if (!current?.component) return Promise.resolve();
+      const { month, doctor, unit, component } = current;
+      if (!doctor) { stop(); source.stop(); return Promise.resolve(); }
+      const nextKey = monthKey(month, doctor, unit);
+      if (!force && key === nextKey && pending) return pending;
+      key = nextKey;
+      const ticket = ++generation;
+      clearTimeout(timer);
+      const valid = () => ticket === generation && active();
+      const armRefresh = (failed) => {
+        if (!valid()) return;
+        timer = setTimeout(() => {
+          timer = null;
+          sync({ force: true, refresh: true });
+        }, failed ? 15000 : BACKGROUND_REFRESH_MS);
+      };
+      pending = source.ensure(calendarDates(month), doctor, unit, component, { refresh, priority: 0 });
+      pending.then(async () => {
+        armRefresh(false);
+        for (const offset of [1, 2, -1]) {
+          if (!valid()) return;
+          const adjacent = new Date(month.getFullYear(), month.getMonth() + offset, 1, 12);
+          try {
+            await source.ensure(calendarDates(adjacent), doctor, unit, component, { priority: 1 });
+          } catch (error) {
+            if (!valid() || error.cancelled) return;
+            onError(error);
+          }
+        }
+      }, (error) => {
+        if (!valid()) return;
+        armRefresh(true);
+        if (!error.cancelled) onError(error);
+      });
+      return pending;
+    }
+    source.subscribe((event) => {
+      if (event === 'invalidate' && active()) {
+        stop();
+        // Não reentra no interceptor nem na limpeza do cache.
+        Promise.resolve().then(() => sync());
+      }
+    });
+    return { sync, stop };
+  }
+
+  tmAppointmentCalendarCore = { source, prepare, createCalendarSource, createCalendarPreloader, calendarDates, iso, monthNames };
+  const supportedRoute = () => ['#/recepcao', '#/call-center/confirmacao'].includes(window.location.hash);
+  window.addEventListener('hashchange', () => { if (!supportedRoute()) source.stop(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) source.stop(); });
+
+  let paintFrame = null;
+  source.subscribe(() => {
+      if (!document.getElementById(POPOVER_ID) || paintFrame != null) return;
+      paintFrame = requestAnimationFrame(() => {
+        paintFrame = null;
+        const component = receptionComponent();
+        const doctor = document.querySelector('#filtro-medico')?.value || '';
+        const unit = String(component?.unidade_operacao || '');
+        if (!state.month || state.context !== doctor + '|' + unit) return;
+        state.days = source.read(calendarDates(state.month), doctor, unit);
+        if (state.days.size === 42 && source.freshCount(calendarDates(state.month), doctor, unit) === 42) state.loading = false;
+        paintDays();
+      });
+  });
+
+  function bindNative(component) {
+    prepare(component);
+    if (component === boundComponent) return;
+    detachContext?.();
+    detachContext = null;
+    boundComponent = component;
+    // Fallback para alterações programáticas do Vue; a seleção manual usa o evento direto.
+    if (typeof component?.$watch === 'function') {
+      detachContext = component.$watch(() =>
+        `${component.medico || ''}|${component.unidade_operacao || ''}|${String(component.referencia || '').slice(0, 7)}`,
+      () => {
+        component.$nextTick(() => {
+          if (boundComponent !== component || !isReceptionPage() || document.hidden) return;
+          if (document.getElementById(POPOVER_ID)) loadMonth();
+          else prefetchSelectedMonth();
+        });
+      });
+    }
+  }
+
+  const preloader = createCalendarPreloader({
+    source,
+    active: () => isReceptionPage() && !document.hidden,
+    context: () => {
+      const component = receptionComponent();
+      prepare(component);
+      return {
+        component, doctor: document.querySelector('#filtro-medico')?.value || '',
+        unit: String(component?.unidade_operacao || ''),
+        month: document.getElementById(POPOVER_ID) && state.month ? state.month : selectedMonth()
+      };
+    },
+    onError: (error) => console.warn('[TM] Pré-busca do calendário:', error.message)
+  });
+
+  function prefetchSelectedMonth(force = false, refresh = false) {
+    return preloader.sync({ force, refresh });
+  }
+
+  async function loadMonth() {
+    if (document.hidden || !isReceptionPage()) return;
+    const doctor = document.querySelector('#filtro-medico')?.value || '';
+    const component = receptionComponent();
+    prepare(component);
+    const unit = String(component?.unidade_operacao || '');
+    const dates = calendarDates(state.month), request = ++state.request;
+    state.context = doctor + '|' + unit;
+    state.days = source.read(dates, doctor, unit);
+    state.error = '';
+    state.loading = !!doctor && source.freshCount(dates, doctor, unit) !== dates.length;
+    render();
+    if (!doctor || !component) { preloader.sync(); state.loading = false; paintDays(); return; }
+    try {
+      const days = await prefetchSelectedMonth(true);
+      if (request === state.request && days) state.days = days;
+    } catch (error) {
+      if (request === state.request && !error.cancelled) {
+        state.error = 'Algumas datas não puderam ser verificadas. Reabra para tentar novamente.';
+        console.warn('[TM] Calendário:', error.message);
+      }
+    } finally {
+      if (request === state.request) { state.loading = false; paintDays(); }
+    }
+  }
+
+  function injectStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      #ref-data::-webkit-calendar-picker-indicator { opacity: 0; pointer-events: none; }
+      .${HIDDEN_TURNO_CLASS} { display: none !important; }
+      #${BUTTON_ID} { height: 100%; min-width: 42px; border-radius: 0 .25rem .25rem 0; }
+      #${POPOVER_ID} { position: fixed; z-index: 1080; width: 322px; max-width: calc(100vw - 16px);
+        background: #fff; color: #344054; border: 1px solid #cbd5e1; border-radius: 8px;
+        box-shadow: 0 10px 28px rgba(16, 24, 40, .22); padding: 12px; font-size: 13px; }
+      #${POPOVER_ID} .tm-cal-header { display: flex; align-items: center; justify-content: space-between;
+        gap: 8px; margin-bottom: 9px; }
+      #${POPOVER_ID} .tm-cal-header strong { text-transform: capitalize; font-size: 14px; }
+      #${POPOVER_ID} button { cursor: pointer; }
+      #${POPOVER_ID} .tm-cal-nav { width: 30px; height: 30px; border: 1px solid #cbd5e1;
+        border-radius: 5px; background: #fff; color: #344054; }
+      #${POPOVER_ID} .tm-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+      #${POPOVER_ID} .tm-cal-weekday { text-align: center; color: #667085; font-size: 11px;
+        font-weight: 600; padding: 5px 0; }
+      #${POPOVER_ID} .tm-cal-day { height: 34px; border: 1px solid transparent; border-radius: 5px;
+        background: #f5f7fa; color: #344054; }
+      #${POPOVER_ID} .tm-cal-day:hover { border-color: #007bff; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="attendance"] { background: #198754; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="blocked"] { background: #dc3545; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #0d6efd; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline: 2px solid #0d6efd; outline-offset: 1px; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="booked"][data-selected="true"] { outline-color: #084298; }
+      #${POPOVER_ID} .tm-cal-day[data-outside="true"] { opacity: .45; }
+      #${POPOVER_ID} .tm-cal-footer { display: flex; align-items: center;
+        justify-content: flex-start; gap: 10px; margin-top: 10px; }
+      #${POPOVER_ID} .tm-cal-footer button { border: 0; background: transparent;
+        color: #007bff; padding: 3px 5px; font-size: 13px; margin-left: auto; }
+      #${POPOVER_ID} .tm-cal-footer button:hover { text-decoration: underline; }
+      #${POPOVER_ID} .tm-cal-status { color: #667085; font-size: 13px; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function positionPopover() {
+    const popover = document.getElementById(POPOVER_ID);
+    const input = document.querySelector('#ref-data');
+    if (!popover || !input) return;
+    const rect = input.getBoundingClientRect();
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - popover.offsetWidth - 8));
+    const below = rect.bottom + 6;
+    const top = below + popover.offsetHeight <= window.innerHeight - 8
+      ? below : Math.max(8, rect.top - popover.offsetHeight - 6);
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  }
+
+  function render() {
+    const popover = document.getElementById(POPOVER_ID);
+    if (!popover || !state.month) return;
+    popover.replaceChildren();
+
+    const header = document.createElement('div');
+    header.className = 'tm-cal-header';
+    const previous = document.createElement('button');
+    previous.type = 'button';
+    previous.className = 'tm-cal-nav';
+    previous.dataset.action = 'previous';
+    previous.setAttribute('aria-label', 'Mês anterior');
+    previous.textContent = '‹';
+    const title = document.createElement('strong');
+    title.textContent = `${monthNames[state.month.getMonth()]} de ${state.month.getFullYear()}`;
+    const next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'tm-cal-nav';
+    next.dataset.action = 'next';
+    next.setAttribute('aria-label', 'Próximo mês');
+    next.textContent = '›';
+    header.append(previous, title, next);
+    popover.appendChild(header);
+
+    const grid = document.createElement('div');
+    grid.className = 'tm-cal-grid';
+    ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].forEach((label) => {
+      const weekday = document.createElement('div');
+      weekday.className = 'tm-cal-weekday';
+      weekday.textContent = label;
+      grid.appendChild(weekday);
+    });
+    const selected = document.querySelector('#ref-data')?.value;
+    for (const dateKey of calendarDates(state.month)) {
+      const detail = state.days.get(dateKey);
+      const day = document.createElement('button');
+      day.type = 'button';
+      day.className = 'tm-cal-day';
+      day.dataset.date = dateKey;
+      day.dataset.kind = detail?.kind || '';
+      day.dataset.selected = String(dateKey === selected);
+      day.dataset.outside = String(Number(dateKey.slice(5, 7)) !== state.month.getMonth() + 1);
+      day.textContent = String(Number(dateKey.slice(8, 10)));
+      day.title = dayTitle(detail);
+      grid.appendChild(day);
+    }
+    popover.appendChild(grid);
+
+    const footer = document.createElement('div');
+    footer.className = 'tm-cal-footer';
+    const message = document.createElement('span');
+    message.className = 'tm-cal-status';
+    footer.appendChild(message);
+    const today = document.createElement('button');
+    today.type = 'button';
+    today.dataset.action = 'today';
+    today.textContent = 'Hoje';
+    footer.appendChild(today);
+    popover.appendChild(footer);
+    paintDays();
+    positionPopover();
+  }
+
+  function dayTitle(detail) {
+    if (!detail) return state.loading ? 'Data ainda em consulta' : 'Data não verificada';
+    return detail.kind === 'booked' && detail.holidayClosed
+        ? `Paciente marcado no feriado: ${detail.holiday}`
+        : detail?.kind === 'booked' && detail?.block
+        ? 'Paciente marcado apesar do bloqueio da agenda'
+        : detail?.kind === 'booked'
+        ? 'Paciente marcado sem horários regulares disponíveis nesta data'
+        : detail?.kind === 'blocked' && detail?.holidayClosed
+        ? `Feriado: ${detail.holiday}`
+        : detail?.kind === 'blocked' ? 'Agenda bloqueada nesta data'
+        : detail?.kind === 'attendance' && detail?.holiday
+        ? `Atendimento permitido no feriado: ${detail.holiday}`
+        : detail?.kind === 'attendance' && detail?.block
+        ? 'Médico atende nesta data (bloqueio parcial)'
+        : detail?.kind === 'attendance' ? 'Médico atende nesta data'
+        : 'Sem agenda identificada nesta unidade';
+  }
+
+  function paintDays() {
+    const popover = document.getElementById(POPOVER_ID);
+    if (!popover) return;
+    popover.querySelectorAll('button[data-date]').forEach((day) => {
+      const detail = state.days.get(day.dataset.date), kind = detail?.kind || '';
+      if (day.dataset.kind !== kind) day.dataset.kind = kind;
+      const title = dayTitle(detail);
+      if (day.title !== title) day.title = title;
+      day.setAttribute('aria-label', day.dataset.date + ': ' + title);
+    });
+    const message = popover.querySelector('.tm-cal-status');
+    const status = state.loading ? 'Buscando...' : state.error;
+    if (message && message.textContent !== status) message.textContent = status;
+    popover.setAttribute('aria-busy', String(state.loading));
+  }
+
+  function selectDate(date) {
+    const input = document.querySelector('input#ref-data[type="date"]');
+    if (!input) return;
+    input.value = date;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    const component = receptionComponent();
+    if (component) component.referencia = date;
+    closeCalendar();
+    // Atualização nativa necessária para mostrar a data, não uma invalidação
+    // do mês. O interceptor aproveitará a resposta quando ela for completa.
+    if (date) {
+      automaticRefresh = true;
+      try { document.querySelector('#refresh-button')?.click(); }
+      finally { automaticRefresh = false; }
+    }
+  }
+
+  function closeCalendar() {
+    const popover = document.getElementById(POPOVER_ID);
+    if (!popover) return;
+    state.request += 1;
+    popover.remove();
+    prefetchSelectedMonth(true);
+  }
+
+  function openCalendar() {
+    if (document.getElementById(POPOVER_ID)) {
+      closeCalendar();
+      return;
+    }
+    state.month = selectedMonth();
+    const popover = document.createElement('div');
+    popover.id = POPOVER_ID;
+    popover.setAttribute('role', 'dialog');
+    popover.setAttribute('aria-label', 'Calendário de atendimentos');
+    popover.addEventListener('click', (event) => {
+      // render() substitui a seta clicada; sem isto, o clique chega ao documento
+      // com alvo já desconectado e é interpretado como clique fora do calendário.
+      event.stopPropagation();
+      if (!(event.target instanceof Element)) return;
+      const action = event.target.closest('button[data-action]')?.dataset.action;
+      if (action === 'today') return selectDate(iso(new Date()));
+      if (action === 'previous' || action === 'next') {
+        state.month = new Date(state.month.getFullYear(), state.month.getMonth() +
+          (action === 'next' ? 1 : -1), 1, 12);
+        loadMonth();
+        return;
+      }
+      const date = event.target.closest('button[data-date]')?.dataset.date;
+      if (date) selectDate(date);
+    });
+    document.body.appendChild(popover);
+    loadMonth();
+  }
+
+  function ensureCalendar() {
+    if (window.location.hash !== '#/recepcao') {
+      preloader.stop();
+      if (boundComponent || mountedInput) {
+        detachContext?.();
+        detachContext = null;
+        boundComponent = null;
+        mountedInput = null;
+        mountedContext = '';
+      }
+      closeCalendar();
+      document.getElementById(BUTTON_HOST_ID)?.remove();
+      document.querySelectorAll(`.${HIDDEN_TURNO_CLASS}`).forEach((element) =>
+        element.classList.remove(HIDDEN_TURNO_CLASS));
+      document.getElementById(STYLE_ID)?.remove();
+      return;
+    }
+    const input = document.querySelector('input#ref-data[type="date"]');
+    const group = input?.closest('.input-group.mb-1');
+    if (!group) return;
+    const component = receptionComponent();
+    const context = monthKey(selectedMonth(), document.querySelector('#filtro-medico')?.value || '',
+      String(component?.unidade_operacao || ''));
+    if (mountedInput === input && mountedContext === context &&
+        boundComponent === component && document.getElementById(BUTTON_ID)?.isConnected) return;
+    mountedInput = input;
+    mountedContext = context;
+    bindNative(component);
+    injectStyle();
+    const turno = input.nextElementSibling;
+    if (turno?.classList.contains('input-group-append') &&
+        turno.querySelector('button.dropdown-toggle') &&
+        !turno.classList.contains(HIDDEN_TURNO_CLASS)) {
+      turno.classList.add(HIDDEN_TURNO_CLASS);
+    }
+    if (component && component.turno !== 'G') {
+      component.turno = 'G';
+      automaticRefresh = true;
+      try { document.querySelector('#refresh-button')?.click(); }
+      finally { automaticRefresh = false; }
+    }
+    let host = document.getElementById(BUTTON_HOST_ID);
+    if (!host) {
+      host = document.createElement('div');
+      host.id = BUTTON_HOST_ID;
+      host.className = 'input-group-append';
+    }
+    let button = document.getElementById(BUTTON_ID);
+    if (!button) {
+      button = document.createElement('button');
+      button.id = BUTTON_ID;
+      button.type = 'button';
+      button.className = 'btn btn-outline-secondary';
+      button.innerHTML = '<i class="fas fa-calendar-alt" aria-hidden="true"></i>';
+      button.setAttribute('aria-label', 'Abrir calendário de atendimentos');
+      button.title = 'Calendário de atendimentos e bloqueios';
+      button.addEventListener('pointerenter', () => prefetchSelectedMonth(true));
+      button.addEventListener('focus', () => prefetchSelectedMonth(true));
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openCalendar();
+      });
+    }
+    if (button.parentElement !== host) host.appendChild(button);
+    if (host.parentElement !== group) group.appendChild(host);
+    if (document.getElementById(POPOVER_ID) &&
+        state.context !== `${document.querySelector('#filtro-medico')?.value || ''}|${String(component?.unidade_operacao || '')}`) {
+      loadMonth();
+    }
+    if (!document.getElementById(POPOVER_ID)) prefetchSelectedMonth();
+  }
+
+  document.addEventListener('click', (event) => {
+    if (!document.getElementById(POPOVER_ID)) return;
+    if (!(event.target instanceof Element)) return;
+    if (event.target.closest(`#${POPOVER_ID}, #${BUTTON_ID}`)) return;
+    closeCalendar();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeCalendar();
+  });
+  const onReceptionFilter = (event) => {
+    if (!isReceptionPage()) return;
+    if (event.target?.id === 'filtro-medico') {
+      if (document.getElementById(POPOVER_ID)) loadMonth();
+      else prefetchSelectedMonth();
+    }
+  };
+  document.addEventListener('input', onReceptionFilter, true);
+  document.addEventListener('change', onReceptionFilter, true);
+  document.addEventListener('click', (event) => {
+    if (!automaticRefresh && isReceptionPage() && event.target instanceof Element && event.target.closest('#refresh-button')) {
+      const component = receptionComponent();
+      source.invalidate(document.querySelector('#filtro-medico')?.value || '', String(component?.unidade_operacao || ''));
+    }
+  }, true);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      preloader.stop();
+    } else if (isReceptionPage()) {
+      if (document.getElementById(POPOVER_ID)) loadMonth();
+      else prefetchSelectedMonth(true);
+    }
+  });
+  window.addEventListener('resize', positionPopover);
+  window.addEventListener('scroll', positionPopover, true);
+  tmRuntime.register('calendário de atendimentos da Recepção', ensureCalendar);
+})();
+
+/* =========================
+   RECEPÇÃO E CONFIRMAÇÃO - OCULTAR PRÉVIA DE DIAS DA AGENDA
 ========================= */
 (function () {
   'use strict';
 
-  const SUMMARY_ID = 'tm-recepcao-agenda-resumo';
-  const HIDDEN_CLASS = 'tm-recepcao-agenda-origem-oculta';
-  const STYLE_ID = 'tm-recepcao-agenda-resumo-style';
-  let lastSignature = '';
+  const HIDDEN_CLASS = 'tm-agenda-previa-oculta';
+  const STYLE_ID = 'tm-agenda-previa-style';
 
-  function isReceptionPage() {
-    return /\bRecepção\b/i.test(document.querySelector('.breadcrumb')?.textContent || '');
-  }
-
-  function clearSummary() {
-    document.getElementById(SUMMARY_ID)?.remove();
-    document.querySelectorAll(`.${HIDDEN_CLASS}`).forEach((element) =>
-      element.classList.remove(HIDDEN_CLASS));
-    lastSignature = '';
-  }
-
-  function highlightSelectedDate(summary, selectedDate) {
-    const label = selectedDate.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2');
-    Array.from(summary.children).forEach((card) => {
-      card.classList.toggle('border-primary',
-        card.querySelector('a.card-link')?.textContent.trim() === label);
-    });
-  }
-
-  function updateSummary() {
-    if (!isReceptionPage()) {
-      clearSummary();
+  function hideSchedulePreview() {
+    document.getElementById('tm-recepcao-agenda-resumo')?.remove();
+    document.getElementById('tm-recepcao-agenda-resumo-style')?.remove();
+    const route = window.location.hash;
+    if (route !== '#/recepcao' && route !== '#/call-center/confirmacao') {
+      document.querySelectorAll(`.${HIDDEN_CLASS}`).forEach((element) =>
+        element.classList.remove(HIDDEN_CLASS));
+      document.getElementById(STYLE_ID)?.remove();
       return;
     }
 
-    const dateInput = document.querySelector('input#ref-data[type="date"]');
-    const sourceGroup = Array.from(document.querySelectorAll(`.card-group:not(#${SUMMARY_ID})`))
+    const scope = route === '#/call-center/confirmacao'
+      ? document.querySelector('#refresh-button')?.closest('.card.dashcard')?.parentElement
+      : document;
+    const source = Array.from(scope?.querySelectorAll('.card-group') || [])
       .find((group) => group.querySelector(':scope > .card > .card-body.small.p-2 a.card-link'));
-    const root = sourceGroup?.parentElement?.parentElement;
-    const anchor = root?.querySelector(':scope > .progress.mt-1.mb-2');
-    const cards = Array.from(sourceGroup?.children || []).filter((card) => card.classList.contains('card'));
-    let summary = document.getElementById(SUMMARY_ID);
-    const doctor = document.querySelector('#filtro-medico')?.value || '';
-    if (summary?.dataset.tmDoctor && summary.dataset.tmDoctor !== doctor) {
-      clearSummary();
-      summary = null;
-    }
-    if (!dateInput || !anchor || !cards.length) {
-      if (dateInput && summary?.dataset.tmFrozen === '1' && doctor &&
-          summary.dataset.tmDoctor === doctor) {
-        highlightSelectedDate(summary, dateInput.value);
-        return;
-      }
-      clearSummary();
-      return;
-    }
+    if (!source) return;
 
     if (!document.getElementById(STYLE_ID)) {
       const style = document.createElement('style');
       style.id = STYLE_ID;
-      style.textContent = `
-        .${HIDDEN_CLASS} { display: none !important; }
-        #${SUMMARY_ID} { margin-bottom: 1rem; }
-      `;
+      style.textContent = `.${HIDDEN_CLASS} { display: none !important; }`;
       document.head.appendChild(style);
     }
-
-    if (!summary) {
-      summary = document.createElement('div');
-      summary.id = SUMMARY_ID;
-      summary.className = 'card-group';
-      lastSignature = '';
-    }
-    if (summary.parentElement !== root || summary.previousElementSibling !== anchor) {
-      anchor.insertAdjacentElement('afterend', summary);
-    }
-
-    const selectedLabel = dateInput.value.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2');
-    let selectedIndex = cards.findIndex((card) =>
-      card.querySelector('a.card-link')?.textContent.trim() === selectedLabel);
-    if (selectedIndex < 0) selectedIndex = cards.findIndex((card) => card.classList.contains('border-primary'));
-    if (selectedIndex < 0) selectedIndex = 0;
-    selectedIndex = Math.min(selectedIndex, Math.max(0, cards.length - 2));
-    const visibleCards = cards.slice(selectedIndex, selectedIndex + 2);
-
-    const signature = visibleCards.map((card) => card.outerHTML).join('\n');
-    if (signature !== lastSignature) {
-      summary.replaceChildren(...visibleCards.map((card, index) => {
-        const copy = card.cloneNode(true);
-        copy.classList.toggle('border-primary', index === 0);
-        return copy;
-      }));
-      lastSignature = signature;
-    }
-    summary.dataset.tmDoctor = doctor;
-    highlightSelectedDate(summary, dateInput.value);
-
-    sourceGroup.classList.add(HIDDEN_CLASS);
-    if (sourceGroup.previousElementSibling?.matches('hr')) {
-      sourceGroup.previousElementSibling.classList.add(HIDDEN_CLASS);
+    if (!source.classList.contains(HIDDEN_CLASS)) source.classList.add(HIDDEN_CLASS);
+    if (source.previousElementSibling?.matches('hr')) {
+      if (!source.previousElementSibling.classList.contains(HIDDEN_CLASS)) {
+        source.previousElementSibling.classList.add(HIDDEN_CLASS);
+      }
     }
   }
 
-  tmRuntime.register('agenda resumida na Recepção', updateSummary);
+  tmRuntime.register('ocultar prévia da agenda na Recepção e Confirmação', hideSchedulePreview);
 })();
 
 
 /* =========================
-   RECEPÇÃO - SELECIONAR DATA PELO CARTÃO DA AGENDA
+   CALL CENTER / CONFIRMAÇÃO - ADAPTADOR DO CALENDÁRIO
+========================= */
+const tmConfirmationCalendarAdapter = (() => {
+  const ROUTE = '#/call-center/confirmacao';
+  const EVENT = 'tm-confirmacao-calendar-context';
+  let lastContext = '';
+
+  function selectByPlaceholder(root, label) {
+    return [...root.querySelectorAll('select')].find((select) =>
+      select.options[0]?.textContent.trim() === label) || null;
+  }
+
+  function read(root = document, route = window.location.hash) {
+    if (route !== ROUTE) return null;
+    const refresh = root.querySelector('#refresh-button');
+    const toolbar = refresh?.closest('.card.dashcard');
+    const startInput = refresh?.closest('.input-group')?.querySelector('input[type="date"]');
+    const endInput = [...(toolbar?.querySelectorAll('input[type="date"]') || [])]
+      .find((input) => input !== startInput);
+    const unitSelect = toolbar && selectByPlaceholder(toolbar, 'Unidades...');
+    const doctorSelect = toolbar && selectByPlaceholder(toolbar, 'Todos os Médicos...');
+    if (!toolbar || !startInput || !endInput || !unitSelect || !doctorSelect) return null;
+    return {
+      startInput, endInput, unitSelect, doctorSelect, refresh,
+      context: {
+        start: startInput.value, end: endInput.value,
+        unit: unitSelect.value, doctor: doctorSelect.value
+      }
+    };
+  }
+
+  function sync() {
+    const current = read();
+    const key = current ? JSON.stringify(current.context) : '';
+    if (key === lastContext) return;
+    lastContext = key;
+    document.dispatchEvent(new CustomEvent(EVENT, { detail: current?.context || null }));
+  }
+
+  // Publica o contexto sem alterar o intervalo mantido pelo Klingo.
+  const onFilter = (event) => {
+    const current = read();
+    if (current && [current.startInput, current.endInput, current.unitSelect,
+      current.doctorSelect].includes(event.target)) sync();
+  };
+  document.addEventListener('input', onFilter, true);
+  document.addEventListener('change', onFilter, true);
+  tmRuntime.register('contexto do calendário da Confirmação', sync);
+  return { read, event: EVENT };
+})();
+
+/* =========================
+   CALL CENTER / CONFIRMAÇÃO - CALENDÁRIO DE ATENDIMENTOS
 ========================= */
 (function () {
   'use strict';
 
-  function isReceptionPage() {
-    return /\bRecepção\b/i.test(document.querySelector('.breadcrumb')?.textContent || '');
-  }
+  const { source, prepare, createCalendarPreloader, calendarDates, iso, monthNames } = tmAppointmentCalendarCore;
+  const STYLE_ID = 'tm-confirmacao-calendario-style';
+  const POPOVER_ID = 'tm-confirmacao-calendario-popover';
+  const BUTTON_CLASS = 'tm-confirmacao-calendario-botao';
+  const INPUT_CLASS = 'tm-confirmacao-calendario-input';
+  const state = { input: null, month: null, days: new Map(), loading: false, error: '', request: 0 };
+  let mounted = [null, null], contextKey = '', paintFrame = null;
 
-  function dateFromCard(label, selectedDate) {
-    const match = label.trim().match(/^(\d{1,2})\/(\d{1,2})$/);
-    if (!match) return '';
-
-    const day = Number(match[1]);
-    const month = Number(match[2]);
-    const reference = selectedDate ? new Date(`${selectedDate}T12:00:00`) : new Date();
-    if (Number.isNaN(reference.getTime())) return '';
-
-    const candidates = [reference.getFullYear() - 1, reference.getFullYear(), reference.getFullYear() + 1]
-      .map((year) => new Date(year, month - 1, day, 12))
-      .filter((date) => date.getDate() === day && date.getMonth() === month - 1);
-    candidates.sort((a, b) => Math.abs(a - reference) - Math.abs(b - reference));
-    const date = candidates[0];
-    if (!date) return '';
-    return `${date.getFullYear()}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  }
-
-  document.addEventListener('click', (event) => {
-    if (!isReceptionPage() || !(event.target instanceof Element)) return;
-    const link = event.target.closest(
-      '#tm-recepcao-agenda-resumo > .card > .card-body.small.p-2 > .d-flex.justify-content-between a.card-link'
-    );
-    if (!link) return;
-
-    const dateInput = document.querySelector('input#ref-data[type="date"]');
-    const summary = document.getElementById('tm-recepcao-agenda-resumo');
-    let component = summary;
-    while (component && typeof component.__vue__?.load !== 'function') {
-      component = component.parentElement;
+  function componentFor(current) {
+    let element = current?.refresh;
+    while (element) {
+      const component = element.__vue__;
+      if (typeof component?.$http?.post === 'function') return component;
+      element = element.parentElement;
     }
-    const reception = component?.__vue__;
-    if (!dateInput || !summary || !reception) return;
-    const date = dateFromCard(link.textContent, dateInput.value);
-    if (!date) return;
+    return null;
+  }
 
-    event.preventDefault();
-    summary.dataset.tmFrozen = '1';
-    dateInput.value = date;
-    dateInput.dispatchEvent(new Event('input', { bubbles: true }));
-    dateInput.dispatchEvent(new Event('change', { bubbles: true }));
-    reception.referencia = date;
-    Array.from(summary.children).forEach((card) => {
-      card.classList.toggle('border-primary',
-        card.querySelector('a.card-link')?.textContent.trim() === link.textContent.trim());
+  source.subscribe(() => {
+    if (!document.getElementById(POPOVER_ID) || paintFrame != null) return;
+    paintFrame = requestAnimationFrame(() => {
+      paintFrame = null;
+      const current = tmConfirmationCalendarAdapter.read();
+      if (!current || !state.month || state.input !== current.startInput) return;
+      state.days = source.read(calendarDates(state.month), current.context.doctor, current.context.unit);
+      if (source.freshCount(calendarDates(state.month), current.context.doctor, current.context.unit) === 42) state.loading = false;
+      paintDays();
     });
-
-    const instructions = reception.instrucoes;
-    const schedule = reception.agenda_do_medico;
-    try {
-      reception.load(false);
-    } finally {
-      if (reception.instrucoes === null) reception.instrucoes = instructions;
-      if (reception.agenda_do_medico === null) reception.agenda_do_medico = schedule;
-    }
-    tmRuntime.schedule(0);
   });
-})();
 
+  function monthOf(value) {
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-\d{2}$/);
+    const date = match ? new Date(Number(match[1]), Number(match[2]) - 1, 1, 12) : new Date();
+    return new Date(date.getFullYear(), date.getMonth(), 1, 12);
+  }
+
+  function requestContext(current, month) {
+    return [current.context.doctor, current.context.unit, iso(month).slice(0, 7)].join('|');
+  }
+
+  const preloader = createCalendarPreloader({
+    source,
+    active: () => !!tmConfirmationCalendarAdapter.read() && !document.hidden,
+    context: () => {
+      const current = tmConfirmationCalendarAdapter.read();
+      if (!current) return null;
+      const component = componentFor(current);
+      prepare(component);
+      return {
+        component, doctor: current.context.doctor, unit: current.context.unit,
+        month: document.getElementById(POPOVER_ID) && state.input === current.startInput && state.month
+          ? state.month : monthOf(current.context.start)
+      };
+    },
+    onError: (error) => console.warn('[TM] Pré-busca do calendário da Confirmação:', error.message)
+  });
+
+  function stopWork() { preloader.stop(); }
+
+  function preload(force = false) {
+    return preloader.sync({ force: force === true });
+  }
+
+  function dayTitle(detail) {
+    if (!detail) return state.loading ? 'Data ainda em consulta' : 'Data não verificada';
+    if (detail.kind === 'booked') return 'Paciente marcado sem atendimento regular disponível';
+    if (detail.kind === 'blocked') return detail.holidayClosed ? `Feriado: ${detail.holiday}` : 'Agenda bloqueada';
+    if (detail.kind === 'attendance') return detail.holiday ?
+      `Atendimento permitido no feriado: ${detail.holiday}` : 'Médico atende nesta data';
+    return 'Sem agenda identificada nesta unidade';
+  }
+
+  function injectStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      input.${INPUT_CLASS}[type="date"]::-webkit-calendar-picker-indicator { display: none !important; }
+      .${BUTTON_CLASS} { height: 100%; min-width: 42px; border-radius: 0 .25rem .25rem 0; }
+      #${POPOVER_ID} { position: fixed; z-index: 1080; width: 322px; max-width: calc(100vw - 16px);
+        background: #fff; color: #344054; border: 1px solid #cbd5e1; border-radius: 8px;
+        box-shadow: 0 10px 28px rgba(16,24,40,.22); padding: 12px; font-size: 13px; }
+      #${POPOVER_ID} .tm-cal-header { display: flex; align-items: center; justify-content: space-between;
+        gap: 8px; margin-bottom: 9px; }
+      #${POPOVER_ID} .tm-cal-header strong { text-transform: capitalize; font-size: 14px; }
+      #${POPOVER_ID} button { cursor: pointer; }
+      #${POPOVER_ID} .tm-cal-nav { width: 30px; height: 30px; border: 1px solid #cbd5e1;
+        border-radius: 5px; background: #fff; color: #344054; }
+      #${POPOVER_ID} .tm-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+      #${POPOVER_ID} .tm-cal-weekday { text-align: center; color: #667085; font-size: 11px;
+        font-weight: 600; padding: 5px 0; }
+      #${POPOVER_ID} .tm-cal-day { height: 34px; border: 1px solid transparent; border-radius: 5px;
+        background: #f5f7fa; color: #344054; }
+      #${POPOVER_ID} .tm-cal-day:hover { border-color: #007bff; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="attendance"] { background: #198754; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="blocked"] { background: #dc3545; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #0d6efd; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline: 2px solid #0d6efd; outline-offset: 1px; }
+      #${POPOVER_ID} .tm-cal-day[data-outside="true"] { opacity: .45; }
+      #${POPOVER_ID} .tm-cal-footer { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+      #${POPOVER_ID} .tm-cal-status { color: #667085; }
+      #${POPOVER_ID} .tm-cal-footer button { border: 0; background: transparent; color: #007bff;
+        padding: 3px 5px; font-size: 13px; margin-left: auto; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function positionPopover() {
+    const popover = document.getElementById(POPOVER_ID), input = state.input;
+    if (!popover || !input) return;
+    const rect = input.getBoundingClientRect();
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - popover.offsetWidth - 8));
+    const below = rect.bottom + 6;
+    const top = below + popover.offsetHeight <= window.innerHeight - 8 ?
+      below : Math.max(8, rect.top - popover.offsetHeight - 6);
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  }
+
+  function paintDays() {
+    const popover = document.getElementById(POPOVER_ID);
+    if (!popover) return;
+    const painted = state.input === tmConfirmationCalendarAdapter.read()?.startInput;
+    popover.querySelectorAll('button[data-date]').forEach((day) => {
+      const detail = painted ? state.days.get(day.dataset.date) : null;
+      day.dataset.kind = detail?.kind || '';
+      day.title = painted ? dayTitle(detail) : 'Selecionar data';
+      day.setAttribute('aria-label', day.dataset.date + ': ' + day.title);
+    });
+    const message = popover.querySelector('.tm-cal-status');
+    if (message) message.textContent = painted ? (state.loading ? 'Buscando...' : state.error) : '';
+    popover.setAttribute('aria-busy', String(painted && state.loading));
+  }
+
+  function render() {
+    const popover = document.getElementById(POPOVER_ID);
+    if (!popover || !state.month) return;
+    popover.replaceChildren();
+    const header = document.createElement('div');
+    header.className = 'tm-cal-header';
+    const previous = document.createElement('button'), next = document.createElement('button');
+    for (const [button, action, label, icon] of [
+      [previous, 'previous', 'Mês anterior', '‹'], [next, 'next', 'Próximo mês', '›']
+    ]) {
+      button.type = 'button'; button.className = 'tm-cal-nav'; button.dataset.action = action;
+      button.setAttribute('aria-label', label); button.textContent = icon;
+    }
+    const title = document.createElement('strong');
+    title.textContent = `${monthNames[state.month.getMonth()]} de ${state.month.getFullYear()}`;
+    header.append(previous, title, next);
+    popover.appendChild(header);
+    const grid = document.createElement('div');
+    grid.className = 'tm-cal-grid';
+    ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].forEach((label) => {
+      const weekday = document.createElement('div');
+      weekday.className = 'tm-cal-weekday'; weekday.textContent = label; grid.appendChild(weekday);
+    });
+    for (const dateKey of calendarDates(state.month)) {
+      const day = document.createElement('button');
+      day.type = 'button'; day.className = 'tm-cal-day'; day.dataset.date = dateKey;
+      day.dataset.selected = String(dateKey === state.input?.value);
+      day.dataset.outside = String(Number(dateKey.slice(5, 7)) !== state.month.getMonth() + 1);
+      day.textContent = String(Number(dateKey.slice(8, 10)));
+      grid.appendChild(day);
+    }
+    popover.appendChild(grid);
+    const footer = document.createElement('div');
+    footer.className = 'tm-cal-footer';
+    const message = document.createElement('span'); message.className = 'tm-cal-status';
+    const today = document.createElement('button'); today.type = 'button';
+    today.dataset.action = 'today'; today.textContent = 'Hoje';
+    footer.append(message, today); popover.appendChild(footer);
+    paintDays(); positionPopover();
+  }
+
+  async function loadMonth() {
+    const current = tmConfirmationCalendarAdapter.read();
+    if (!current || !state.month || document.hidden) return;
+    const request = ++state.request, dates = calendarDates(state.month);
+    if (state.input === current.endInput) {
+      state.days = new Map();
+      state.loading = false;
+      state.error = '';
+      render();
+      return;
+    }
+    const { doctor, unit } = current.context;
+    prepare(componentFor(current));
+    state.days = source.read(dates, doctor, unit);
+    state.error = '';
+    state.loading = !!doctor && source.freshCount(dates, doctor, unit) !== dates.length;
+    render();
+    if (!doctor || !componentFor(current)) { preload(); state.loading = false; paintDays(); return; }
+    try {
+      const days = await preload(true);
+      if (request === state.request && days) state.days = days;
+    } catch (error) {
+      if (request === state.request && !error.cancelled) {
+        state.error = 'Algumas datas não puderam ser verificadas.';
+        console.warn('[TM] Calendário da Confirmação:', error.message);
+      }
+    } finally {
+      if (request === state.request) { state.loading = false; paintDays(); }
+    }
+  }
+
+  function closeCalendar() {
+    const popover = document.getElementById(POPOVER_ID);
+    if (!popover) return;
+    state.request++;
+    popover.remove();
+    state.input = null;
+  }
+
+  function chooseDate(date) {
+    const input = state.input;
+    if (!input) return;
+    input.value = date;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    closeCalendar();
+    tmRuntime.schedule(0);
+  }
+
+  function openCalendar(input) {
+    if (document.getElementById(POPOVER_ID) && state.input === input) {
+      closeCalendar(); return;
+    }
+    closeCalendar();
+    state.input = input;
+    state.month = monthOf(input.value);
+    const popover = document.createElement('div');
+    popover.id = POPOVER_ID;
+    popover.setAttribute('role', 'dialog');
+    popover.setAttribute('aria-label', input === tmConfirmationCalendarAdapter.read()?.startInput ?
+      'Calendário de atendimentos' : 'Calendário da data final');
+    popover.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (!(event.target instanceof Element)) return;
+      const action = event.target.closest('button[data-action]')?.dataset.action;
+      if (action === 'today') return chooseDate(iso(new Date()));
+      if (action === 'previous' || action === 'next') {
+        state.month = new Date(state.month.getFullYear(), state.month.getMonth() +
+          (action === 'next' ? 1 : -1), 1, 12);
+        loadMonth(); return;
+      }
+      const date = event.target.closest('button[data-date]')?.dataset.date;
+      if (date) chooseDate(date);
+    });
+    document.body.appendChild(popover);
+    loadMonth();
+  }
+
+  function ensureCalendar() {
+    const current = tmConfirmationCalendarAdapter.read();
+    if (!current) {
+      if (mounted.some(Boolean)) {
+        stopWork(); contextKey = ''; mounted = [null, null];
+        closeCalendar();
+        document.querySelectorAll(`.${BUTTON_CLASS}`).forEach((button) => button.parentElement?.remove());
+        document.querySelectorAll(`input.${INPUT_CLASS}`).forEach((input) => input.classList.remove(INPUT_CLASS));
+        document.getElementById(STYLE_ID)?.remove();
+      }
+      return;
+    }
+    injectStyle();
+    [current.startInput, current.endInput].forEach((input, index) => {
+      input.classList.add(INPUT_CLASS);
+      if (mounted[index] === input && input.parentElement?.querySelector(`.${BUTTON_CLASS}`)) return;
+      const group = input.closest('.input-group');
+      if (!group) return;
+      const host = document.createElement('div'); host.className = 'input-group-append';
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = `btn btn-outline-secondary ${BUTTON_CLASS}`;
+      button.innerHTML = '<i class="fas fa-calendar-alt" aria-hidden="true"></i>';
+      button.setAttribute('aria-label', index ? 'Abrir calendário da data final' : 'Abrir calendário da data inicial');
+      button.title = index ? 'Selecionar data final' : 'Calendário de atendimentos e bloqueios';
+      if (!index) {
+        button.addEventListener('pointerenter', preload);
+        button.addEventListener('focus', preload);
+      }
+      button.addEventListener('click', (event) => {
+        event.preventDefault(); event.stopPropagation(); openCalendar(input);
+      });
+      host.appendChild(button); group.appendChild(host); mounted[index] = input;
+    });
+    preload();
+  }
+
+  document.addEventListener(tmConfirmationCalendarAdapter.event, () => {
+    const current = tmConfirmationCalendarAdapter.read();
+    if (!current) return;
+    const key = requestContext(current, monthOf(current.context.start));
+    if (key !== contextKey) {
+      contextKey = key;
+      preload();
+      if (document.getElementById(POPOVER_ID)) loadMonth();
+    }
+  });
+  document.addEventListener('click', (event) => {
+    if (document.getElementById(POPOVER_ID) && event.target instanceof Element &&
+        !event.target.closest(`#${POPOVER_ID}, .${BUTTON_CLASS}`)) closeCalendar();
+  });
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeCalendar(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopWork();
+    else if (document.getElementById(POPOVER_ID)) loadMonth();
+    else preload();
+  });
+  document.addEventListener('click', (event) => {
+    const current = tmConfirmationCalendarAdapter.read();
+    if (current && event.target instanceof Element && event.target.closest('#refresh-button')) {
+      source.invalidate(current.context.doctor, current.context.unit);
+    }
+  }, true);
+  window.addEventListener('resize', positionPopover);
+  window.addEventListener('scroll', positionPopover, true);
+  tmRuntime.register('calendário de atendimentos da Confirmação', ensureCalendar);
+})();
 
 /* =========================
    CONFIRMAÇÃO - FILTRO POR TIPO DE AGENDAMENTO
@@ -5629,43 +7574,6 @@ function setDateCalculatorOpen(isOpen) {
         position: fixed !important;
       }
 
-      .tm-datecalc-final-close-row {
-        display: flex !important;
-        justify-content: flex-end !important;
-        align-items: center !important;
-        width: 100% !important;
-        height: 18px !important;
-        margin: -2px 0 4px 0 !important;
-        padding: 0 !important;
-      }
-
-      .tm-datecalc-final-close {
-        position: static !important;
-        z-index: 100000 !important;
-        border: 0 !important;
-        border-color: transparent !important;
-        background: transparent !important;
-        color: #dc3545 !important;
-        font-size: 20px !important;
-        font-weight: 700 !important;
-        line-height: 1 !important;
-        padding: 0 2px !important;
-        cursor: pointer !important;
-        appearance: none !important;
-        -webkit-appearance: none !important;
-      }
-
-      .tm-datecalc-final-close:hover,
-      .tm-datecalc-final-close:focus,
-      .tm-datecalc-final-close:active,
-      .tm-datecalc-final-close:focus-visible {
-        color: #b02a37 !important;
-        border: 0 !important;
-        border-color: transparent !important;
-        background: transparent !important;
-      }
-
-      .tm-datecalc-final-close:focus-visible,
       .tm-datecalc-final-root .tm-datecalc-hoje-btn:focus-visible,
       .tm-datecalc-final-root .tm-datecalc-copy-result:focus-visible {
         outline: 2px solid #1679e8 !important;
@@ -5732,37 +7640,6 @@ function setDateCalculatorOpen(isOpen) {
     const root = document.getElementById('tm-datecalc-panel');
     return root && !root.classList.contains('tm-datecalc-hidden') ? root : null;
   }
-  function clearCalculatorFields(root) {
-    if (!root) return;
-
-    const startInput = root.querySelector('#tm-datecalc-start');
-    const daysInput = root.querySelector('#tm-datecalc-days');
-    const resultDate = root.querySelector('#tm-datecalc-result-date');
-    const copyButton = root.querySelector('[data-tm-copy-date-result="1"]');
-
-    [startInput, daysInput].filter(Boolean).forEach((input) => {
-      input.value = '';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    if (resultDate) {
-      resultDate.textContent = '';
-    }
-
-    if (copyButton) {
-      copyButton.disabled = true;
-      copyButton.textContent = '📋';
-      copyButton.blur();
-    }
-  }
-
-  function closeRoot(root) {
-    clearCalculatorFields(root);
-    root.classList.add('tm-datecalc-hidden');
-    document.querySelector('[data-tm-datecalc-header-trigger="1"]')?.focus({ preventScroll: true });
-  }
-
   function cleanupOldResultLabelNodes(root) {
     if (!root) return;
 
@@ -5797,7 +7674,7 @@ function setDateCalculatorOpen(isOpen) {
     root.classList.add('tm-datecalc-final-root');
 
     cleanupOldResultLabelNodes(root);
-    root.querySelectorAll('.tm-datecalc-close-btn, .tm-datecalc-close-main, .tm-datecalc-safe-close, .tm-datecalc-safe-close-row')
+    root.querySelectorAll('.tm-datecalc-final-close-row, .tm-datecalc-close-btn, .tm-datecalc-close-main, .tm-datecalc-safe-close, .tm-datecalc-safe-close-row')
       .forEach((node) => node.remove());
 
     const prazoInput = root.querySelector('#tm-datecalc-days, input[type="number"]');
@@ -5816,36 +7693,6 @@ function setDateCalculatorOpen(isOpen) {
         section.style.setProperty('display', 'none', 'important');
       }
     });
-
-    let row = root.querySelector(':scope > .tm-datecalc-final-close-row');
-
-    if (!row) {
-      row = document.createElement('div');
-      row.className = 'tm-datecalc-final-close-row';
-      root.insertBefore(row, root.firstElementChild || null);
-    }
-
-    let btn = row.querySelector(':scope > .tm-datecalc-final-close');
-
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'tm-datecalc-final-close';
-      btn.textContent = '×';
-      btn.title = 'Fechar';
-      btn.setAttribute('aria-label', 'Fechar calculadora');
-      row.appendChild(btn);
-    }
-
-    if (btn.dataset.tmDatecalcFinalBound !== '1') {
-      btn.dataset.tmDatecalcFinalBound = '1';
-
-      btn.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        closeRoot(root);
-      }, true);
-    }
   }
 
   document.addEventListener('click', () => {
@@ -6107,6 +7954,588 @@ function setDateCalculatorOpen(isOpen) {
     ensureAttachmentFilter();
     applyAttachmentFilter();
   });
+})();
+
+
+/* =========================
+   AUTORIZAÇÕES - FILTROS INICIAIS
+   v26.11
+========================= */
+(function () {
+  'use strict';
+
+  const RETRY_DELAY = 120;
+  const MAX_READY_RETRIES = 8;
+  const INITIAL_REFRESH_DELAY = 80;
+  let activeFilterCard = null;
+  let currentFilters = null;
+  let cardStateApplied = false;
+  let refreshScheduledForTabEntry = false;
+  let autorizaçõesTabWasActive = false;
+  let readyRetries = 0;
+  let retryTimer = null;
+  let refreshTimer = null;
+
+  function norm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function isAuthorizationModuleOpen() {
+    const hash = String(window.location?.hash || '');
+
+    if (hash) return /^#\/autorizacoes(?:\/|$)/i.test(hash);
+
+    const breadcrumb = document.querySelector('.breadcrumb');
+    return /(?:^|\/)\s*Autorizações\b/.test(norm(breadcrumb?.innerText || breadcrumb?.textContent || ''));
+  }
+
+  function isAutorizacoesTabActive() {
+    return Array.from(document.querySelectorAll('.nav.nav-pills .nav-link.active, .nav-pills .nav-link.active'))
+      .some((link) => norm(link.innerText || link.textContent || '') === 'Autorizações');
+  }
+
+  function findSelectWithOptions(container, requiredLabels) {
+    return Array.from(container.querySelectorAll('select')).find((select) => {
+      const labels = new Set(Array.from(select.options, (option) => norm(option.textContent)));
+      return requiredLabels.every((label) => labels.has(label));
+    }) || null;
+  }
+
+  function findSelectWithOptionPrefix(container, prefix) {
+    return Array.from(container.querySelectorAll('select')).find((select) =>
+      Array.from(select.options).some((option) => norm(option.textContent).startsWith(prefix))
+    ) || null;
+  }
+
+  function getAuthorizationFilterCard() {
+    if (!isAutorizacoesTabActive()) return null;
+
+    const refreshButton = document.querySelector('#refresh-button');
+    const card = refreshButton?.closest('.card.dashcard, .card');
+    const cardBody = card?.querySelector(':scope > .card-body') || refreshButton?.closest('.card-body');
+
+    if (!cardBody) return null;
+
+    const hasPeriod = !!findSelectWithOptions(cardBody, ['Semana']);
+    const hasStatus = !!findSelectWithOptions(cardBody, ['Aberto', 'Todos os Status Ativos...']);
+    const hasDateKind = !!findSelectWithOptions(cardBody, ['Data de Abertura', 'Data de Agendamento']);
+    const hasAuthorizationQueue = !!findSelectWithOptionPrefix(cardBody, 'Sem filtro por fila de autorização');
+
+    return hasPeriod && hasStatus && hasDateKind && hasAuthorizationQueue ? cardBody : null;
+  }
+
+  function getCurrentIsoWeek(date = new Date()) {
+    const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const day = utcDate.getUTCDay() || 7;
+
+    utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
+
+    const year = utcDate.getUTCFullYear();
+    const yearStart = new Date(Date.UTC(year, 0, 1));
+    const week = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
+
+    return `${year}-W${String(week).padStart(2, '0')}`;
+  }
+
+  function setValue(element, value) {
+    if (!element || element.value === value) return false;
+
+    const prototype = element instanceof HTMLSelectElement
+      ? HTMLSelectElement.prototype
+      : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+
+    if (setter) {
+      setter.call(element, value);
+    } else {
+      element.value = value;
+    }
+
+    return true;
+  }
+
+  function notifyValueChange(element) {
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function selectValueForLabel(select, label) {
+    const option = Array.from(select?.options || [])
+      .find((item) => norm(item.textContent) === label);
+
+    return option ? option.value : null;
+  }
+
+  function getAuthorizationControls(cardBody) {
+    const period = findSelectWithOptions(cardBody, ['Semana']);
+    const status = findSelectWithOptions(cardBody, ['Aberto', 'Todos os Status Ativos...']);
+    const dateKind = findSelectWithOptions(cardBody, ['Data de Abertura', 'Data de Agendamento']);
+    const authorizationQueue = findSelectWithOptionPrefix(cardBody, 'Sem filtro por fila de autorização');
+    const range = cardBody.querySelector('input[type="week"], input[type="month"], input[type="date"]');
+
+    return { period, status, dateKind, authorizationQueue, range };
+  }
+
+  function getAuxiliaryInputs(cardBody, range) {
+    return Array.from(cardBody.querySelectorAll('input'))
+      .filter((input) => input !== range && input.type !== 'hidden' && input.type !== 'button' && input.type !== 'submit' && input.type !== 'reset');
+  }
+
+  function getDefaultFilters(cardBody) {
+    const { period, status, dateKind, authorizationQueue } = getAuthorizationControls(cardBody);
+    const periodValue = selectValueForLabel(period, 'Semana');
+    const statusValue = selectValueForLabel(status, 'Aberto');
+    const dateKindValue = selectValueForLabel(dateKind, 'Data de Agendamento');
+    const authorizationQueueValue = selectValueForLabel(authorizationQueue, 'Exames');
+
+    if (periodValue === null || statusValue === null || dateKindValue === null || authorizationQueueValue === null) return null;
+
+    return {
+      period: periodValue,
+      status: statusValue,
+      dateKind: dateKindValue,
+      authorizationQueue: authorizationQueueValue,
+      range: getCurrentIsoWeek(),
+      rangeType: 'week'
+    };
+  }
+
+  function captureCurrentFilters(cardBody) {
+    const { period, status, dateKind, authorizationQueue, range } = getAuthorizationControls(cardBody);
+
+    if (!period || !status || !dateKind || !authorizationQueue || !range) return null;
+
+    return {
+      period: period.value,
+      status: status.value,
+      dateKind: dateKind.value,
+      authorizationQueue: authorizationQueue.value,
+      range: range.value,
+      rangeType: range.type,
+      selectValues: Array.from(cardBody.querySelectorAll('select'), (select) => select.value),
+      inputValues: getAuxiliaryInputs(cardBody, range).map((input) => ({
+        type: input.type,
+        value: input.value,
+        checked: input.checked
+      }))
+    };
+  }
+
+  function applyFilterState(cardBody, filters) {
+    const { period, status, dateKind, authorizationQueue, range } = getAuthorizationControls(cardBody);
+
+    if (!period || !status || !dateKind || !authorizationQueue || !filters) return { ready: false, changed: false };
+
+    const changedElements = [];
+    const selects = Array.from(cardBody.querySelectorAll('select'));
+
+    (filters.selectValues || []).forEach((value, index) => {
+      const select = selects[index];
+      if (select && setValue(select, value)) changedElements.push(select);
+    });
+
+    [
+      [period, filters.period],
+      [status, filters.status],
+      [dateKind, filters.dateKind],
+      [authorizationQueue, filters.authorizationQueue]
+    ].forEach(([element, value]) => {
+      if (setValue(element, value)) changedElements.push(element);
+    });
+
+    if ((!range || (filters.rangeType && range.type !== filters.rangeType)) && filters.range) {
+      changedElements.forEach(notifyValueChange);
+      return { ready: false, changed: changedElements.length > 0 };
+    }
+
+    if (range && filters.range && setValue(range, filters.range)) {
+      changedElements.push(range);
+    }
+
+    const auxiliaryInputs = getAuxiliaryInputs(cardBody, range);
+    (filters.inputValues || []).forEach((savedInput, index) => {
+      const input = auxiliaryInputs[index];
+      if (!input || input.type !== savedInput.type) return;
+
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        if (input.checked !== savedInput.checked) {
+          input.checked = savedInput.checked;
+          changedElements.push(input);
+        }
+        return;
+      }
+
+      if (setValue(input, savedInput.value)) changedElements.push(input);
+    });
+
+    changedElements.forEach(notifyValueChange);
+    return { ready: true, changed: changedElements.length > 0 };
+  }
+
+  function scheduleTabRefresh() {
+    if (refreshScheduledForTabEntry || refreshTimer) return;
+
+    refreshScheduledForTabEntry = true;
+    refreshTimer = window.setTimeout(() => {
+      refreshTimer = null;
+
+      if (!isAuthorizationModuleOpen() || !isAutorizacoesTabActive()) return;
+
+      const refreshButton = document.querySelector('#refresh-button');
+      if (!refreshButton || refreshButton.disabled) {
+        refreshScheduledForTabEntry = false;
+        return;
+      }
+
+      refreshButton.click();
+    }, INITIAL_REFRESH_DELAY);
+  }
+
+  function resetAuthorizationSession() {
+    activeFilterCard = null;
+    currentFilters = null;
+    cardStateApplied = false;
+    refreshScheduledForTabEntry = false;
+    autorizaçõesTabWasActive = false;
+    readyRetries = 0;
+    window.clearTimeout(retryTimer);
+    window.clearTimeout(refreshTimer);
+    retryTimer = null;
+    refreshTimer = null;
+  }
+
+  function ensureAuthorizationDefaults() {
+    if (!isAuthorizationModuleOpen()) {
+      resetAuthorizationSession();
+      return;
+    }
+
+    if (!isAutorizacoesTabActive()) {
+      autorizaçõesTabWasActive = false;
+      refreshScheduledForTabEntry = false;
+      window.clearTimeout(refreshTimer);
+      refreshTimer = null;
+      return;
+    }
+
+    const cardBody = getAuthorizationFilterCard();
+
+    if (!cardBody) {
+      return;
+    }
+
+    if (!autorizaçõesTabWasActive || cardBody !== activeFilterCard) {
+      activeFilterCard = cardBody;
+      cardStateApplied = false;
+      readyRetries = 0;
+    }
+    autorizaçõesTabWasActive = true;
+
+    if (cardStateApplied) return;
+
+    const filters = currentFilters || getDefaultFilters(cardBody);
+    const result = applyFilterState(cardBody, filters);
+
+    if (result.ready) {
+      currentFilters = captureCurrentFilters(cardBody) || filters;
+      cardStateApplied = true;
+      window.clearTimeout(retryTimer);
+      retryTimer = null;
+      scheduleTabRefresh();
+      return;
+    }
+
+    if (readyRetries >= MAX_READY_RETRIES || retryTimer) return;
+
+    readyRetries += 1;
+    retryTimer = window.setTimeout(() => {
+      retryTimer = null;
+      tmRuntime.schedule();
+    }, RETRY_DELAY);
+  }
+
+  document.addEventListener('change', (event) => {
+    if (!isAuthorizationModuleOpen() || !isAutorizacoesTabActive()) return;
+
+    const cardBody = getAuthorizationFilterCard();
+    if (!cardBody || !cardBody.contains(event.target)) return;
+
+    const filters = captureCurrentFilters(cardBody);
+    if (filters) currentFilters = filters;
+  }, true);
+
+  tmRuntime.register('filtros iniciais de autorizações', ensureAuthorizationDefaults);
+})();
+
+
+/* =========================
+   VISÃO GERAL - FILTROS INICIAIS
+   v26.10
+========================= */
+(function () {
+  'use strict';
+
+  const RETRY_DELAY = 120;
+  const MAX_READY_RETRIES = 8;
+  const REFRESH_DELAY = 80;
+  let activeFilterCard = null;
+  let cardStateApplied = false;
+  let visaoGeralTabWasActive = false;
+  let refreshScheduledForTabEntry = false;
+  let readyRetries = 0;
+  let retryTimer = null;
+  let refreshTimer = null;
+
+  function norm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function isAuthorizationModuleOpen() {
+    const hash = String(window.location?.hash || '');
+
+    if (hash) return /^#\/autorizacoes(?:\/|$)/i.test(hash);
+
+    const breadcrumb = document.querySelector('.breadcrumb');
+    return /(?:^|\/)\s*Autorizações\b/.test(norm(breadcrumb?.innerText || breadcrumb?.textContent || ''));
+  }
+
+  function isVisaoGeralTabActive() {
+    return Array.from(document.querySelectorAll('.nav.nav-pills .nav-link.active, .nav-pills .nav-link.active'))
+      .some((link) => norm(link.innerText || link.textContent || '') === 'Visão Geral');
+  }
+
+  function findSelectWithOptions(container, requiredLabels) {
+    return Array.from(container.querySelectorAll('select')).find((select) => {
+      const labels = new Set(Array.from(select.options, (option) => norm(option.textContent)));
+      return requiredLabels.every((label) => labels.has(label));
+    }) || null;
+  }
+
+  function selectValueForLabel(select, label) {
+    const option = Array.from(select?.options || [])
+      .find((item) => norm(item.textContent) === label);
+
+    return option ? option.value : null;
+  }
+
+  function getOverviewControls(cardBody) {
+    const period = findSelectWithOptions(cardBody, ['Mês Atual']);
+    const dateKind = findSelectWithOptions(cardBody, ['Data de Abertura', 'Data de Agendamento']);
+    const exam = Array.from(cardBody.querySelectorAll('select'))
+      .find((select) => select !== period && select !== dateKind && selectValueForLabel(select, 'Exames') !== null) || null;
+
+    return { period, dateKind, exam };
+  }
+
+  function getOverviewFilterCard() {
+    if (!isVisaoGeralTabActive()) return null;
+
+    const refreshButton = document.querySelector('#refresh-button');
+    const card = refreshButton?.closest('.card.dashcard, .card');
+    const cardBody = card?.querySelector(':scope > .card-body') || refreshButton?.closest('.card-body');
+
+    if (!cardBody) return null;
+
+    const { period, dateKind, exam } = getOverviewControls(cardBody);
+    return period && dateKind && exam ? cardBody : null;
+  }
+
+  function setValue(element, value) {
+    if (!element || element.value === value) return false;
+
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    if (setter) {
+      setter.call(element, value);
+    } else {
+      element.value = value;
+    }
+
+    return true;
+  }
+
+  function notifyValueChange(element) {
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function applyOverviewDefaults(cardBody) {
+    const { period, dateKind, exam } = getOverviewControls(cardBody);
+    const values = [
+      [period, selectValueForLabel(period, 'Mês Atual')],
+      [dateKind, selectValueForLabel(dateKind, 'Data de Agendamento')],
+      [exam, selectValueForLabel(exam, 'Exames')]
+    ];
+
+    if (values.some(([element, value]) => !element || value === null)) return false;
+
+    const changedElements = values
+      .filter(([element, value]) => setValue(element, value))
+      .map(([element]) => element);
+
+    changedElements.forEach(notifyValueChange);
+    return true;
+  }
+
+  function scheduleTabRefresh() {
+    if (refreshScheduledForTabEntry || refreshTimer) return;
+
+    refreshScheduledForTabEntry = true;
+    refreshTimer = window.setTimeout(() => {
+      refreshTimer = null;
+
+      if (!isAuthorizationModuleOpen() || !isVisaoGeralTabActive()) return;
+
+      const refreshButton = document.querySelector('#refresh-button');
+      if (!refreshButton || refreshButton.disabled) {
+        refreshScheduledForTabEntry = false;
+        return;
+      }
+
+      refreshButton.click();
+    }, REFRESH_DELAY);
+  }
+
+  function resetOverviewState() {
+    activeFilterCard = null;
+    cardStateApplied = false;
+    visaoGeralTabWasActive = false;
+    refreshScheduledForTabEntry = false;
+    readyRetries = 0;
+    window.clearTimeout(retryTimer);
+    window.clearTimeout(refreshTimer);
+    retryTimer = null;
+    refreshTimer = null;
+  }
+
+  function ensureOverviewDefaults() {
+    if (!isAuthorizationModuleOpen()) {
+      resetOverviewState();
+      return;
+    }
+
+    if (!isVisaoGeralTabActive()) {
+      visaoGeralTabWasActive = false;
+      refreshScheduledForTabEntry = false;
+      window.clearTimeout(refreshTimer);
+      refreshTimer = null;
+      return;
+    }
+
+    const cardBody = getOverviewFilterCard();
+    if (!cardBody) {
+      scheduleTabRefresh();
+      return;
+    }
+
+    if (!visaoGeralTabWasActive || cardBody !== activeFilterCard) {
+      activeFilterCard = cardBody;
+      cardStateApplied = false;
+      readyRetries = 0;
+    }
+    visaoGeralTabWasActive = true;
+
+    if (cardStateApplied) {
+      scheduleTabRefresh();
+      return;
+    }
+
+    if (applyOverviewDefaults(cardBody)) {
+      cardStateApplied = true;
+      window.clearTimeout(retryTimer);
+      retryTimer = null;
+      scheduleTabRefresh();
+      return;
+    }
+
+    if (readyRetries >= MAX_READY_RETRIES || retryTimer) return;
+
+    readyRetries += 1;
+    retryTimer = window.setTimeout(() => {
+      retryTimer = null;
+      tmRuntime.schedule();
+    }, RETRY_DELAY);
+  }
+
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const tab = target.closest('.nav.nav-pills .nav-link, .nav-pills .nav-link');
+    if (!tab || norm(tab.innerText || tab.textContent || '') !== 'Visão Geral') return;
+
+    activeFilterCard = null;
+    cardStateApplied = false;
+    visaoGeralTabWasActive = false;
+    refreshScheduledForTabEntry = false;
+    readyRetries = 0;
+    window.clearTimeout(retryTimer);
+    window.clearTimeout(refreshTimer);
+    retryTimer = null;
+    refreshTimer = null;
+
+    window.setTimeout(() => tmRuntime.schedule(), 0);
+    window.setTimeout(() => tmRuntime.schedule(), RETRY_DELAY);
+  }, true);
+
+  tmRuntime.register('filtros iniciais da visão geral de autorizações', ensureOverviewDefaults);
+})();
+
+
+/* =========================
+   AUTORIZAÇÕES - MODAL COMPACTO
+   v26.11
+========================= */
+(function () {
+  'use strict';
+
+  const STYLE_ID = 'tm-authorization-modal-compact-style';
+
+  function injectAuthorizationModalStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      #autorizarModal.modal.show {
+        align-items: center !important;
+        display: flex !important;
+        justify-content: center !important;
+        overflow-y: auto !important;
+        padding: 16px !important;
+      }
+
+      #autorizarModal .modal-dialog.modal-dialog-total {
+        height: auto !important;
+        margin: 0 !important;
+        max-height: calc(100vh - 32px) !important;
+        max-width: 1120px !important;
+        min-height: 0 !important;
+        width: min(1120px, 100%) !important;
+      }
+
+      #autorizarModal .modal-content.modal-content-total {
+        height: auto !important;
+        max-height: calc(100vh - 32px) !important;
+        min-height: 0 !important;
+        width: 100% !important;
+      }
+
+      #autorizarModal .modal-body {
+        flex: 0 1 auto !important;
+        max-height: calc(100vh - 184px) !important;
+        overflow-y: auto !important;
+      }
+
+      #autorizarModal .modal-body > br {
+        display: none !important;
+      }
+
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  tmRuntime.register('modal compacto de autorização', injectAuthorizationModalStyle);
 })();
 
 
