@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.27
+// @version      26.28
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -4706,6 +4706,22 @@ function setDateCalculatorOpen(isOpen) {
   let saving = false;
   let rendered = '';
   let lastRoute = '';
+  let unloadGuardAttached = false;
+
+  function confirmLeavingWithDrafts(event) {
+    if (!drafts.length) return;
+    event.preventDefault();
+    // Compatibilidade com navegadores que ainda exigem returnValue.
+    event.returnValue = true;
+  }
+
+  function syncUnloadGuard() {
+    const shouldAttach = drafts.length > 0;
+    if (shouldAttach === unloadGuardAttached) return;
+    if (shouldAttach) window.addEventListener('beforeunload', confirmLeavingWithDrafts);
+    else window.removeEventListener('beforeunload', confirmLeavingWithDrafts);
+    unloadGuardAttached = shouldAttach;
+  }
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value, (key, item) => {
@@ -5126,6 +5142,7 @@ function setDateCalculatorOpen(isOpen) {
     const headerHost = document.querySelector('nav.navbar ul.navbar-nav.ml-auto');
     const currentUser = headerUserId();
     if (currentUser) checkOwner(vue || { $store: { state: { user: { id_usuario: currentUser } } } });
+    syncUnloadGuard();
     ensureModalSave(canSave);
     let dock = document.getElementById(DOCK_ID);
     if (!headerHost || !currentUser) {

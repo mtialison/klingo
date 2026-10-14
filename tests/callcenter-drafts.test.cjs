@@ -11,13 +11,18 @@ assert.ok(start >= 0 && end > start);
 
 function setup() {
   const eventHandlers = {};
+  const windowHandlers = {};
   const context = vm.createContext({
-    window: { location: { hash: '#/call-center' }, setTimeout },
+    window: { location: { hash: '#/call-center' }, setTimeout,
+      addEventListener(type, handler) { windowHandlers[type] = handler; },
+      removeEventListener(type, handler) {
+        if (windowHandlers[type] === handler) delete windowHandlers[type];
+      } },
     document: { querySelectorAll: () => [], querySelector: () => null,
       addEventListener(type, handler) { eventHandlers[type] = handler; } },
     tmRuntime: { schedule() {} },
     console: { warn() {}, error() {} },
-    eventHandlers
+    eventHandlers, windowHandlers
   });
   vm.runInContext(script.slice(start, end), context);
   vm.runInContext('actualRender = render; render = () => {};', context);
@@ -78,6 +83,23 @@ test('abrir a calculadora fecha o menu Em espera', () => {
   vm.runInContext('open = true;', context);
   context.eventHandlers['tm-datecalc-opened']();
   assert.equal(vm.runInContext('open', context), false);
+});
+
+test('avisa antes de recarregar somente enquanto há rascunhos em memória', () => {
+  const context = setup();
+  vm.runInContext('syncUnloadGuard()', context);
+  assert.equal(context.windowHandlers.beforeunload, undefined);
+
+  vm.runInContext("drafts.push({ id: 1, patient: 'Paciente teste' }); syncUnloadGuard()", context);
+  const handler = context.windowHandlers.beforeunload;
+  assert.equal(typeof handler, 'function');
+  const event = { prevented: false, preventDefault() { this.prevented = true; } };
+  handler(event);
+  assert.equal(event.prevented, true);
+  assert.equal(event.returnValue, true);
+
+  vm.runInContext('drafts.length = 0; syncUnloadGuard()', context);
+  assert.equal(context.windowHandlers.beforeunload, undefined);
 });
 
 test('restaura procedimento sem reaproveitar horário ou reserva', async () => {
