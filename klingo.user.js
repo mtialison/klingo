@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.33
+// @version      26.34
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -5821,18 +5821,11 @@ let tmAppointmentCalendarCore;
   const monthNames = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
     'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
   const CACHE_MS = 120000;
+  const METADATA_CACHE_MS = CACHE_MS;
   const RETAIN_MS = 15 * 60000;
   const BACKGROUND_REFRESH_MS = 90000;
-  let preloadTimer = null;
-  let preloadRefresh = false;
-  let expiryTimer = null;
-  let warmTimer = null;
-  let warmGeneration = 0;
-  let warmedKey = '';
-  let lastPreloadKey = '';
   let automaticRefresh = false;
   let boundComponent = null;
-  let detachNative = null;
   let detachContext = null;
   let mountedInput = null;
   let mountedContext = '';
@@ -5905,16 +5898,18 @@ let tmAppointmentCalendarCore;
   }
 
   // Núcleo independente da interface. Só conserva resumos; nunca pacientes.
-  function createCalendarSource({ post, busy = () => false, changed = () => {}, now = Date.now }) {
+  function createCalendarSource({ post, busy = () => false, paused = () => false, changed = () => {}, now = Date.now }) {
     const days = new Map(), weeks = new Map(), holidays = new Map();
-    let current = null, sequence = 0, invalidatedAt = 0, active = 0, wake = null;
+    const runs = new Map(), pendingDays = new Map(), pendingMetadata = new Map(), listeners = new Set();
+    let activeContext = '', sequence = 0, invalidatedAt = 0, active = 0, wake = null;
+    const stats = { requests: 0, queries: 0, joined: 0, cacheHits: 0 };
     const queue = [];
     const cancelled = () => Object.assign(new Error('Busca substituída.'), { cancelled: true });
     const contextKey = (doctor, unit) => String(doctor) + '|' + String(unit);
     const dayKey = (context, date) => context + '|' + date;
     function fresh(map, key) {
       const entry = map.get(key);
-      if (entry && now() - entry.time < CACHE_MS) return entry.value;
+      if (entry && now() - entry.time < (map === days ? CACHE_MS : METADATA_CACHE_MS)) return entry.value;
       if (entry && now() - entry.time >= RETAIN_MS) map.delete(key);
       return undefined;
     }
@@ -5949,30 +5944,47 @@ let tmAppointmentCalendarCore;
       return dates.filter((date) => fresh(days, dayKey(context, date)) !== undefined).length;
     }
     function stop() {
-      if (current) {
-        current.cancelled = true;
-        current.cancels.forEach((cancel) => cancel());
-      }
+      runs.forEach((run) => {
+        run.cancelled = true;
+        run.cancels.forEach((cancel) => cancel());
+      });
+      runs.clear();
+      pendingDays.clear();
+      pendingMetadata.clear();
       while (queue.length) queue.shift().reject(cancelled());
       clearTimeout(wake);
       wake = null;
-      current = null;
+      activeContext = '';
+    }
+    function notify(event = 'days') {
+      changed(event);
+      listeners.forEach((listener) => listener(event));
+    }
+    function promote(run, priority) {
+      run.priority = Math.min(run.priority, priority);
+      run.dependencies.forEach((dependency) => promote(dependency, priority));
     }
     function pump() {
       clearTimeout(wake);
       wake = null;
+      queue.sort((a, b) => a.run.priority - b.run.priority);
       while (active < 2 && queue.length) {
         const job = queue[0];
         if (job.run.cancelled) { queue.shift().reject(cancelled()); continue; }
-        // Não disputa as duas conexões de trabalho com uma carga nativa em curso.
-        if (busy(job.run.component)) {
+        // A seleção do médico começa imediatamente, mesmo durante a busca nativa.
+        // Nessa situação e nos meses secundários usamos só uma conexão própria.
+        const limit = busy(job.run.component) || job.run.priority > 0 ? 1 : 2;
+        if (paused()) {
           wake = setTimeout(pump, 200);
           return;
         }
+        if (active >= limit) return; // A conclusão da consulta ativa já acorda a fila.
         queue.shift();
         active++;
         Promise.resolve().then(() => {
           if (job.run.cancelled) throw cancelled();
+          stats.requests++;
+          stats.queries += job.q.length;
           return post(job.run.component, job.q, job.run.cancels);
         }).then((response) => {
           if (job.run.cancelled) throw cancelled();
@@ -6044,7 +6056,7 @@ let tmAppointmentCalendarCore;
     function put(run, date, data, schedule) {
       if (run.cancelled) return;
       remember(days, dayKey(run.context, date), classify(data, schedule), run.stamp, 1008);
-      changed();
+      notify();
     }
     function holidayCandidate(date, records) {
       return records.some((holiday) => {
@@ -6065,27 +6077,51 @@ let tmAppointmentCalendarCore;
       const anchors = [...new Set(dates.map(weekAnchor))];
       const years = [...new Set(dates.map((date) => date.slice(0, 4)))];
       const holidayKey = (year) => run.unit + '|' + year;
-      const missingWeeks = anchors.filter((date) => run.refresh || fresh(weeks, dayKey(run.context, date)) === undefined);
-      const missingYears = years.filter((year) => run.refresh || fresh(holidays, holidayKey(year)) === undefined);
-      const q = missingWeeks.map((date, i) => ({
+      const missingWeeks = anchors.filter((date) => fresh(weeks, dayKey(run.context, date)) === undefined);
+      const missingYears = years.filter((year) => fresh(holidays, holidayKey(year)) === undefined);
+      const flightKey = (type, key) => type + '|' + key;
+      const dependencies = [];
+      const ownWeeks = missingWeeks.filter((date) => {
+        const flight = pendingMetadata.get(flightKey('week', dayKey(run.context, date)));
+        if (flight) { promote(flight.run, run.priority); dependencies.push(flight.promise); }
+        return !flight;
+      });
+      const ownYears = missingYears.filter((year) => {
+        const flight = pendingMetadata.get(flightKey('holiday', holidayKey(year)));
+        if (flight) { promote(flight.run, run.priority); dependencies.push(flight.promise); }
+        return !flight;
+      });
+      const q = ownWeeks.map((date, i) => ({
         name: 'medicos.agenda_semanal', id: 'week' + i,
         parms: { id_medico: Number(run.doctor), data: date }
-      })).concat(missingYears.map((year, i) => ({
+      })).concat(ownYears.map((year, i) => ({
         name: 'agenda_feriados.index', id: 'holiday' + i, parms: { ano: Number(year), cadastro: true }
       })));
       if (q.length) {
-        const response = await query(run, q);
-        missingWeeks.forEach((date, i) =>
-          remember(weeks, dayKey(run.context, date), scheduleMap(result(response, 'week' + i), run.unit), run.stamp, 168));
-        missingYears.forEach((year, i) => {
-          const records = result(response, 'holiday' + i);
+        const response = query(run, q);
+        function track(key, consume) {
+          const flight = { run, promise: null };
+          flight.promise = response.then(consume).finally(() => {
+            if (pendingMetadata.get(key) === flight) pendingMetadata.delete(key);
+          });
+          pendingMetadata.set(key, flight);
+          dependencies.push(flight.promise);
+        }
+        ownWeeks.forEach((date, i) => track(flightKey('week', dayKey(run.context, date)), (value) =>
+          remember(weeks, dayKey(run.context, date), scheduleMap(result(value, 'week' + i), run.unit), run.stamp, 168)));
+        ownYears.forEach((year, i) => track(flightKey('holiday', holidayKey(year)), (value) => {
+          const records = result(value, 'holiday' + i);
           if (!Array.isArray(records)) throw new Error('Cadastro de feriados incompleto.');
           remember(holidays, holidayKey(year), records.map((h) => ({
             dt_inicio: h.dt_inicio, dt_termino: h.dt_termino,
             fl_recorrente: h.fl_recorrente, fl_ativo: h.fl_ativo
           })), run.stamp, 12);
-        });
+        }));
       }
+      const outcomes = await Promise.allSettled(dependencies);
+      if (run.cancelled) throw cancelled();
+      const failure = outcomes.find((item) => item.status === 'rejected');
+      if (failure) throw failure.reason;
       const scheduled = new Map();
       anchors.forEach((date) => {
         const week = fresh(weeks, dayKey(run.context, date));
@@ -6160,16 +6196,39 @@ let tmAppointmentCalendarCore;
       });
       await daily(run, exceptions, scheduled);
     }
-    function ensure(dates, doctor, unit, component, { refresh = false } = {}) {
+    function ensure(dates, doctor, unit, component, { refresh = false, priority = 0 } = {}) {
+      dates = [...new Set(dates)].sort();
+      doctor = String(doctor || ''); unit = String(unit || '');
+      if (!doctor || !component || !dates.length) return Promise.resolve(new Map());
       const context = contextKey(doctor, unit), key = context + '|' + dates.join(',');
-      if (current && !current.cancelled && current.key === key) return current.promise;
-      stop();
-      const missing = dates.filter((date) => refresh || fresh(days, dayKey(context, date)) === undefined);
-      if (!missing.length) return Promise.resolve(read(dates, doctor, unit));
+      if (activeContext && activeContext !== context) stop();
+      activeContext = context;
+      if (priority === 0) runs.forEach((run) => { run.priority = 1; });
+      const existing = runs.get(key);
+      if (existing) {
+        stats.joined++;
+        promote(existing, priority);
+        pump();
+        return existing.promise;
+      }
+      const needed = dates.filter((date) => refresh || fresh(days, dayKey(context, date)) === undefined);
+      stats.cacheHits += dates.length - needed.length;
+      if (!needed.length) return Promise.resolve(read(dates, doctor, unit));
+      const dependencies = new Set();
+      const missing = needed.filter((date) => {
+        const owner = pendingDays.get(dayKey(context, date));
+        if (owner) { dependencies.add(owner); promote(owner, priority); stats.joined++; }
+        return !owner;
+      });
       const run = { key, context, doctor, unit, component, stamp: ++sequence,
-        refresh, cancelled: false, cancels: new Set(), promise: null };
-      current = run;
-      run.promise = (async () => {
+        refresh, priority, dependencies, cancelled: false, cancels: new Set(), promise: null };
+      runs.set(key, run);
+      missing.forEach((date) => pendingDays.set(dayKey(context, date), run));
+      // As datas são reservadas antes da primeira microtarefa. Abrir o popup ou
+      // pedir um mês sobreposto adere à consulta existente, sem reiniciá-la.
+      const own = Promise.resolve().then(async () => {
+        if (run.cancelled) throw cancelled();
+        if (!missing.length) return;
         // Se feriados não forem acessíveis, usa a consulta diária já autorizada.
         // As semanas continuam obrigatórias para as exceções de feriado/expediente.
         let meta;
@@ -6214,8 +6273,22 @@ let tmAppointmentCalendarCore;
           }
           await daily(run, missing, scheduled);
         }
-        return read(dates, doctor, unit);
-      })().finally(() => { if (current === run) current = null; });
+      });
+      run.promise = Promise.allSettled([own, ...[...dependencies].map((owner) => owner.promise)])
+        .then((outcomes) => {
+          if (run.cancelled) throw cancelled();
+          const failure = outcomes.find((item) => item.status === 'rejected');
+          // Uma falha em datas de outro mês não invalida as datas já completas deste.
+          if (failure && needed.some((date) => fresh(days, dayKey(context, date)) === undefined)) throw failure.reason;
+          if (outcomes[0].status === 'rejected') throw outcomes[0].reason;
+          return read(dates, doctor, unit);
+        }).finally(() => {
+          if (runs.get(key) === run) runs.delete(key);
+          missing.forEach((date) => {
+            const key = dayKey(context, date);
+            if (pendingDays.get(key) === run) pendingDays.delete(key);
+          });
+        });
       return run.promise;
     }
     function invalidate(doctor, unit) {
@@ -6226,7 +6299,7 @@ let tmAppointmentCalendarCore;
         for (const key of map.keys()) if (key.startsWith(prefix)) map.delete(key);
       });
       holidays.clear();
-      changed();
+      notify('invalidate');
     }
     function nativeTicket() { return ++sequence; }
     function ingestNative(queries, response, stamp = nativeTicket()) {
@@ -6257,19 +6330,19 @@ let tmAppointmentCalendarCore;
           if (!week) continue;
           const value = classify(compact(data), week.get(p.data));
           remember(days, dayKey(context, p.data), value, stamp, 1008);
-          changed();
+          notify();
         } catch (_) { /* Resposta nativa desconhecida: conserva a busca independente. */ }
       }
     }
-    return { read, freshCount, ensure, stop, invalidate, ingestNative, nativeTicket, classify, holidayCandidate };
+    return { read, freshCount, ensure, stop, invalidate, ingestNative, nativeTicket, classify, holidayCandidate,
+      subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+      diagnostics: () => ({ ...stats, active, queued: queue.length, cachedDays: days.size, running: runs.size }) };
   }
 
-  // A Confirmação usa a mesma classificação, sem copiar regras ou dados de pacientes.
-  tmAppointmentCalendarCore = { createCalendarSource, calendarDates, iso, monthNames };
-
-  let paintFrame = null;
+  // Uma única fila e um único cache para as duas telas. Nenhum dado de paciente é persistido.
   const source = createCalendarSource({
-    busy: (component) => document.hidden || !!component?.$store?.state?.loading,
+    busy: (component) => !!component?.$store?.state?.loading,
+    paused: () => document.hidden,
     post: (component, q, cancels) => {
       const axios = component.axios || component.$http;
       const token = axios.CancelToken?.source();
@@ -6279,11 +6352,118 @@ let tmAppointmentCalendarCore;
       const cancel = () => token?.cancel('#BC#');
       cancels.add(cancel);
       return component.$http.post('aql?a=agendas.index&page=1', { q, modulo: 4 }, {
-        tmReceptionCalendar: true, timeout: 20000,
+        tmAppointmentCalendar: true, timeout: 20000,
         ...(token ? { cancelToken: token.token } : {})
       }).finally(() => cancels.delete(cancel));
-    },
-    changed: () => {
+    }
+  });
+
+  let nativeClient = null, detachNative = null, account = null;
+  function prepare(component) {
+    if (!component) return;
+    const nextAccount = String(component.$store?.state?.user?.id_usuario || '');
+    if (account !== null && nextAccount !== account) source.invalidate();
+    account = nextAccount;
+    const client = component.axios || component.$http;
+    if (client === nativeClient) return;
+    detachNative?.();
+    nativeClient = client;
+    const interceptors = client?.interceptors;
+    if (!interceptors?.request || !interceptors?.response) return;
+    const requestId = interceptors.request.use((config) => {
+      if (!config.tmAppointmentCalendar) config.tmCalendarNativeTicket = source.nativeTicket();
+      return config;
+    });
+    const responseId = interceptors.response.use((response) => {
+      try {
+        if (response.config?.tmAppointmentCalendar) return response;
+        const body = typeof response.config?.data === 'string'
+          ? JSON.parse(response.config.data) : response.config?.data;
+        if (!Array.isArray(body?.q)) return response;
+        const mutated = body.q.some((q) =>
+          /^(agendas|marcacoes|bloqueios|agenda_feriados|cadastro_agendas|agenda_grupos|agenda_grupo_datas|reserva_horarios)\./.test(q.name) &&
+          !/\.(index|show|stats|agenda_semanal|horarios|verificar_horarios_agenda|get_doc_pre_atends|campos_customizados)$/.test(q.name) &&
+          response.data?.[q.id]?.status >= 200 && response.data?.[q.id]?.status < 300);
+        if (mutated) source.invalidate();
+        if (Number.isFinite(response.config?.tmCalendarNativeTicket)) {
+          source.ingestNative(body.q, response.data, response.config.tmCalendarNativeTicket);
+        }
+      } catch (_) { /* Nunca interfere no retorno/erro da requisição nativa. */ }
+      return response;
+    });
+    detachNative = () => {
+      interceptors.request.eject(requestId);
+      interceptors.response.eject(responseId);
+    };
+  }
+
+  // O mês solicitado começa agora; vizinhos usam uma única conexão e nunca
+  // cancelam o mês que o usuário abriu. Reabrir aproveita promessas e dias já prontos.
+  function createCalendarPreloader({ source, active, context, onError = () => {} }) {
+    let key = '', generation = 0, timer = null, pending = null;
+    function stop() {
+      generation++;
+      clearTimeout(timer);
+      timer = null;
+      key = '';
+      pending = null;
+    }
+    function sync({ force = false, refresh = false } = {}) {
+      if (!active()) return Promise.resolve();
+      const current = context();
+      if (!current?.component) return Promise.resolve();
+      const { month, doctor, unit, component } = current;
+      if (!doctor) { stop(); source.stop(); return Promise.resolve(); }
+      const nextKey = monthKey(month, doctor, unit);
+      if (!force && key === nextKey && pending) return pending;
+      key = nextKey;
+      const ticket = ++generation;
+      clearTimeout(timer);
+      const valid = () => ticket === generation && active();
+      const armRefresh = (failed) => {
+        if (!valid()) return;
+        timer = setTimeout(() => {
+          timer = null;
+          sync({ force: true, refresh: true });
+        }, failed ? 15000 : BACKGROUND_REFRESH_MS);
+      };
+      pending = source.ensure(calendarDates(month), doctor, unit, component, { refresh, priority: 0 });
+      pending.then(async () => {
+        armRefresh(false);
+        for (const offset of [1, 2, -1]) {
+          if (!valid()) return;
+          const adjacent = new Date(month.getFullYear(), month.getMonth() + offset, 1, 12);
+          try {
+            await source.ensure(calendarDates(adjacent), doctor, unit, component, { priority: 1 });
+          } catch (error) {
+            if (!valid() || error.cancelled) return;
+            onError(error);
+          }
+        }
+      }, (error) => {
+        if (!valid()) return;
+        armRefresh(true);
+        if (!error.cancelled) onError(error);
+      });
+      return pending;
+    }
+    source.subscribe((event) => {
+      if (event === 'invalidate' && active()) {
+        stop();
+        // Não reentra no interceptor nem na limpeza do cache.
+        Promise.resolve().then(() => sync());
+      }
+    });
+    return { sync, stop };
+  }
+
+  tmAppointmentCalendarCore = { source, prepare, createCalendarSource, createCalendarPreloader, calendarDates, iso, monthNames };
+  const supportedRoute = () => ['#/recepcao', '#/call-center/confirmacao'].includes(window.location.hash);
+  window.addEventListener('hashchange', () => { if (!supportedRoute()) source.stop(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) source.stop(); });
+
+  let paintFrame = null;
+  source.subscribe(() => {
       if (!document.getElementById(POPOVER_ID) || paintFrame != null) return;
       paintFrame = requestAnimationFrame(() => {
         paintFrame = null;
@@ -6292,20 +6472,18 @@ let tmAppointmentCalendarCore;
         const unit = String(component?.unidade_operacao || '');
         if (!state.month || state.context !== doctor + '|' + unit) return;
         state.days = source.read(calendarDates(state.month), doctor, unit);
+        if (state.days.size === 42 && source.freshCount(calendarDates(state.month), doctor, unit) === 42) state.loading = false;
         paintDays();
       });
-    }
   });
 
   function bindNative(component) {
+    prepare(component);
     if (component === boundComponent) return;
-    detachNative?.();
     detachContext?.();
-    detachNative = null;
     detachContext = null;
     boundComponent = component;
-    // O Vue pode trocar o médico/unidade sem emitir change no select.
-    // Observa só o contexto, não a árvore inteira nem a lista de pacientes.
+    // Fallback para alterações programáticas do Vue; a seleção manual usa o evento direto.
     if (typeof component?.$watch === 'function') {
       detachContext = component.$watch(() =>
         `${component.medico || ''}|${component.unidade_operacao || ''}|${String(component.referencia || '').slice(0, 7)}`,
@@ -6313,179 +6491,54 @@ let tmAppointmentCalendarCore;
         component.$nextTick(() => {
           if (boundComponent !== component || !isReceptionPage() || document.hidden) return;
           if (document.getElementById(POPOVER_ID)) loadMonth();
-          else prefetchSelectedMonth(true);
+          else prefetchSelectedMonth();
         });
       });
     }
-    const interceptors = (component?.axios || component?.$http)?.interceptors;
-    if (!interceptors?.response || !interceptors?.request) return;
-    const requestId = interceptors.request.use((config) => {
-      if (!config.tmReceptionCalendar && isReceptionPage()) {
-        config.tmCalendarNativeTicket = source.nativeTicket();
-      }
-      return config;
-    });
-    const id = interceptors.response.use((response) => {
-      try {
-        if (!isReceptionPage() || response.config?.tmReceptionCalendar) return response;
-        const body = typeof response.config?.data === 'string'
-          ? JSON.parse(response.config.data) : response.config?.data;
-        if (!Array.isArray(body?.q)) return response;
-        const mutated = body.q.some((q) =>
-          /^(agendas|marcacoes|bloqueios|agenda_feriados|cadastro_agendas|agenda_grupos|agenda_grupo_datas|reserva_horarios)\./.test(q.name) &&
-          !/\.(index|show|stats|agenda_semanal|horarios|verificar_horarios_agenda|get_doc_pre_atends|campos_customizados)$/.test(q.name) &&
-          response.data?.[q.id]?.status >= 200 && response.data?.[q.id]?.status < 300);
-        if (mutated) {
-          source.invalidate();
-          stopWarming();
-          warmedKey = '';
-          lastPreloadKey = '';
-          if (document.getElementById(POPOVER_ID)) loadMonth();
-          else prefetchSelectedMonth(true);
-        }
-        if (Number.isFinite(response.config?.tmCalendarNativeTicket)) {
-          source.ingestNative(body.q, response.data, response.config.tmCalendarNativeTicket);
-        }
-        if (!mutated && body.q.some((q) => q.name === 'agendas.index' && q.parms?.na_recepcao &&
-            response.data?.[q.id]?.status === 200) && !document.getElementById(POPOVER_ID)) {
-          prefetchSelectedMonth(true);
-        }
-      } catch (_) { /* Nunca interfere no retorno/erro da requisição nativa. */ }
-      return response;
-    });
-    detachNative = () => {
-      interceptors.request.eject(requestId);
-      interceptors.response.eject(id);
-    };
   }
 
-  function stopWarming() {
-    warmGeneration++;
-    clearTimeout(warmTimer);
-    warmTimer = null;
-    warmedKey = '';
-  }
-
-  function warmAdjacentMonths(key, month, doctor, unit, component) {
-    if (warmedKey === key || warmTimer || !doctor || !component ||
-        document.hidden || !isReceptionPage() || document.getElementById(POPOVER_ID)) return;
-    warmedKey = key;
-    const generation = ++warmGeneration;
-    warmTimer = setTimeout(async () => {
-      warmTimer = null;
-      let complete = true;
-      for (const offset of [1, 2, -1]) {
-        if (generation !== warmGeneration || key !== lastPreloadKey ||
-            document.hidden || !isReceptionPage() || document.getElementById(POPOVER_ID)) {
-          complete = false;
-          break;
-        }
-        const adjacent = new Date(month.getFullYear(), month.getMonth() + offset, 1, 12);
-        const dates = calendarDates(adjacent);
-        if (source.read(dates, doctor, unit).size === dates.length) continue;
-        try { await source.ensure(dates, doctor, unit, component); }
-        catch (error) {
-          if (error.cancelled) { complete = false; break; }
-          console.warn('[TM] Pré-busca de mês vizinho:', error.message);
-        }
-      }
-      if (!complete && generation === warmGeneration && warmedKey === key) warmedKey = '';
-    }, 750);
-  }
-
-  function scheduleBackgroundRefresh(key, failed = false) {
-    clearTimeout(expiryTimer);
-    expiryTimer = null;
-    if (key !== lastPreloadKey || !isReceptionPage() || document.hidden) return;
-    expiryTimer = setTimeout(() => {
-      expiryTimer = null;
-      if (key !== lastPreloadKey || !isReceptionPage() || document.hidden) return;
-      // Renova antes da validade, preservando as cores já verificadas durante
-      // a consulta. Só um contexto; nenhuma busca de meses extras ou aba oculta.
-      prefetchSelectedMonth(true, true);
-    }, failed ? CACHE_MS : BACKGROUND_REFRESH_MS);
-  }
+  const preloader = createCalendarPreloader({
+    source,
+    active: () => isReceptionPage() && !document.hidden,
+    context: () => {
+      const component = receptionComponent();
+      prepare(component);
+      return {
+        component, doctor: document.querySelector('#filtro-medico')?.value || '',
+        unit: String(component?.unidade_operacao || ''),
+        month: document.getElementById(POPOVER_ID) && state.month ? state.month : selectedMonth()
+      };
+    },
+    onError: (error) => console.warn('[TM] Pré-busca do calendário:', error.message)
+  });
 
   function prefetchSelectedMonth(force = false, refresh = false) {
-    if (!isReceptionPage() || document.hidden) return;
-    const component = receptionComponent();
-    const doctor = document.querySelector('#filtro-medico')?.value || '';
-    if (!doctor || !component) {
-      source.stop();
-      clearTimeout(preloadTimer);
-      clearTimeout(expiryTimer);
-      stopWarming();
-      warmedKey = '';
-      lastPreloadKey = '';
-      preloadRefresh = false;
-      return;
-    }
-    const unit = String(component.unidade_operacao || '');
-    const month = document.getElementById(POPOVER_ID) && state.month ? state.month : selectedMonth();
-    const dates = calendarDates(month), key = monthKey(month, doctor, unit);
-    if (!force && key === lastPreloadKey) return;
-    if (key !== lastPreloadKey) {
-      source.stop();
-      clearTimeout(expiryTimer);
-      stopWarming();
-      warmedKey = '';
-      preloadRefresh = false;
-    }
-    lastPreloadKey = key;
-    preloadRefresh = preloadRefresh || refresh;
-    clearTimeout(preloadTimer);
-    preloadTimer = setTimeout(() => {
-      preloadTimer = null;
-      if (!isReceptionPage() || document.hidden || key !== lastPreloadKey) return;
-      const refreshNow = preloadRefresh;
-      preloadRefresh = false;
-      let failed = false;
-      source.ensure(dates, doctor, unit, component, { refresh: refreshNow }).catch((error) => {
-        failed = true;
-        if (!error.cancelled) console.warn('[TM] Pré-busca do calendário:', error.message);
-      }).finally(() => {
-        if (key !== lastPreloadKey) return;
-        scheduleBackgroundRefresh(key, failed);
-        if (!failed) warmAdjacentMonths(key, month, doctor, unit, component);
-      });
-    }, 180);
+    return preloader.sync({ force, refresh });
   }
 
   async function loadMonth() {
     if (document.hidden || !isReceptionPage()) return;
-    stopWarming();
-    clearTimeout(preloadTimer);
-    preloadTimer = null;
     const doctor = document.querySelector('#filtro-medico')?.value || '';
     const component = receptionComponent();
+    prepare(component);
     const unit = String(component?.unidade_operacao || '');
     const dates = calendarDates(state.month), request = ++state.request;
-    const refresh = preloadRefresh && lastPreloadKey === monthKey(state.month, doctor, unit);
-    preloadRefresh = false;
     state.context = doctor + '|' + unit;
     state.days = source.read(dates, doctor, unit);
     state.error = '';
     state.loading = !!doctor && source.freshCount(dates, doctor, unit) !== dates.length;
-    lastPreloadKey = monthKey(state.month, doctor, unit);
     render();
-    if (!doctor || !component) { source.stop(); state.loading = false; paintDays(); return; }
+    if (!doctor || !component) { preloader.sync(); state.loading = false; paintDays(); return; }
     try {
-      const days = await source.ensure(dates, doctor, unit, component, { refresh });
-      if (request === state.request) state.days = days;
+      const days = await prefetchSelectedMonth(true);
+      if (request === state.request && days) state.days = days;
     } catch (error) {
       if (request === state.request && !error.cancelled) {
         state.error = 'Algumas datas não puderam ser verificadas. Reabra para tentar novamente.';
         console.warn('[TM] Calendário:', error.message);
       }
     } finally {
-      if (request === state.request) {
-        state.loading = false;
-        paintDays();
-        scheduleBackgroundRefresh(monthKey(state.month, doctor, unit), !!state.error);
-        if (!state.error && !document.getElementById(POPOVER_ID)) {
-          warmAdjacentMonths(monthKey(state.month, doctor, unit), state.month, doctor, unit, component);
-        }
-      }
+      if (request === state.request) { state.loading = false; paintDays(); }
     }
   }
 
@@ -6697,17 +6750,9 @@ let tmAppointmentCalendarCore;
 
   function ensureCalendar() {
     if (window.location.hash !== '#/recepcao') {
-      clearTimeout(preloadTimer);
-      clearTimeout(expiryTimer);
-      stopWarming();
-      warmedKey = '';
-      preloadTimer = null;
-      lastPreloadKey = '';
+      preloader.stop();
       if (boundComponent || mountedInput) {
-        source.invalidate();
-        detachNative?.();
         detachContext?.();
-        detachNative = null;
         detachContext = null;
         boundComponent = null;
         mountedInput = null;
@@ -6785,30 +6830,24 @@ let tmAppointmentCalendarCore;
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeCalendar();
   });
-  document.addEventListener('change', (event) => {
+  const onReceptionFilter = (event) => {
+    if (!isReceptionPage()) return;
     if (event.target?.id === 'filtro-medico') {
       if (document.getElementById(POPOVER_ID)) loadMonth();
-      else prefetchSelectedMonth(true);
+      else prefetchSelectedMonth();
     }
-  });
+  };
+  document.addEventListener('input', onReceptionFilter, true);
+  document.addEventListener('change', onReceptionFilter, true);
   document.addEventListener('click', (event) => {
     if (!automaticRefresh && isReceptionPage() && event.target instanceof Element && event.target.closest('#refresh-button')) {
       const component = receptionComponent();
       source.invalidate(document.querySelector('#filtro-medico')?.value || '', String(component?.unidade_operacao || ''));
-      stopWarming();
-      warmedKey = '';
-      lastPreloadKey = '';
-      prefetchSelectedMonth(true);
     }
   }, true);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      source.stop();
-      clearTimeout(preloadTimer);
-      clearTimeout(expiryTimer);
-      stopWarming();
-      warmedKey = '';
-      lastPreloadKey = '';
+      preloader.stop();
     } else if (isReceptionPage()) {
       if (document.getElementById(POPOVER_ID)) loadMonth();
       else prefetchSelectedMonth(true);
@@ -6905,11 +6944,13 @@ const tmConfirmationCalendarAdapter = (() => {
   }
 
   // Publica o contexto sem alterar o intervalo mantido pelo Klingo.
-  document.addEventListener('change', (event) => {
+  const onFilter = (event) => {
     const current = read();
     if (current && [current.startInput, current.endInput, current.unitSelect,
-      current.doctorSelect].includes(event.target)) tmRuntime.schedule(0);
-  });
+      current.doctorSelect].includes(event.target)) sync();
+  };
+  document.addEventListener('input', onFilter, true);
+  document.addEventListener('change', onFilter, true);
   tmRuntime.register('contexto do calendário da Confirmação', sync);
   return { read, event: EVENT };
 })();
@@ -6920,14 +6961,13 @@ const tmConfirmationCalendarAdapter = (() => {
 (function () {
   'use strict';
 
-  const { createCalendarSource, calendarDates, iso, monthNames } = tmAppointmentCalendarCore;
+  const { source, prepare, createCalendarPreloader, calendarDates, iso, monthNames } = tmAppointmentCalendarCore;
   const STYLE_ID = 'tm-confirmacao-calendario-style';
   const POPOVER_ID = 'tm-confirmacao-calendario-popover';
   const BUTTON_CLASS = 'tm-confirmacao-calendario-botao';
   const INPUT_CLASS = 'tm-confirmacao-calendario-input';
   const state = { input: null, month: null, days: new Map(), loading: false, error: '', request: 0 };
-  let mounted = [null, null], contextKey = '', preloadTimer = null, warmTimer = null;
-  let generation = 0, paintFrame = null;
+  let mounted = [null, null], contextKey = '', paintFrame = null;
 
   function componentFor(current) {
     let element = current?.refresh;
@@ -6939,28 +6979,16 @@ const tmConfirmationCalendarAdapter = (() => {
     return null;
   }
 
-  const source = createCalendarSource({
-    busy: (component) => document.hidden || !!component?.$store?.state?.loading,
-    post: (component, q, cancels) => {
-      const axios = component.axios || component.$http;
-      const token = axios.CancelToken?.source();
-      const cancel = () => token?.cancel('#BC#');
-      cancels.add(cancel);
-      return component.$http.post('aql?a=agendas.index&page=1', { q, modulo: 4 }, {
-        tmConfirmationCalendar: true, timeout: 20000,
-        ...(token ? { cancelToken: token.token } : {})
-      }).finally(() => cancels.delete(cancel));
-    },
-    changed: () => {
-      if (!document.getElementById(POPOVER_ID) || paintFrame != null) return;
-      paintFrame = requestAnimationFrame(() => {
-        paintFrame = null;
-        const current = tmConfirmationCalendarAdapter.read();
+  source.subscribe(() => {
+    if (!document.getElementById(POPOVER_ID) || paintFrame != null) return;
+    paintFrame = requestAnimationFrame(() => {
+      paintFrame = null;
+      const current = tmConfirmationCalendarAdapter.read();
       if (!current || !state.month || state.input !== current.startInput) return;
-        state.days = source.read(calendarDates(state.month), current.context.doctor, current.context.unit);
-        paintDays();
-      });
-    }
+      state.days = source.read(calendarDates(state.month), current.context.doctor, current.context.unit);
+      if (source.freshCount(calendarDates(state.month), current.context.doctor, current.context.unit) === 42) state.loading = false;
+      paintDays();
+    });
   });
 
   function monthOf(value) {
@@ -6973,56 +7001,27 @@ const tmConfirmationCalendarAdapter = (() => {
     return [current.context.doctor, current.context.unit, iso(month).slice(0, 7)].join('|');
   }
 
-  function stopWork() {
-    generation++;
-    clearTimeout(preloadTimer);
-    clearTimeout(warmTimer);
-    preloadTimer = warmTimer = null;
-    source.stop();
-  }
+  const preloader = createCalendarPreloader({
+    source,
+    active: () => !!tmConfirmationCalendarAdapter.read() && !document.hidden,
+    context: () => {
+      const current = tmConfirmationCalendarAdapter.read();
+      if (!current) return null;
+      const component = componentFor(current);
+      prepare(component);
+      return {
+        component, doctor: current.context.doctor, unit: current.context.unit,
+        month: document.getElementById(POPOVER_ID) && state.input === current.startInput && state.month
+          ? state.month : monthOf(current.context.start)
+      };
+    },
+    onError: (error) => console.warn('[TM] Pré-busca do calendário da Confirmação:', error.message)
+  });
 
-  async function warmMonths(current, base, key, ticket) {
-    for (const offset of [1, 2, -1]) {
-      const latest = tmConfirmationCalendarAdapter.read();
-      if (ticket !== generation || document.hidden || document.getElementById(POPOVER_ID) ||
-          !latest || requestContext(latest, monthOf(latest.context.start)) !== key) return;
-      const month = new Date(base.getFullYear(), base.getMonth() + offset, 1, 12);
-      const dates = calendarDates(month);
-      if (source.read(dates, current.context.doctor, current.context.unit).size === dates.length) continue;
-      try { await source.ensure(dates, current.context.doctor, current.context.unit, componentFor(current)); }
-      catch (error) {
-        if (error.cancelled) return;
-        console.warn('[TM] Calendário da Confirmação, mês vizinho:', error.message);
-      }
-    }
-  }
+  function stopWork() { preloader.stop(); }
 
-  function preload() {
-    const current = tmConfirmationCalendarAdapter.read();
-    if (!current || document.hidden || document.getElementById(POPOVER_ID)) return;
-    const month = monthOf(current.context.start);
-    const key = requestContext(current, month);
-    if (key === contextKey) return;
-    stopWork();
-    if (!current.context.doctor) { contextKey = key; return; }
-    if (!componentFor(current)) return;
-    contextKey = key;
-    const ticket = generation;
-    preloadTimer = setTimeout(async () => {
-      preloadTimer = null;
-      if (ticket !== generation || document.hidden) return;
-      try {
-        await source.ensure(calendarDates(month), current.context.doctor, current.context.unit, componentFor(current));
-        if (ticket === generation && !document.getElementById(POPOVER_ID)) {
-          warmTimer = setTimeout(() => {
-            warmTimer = null;
-            warmMonths(current, month, key, ticket);
-          }, 750);
-        }
-      } catch (error) {
-        if (!error.cancelled) console.warn('[TM] Pré-busca do calendário da Confirmação:', error.message);
-      }
-    }, 180);
+  function preload(force = false) {
+    return preloader.sync({ force: force === true });
   }
 
   function dayTitle(detail) {
@@ -7148,16 +7147,16 @@ const tmConfirmationCalendarAdapter = (() => {
       render();
       return;
     }
-    clearTimeout(preloadTimer); clearTimeout(warmTimer);
     const { doctor, unit } = current.context;
+    prepare(componentFor(current));
     state.days = source.read(dates, doctor, unit);
     state.error = '';
     state.loading = !!doctor && source.freshCount(dates, doctor, unit) !== dates.length;
     render();
-    if (!doctor || !componentFor(current)) { state.loading = false; paintDays(); return; }
+    if (!doctor || !componentFor(current)) { preload(); state.loading = false; paintDays(); return; }
     try {
-      const days = await source.ensure(dates, doctor, unit, componentFor(current));
-      if (request === state.request) state.days = days;
+      const days = await preload(true);
+      if (request === state.request && days) state.days = days;
     } catch (error) {
       if (request === state.request && !error.cancelled) {
         state.error = 'Algumas datas não puderam ser verificadas.';
@@ -7256,9 +7255,9 @@ const tmConfirmationCalendarAdapter = (() => {
     if (!current) return;
     const key = requestContext(current, monthOf(current.context.start));
     if (key !== contextKey) {
-      contextKey = '';
-      if (document.getElementById(POPOVER_ID)) { stopWork(); contextKey = key; loadMonth(); }
-      else preload();
+      contextKey = key;
+      preload();
+      if (document.getElementById(POPOVER_ID)) loadMonth();
     }
   });
   document.addEventListener('click', (event) => {
@@ -7268,8 +7267,15 @@ const tmConfirmationCalendarAdapter = (() => {
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeCalendar(); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stopWork();
-    else { contextKey = ''; preload(); }
+    else if (document.getElementById(POPOVER_ID)) loadMonth();
+    else preload();
   });
+  document.addEventListener('click', (event) => {
+    const current = tmConfirmationCalendarAdapter.read();
+    if (current && event.target instanceof Element && event.target.closest('#refresh-button')) {
+      source.invalidate(current.context.doctor, current.context.unit);
+    }
+  }, true);
   window.addEventListener('resize', positionPopover);
   window.addEventListener('scroll', positionPopover, true);
   tmRuntime.register('calendário de atendimentos da Confirmação', ensureCalendar);

@@ -66,11 +66,13 @@ test('publica mudanças de contexto sem consultar agendas ou alterar filtros', (
   testPage.sync();
   assert.equal(testPage.events.length, 1);
   testPage.doctorSelect.value = '43';
-  testPage.handlers.change({ target: testPage.doctorSelect });
-  assert.equal(testPage.scheduled(), 1);
-  testPage.sync();
+  testPage.handlers.input({ target: testPage.doctorSelect });
+  assert.equal(testPage.scheduled(), 0);
   assert.equal(testPage.events.length, 2);
   assert.equal(testPage.events[1].detail.doctor, '43');
+  testPage.handlers.change({ target: testPage.doctorSelect });
+  testPage.sync();
+  assert.equal(testPage.events.length, 2, 'input/change/runtime não duplicam o disparo');
   testPage.window.location.hash = '#/call-center';
   testPage.sync();
   assert.equal(testPage.events[2].detail, null);
