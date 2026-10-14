@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.28
+// @version      26.29
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -5092,7 +5092,9 @@ function setDateCalculatorOpen(isOpen) {
       #${DOCK_ID} .tm-draft-resume-hitbox { position: absolute; inset: 0; z-index: 1;
         width: 100%; height: 100%; padding: 0; border: 0 !important;
         background: transparent !important; box-shadow: none !important; }
-      #${DOCK_ID} .tm-draft-resume-hitbox:focus-visible { outline: 2px solid #007bff;
+      #${DOCK_ID} .tm-draft-resume-hitbox:focus:not(:focus-visible) {
+        outline: none !important; }
+      #${DOCK_ID} .tm-draft-resume-hitbox:focus-visible { outline: 2px solid #007bff !important;
         outline-offset: -2px; }
       #${DOCK_ID} .tm-draft-discard { position: absolute; right: 3px; bottom: 7px;
         z-index: 2; width: 28px; height: 28px; padding: 0; border: 0;

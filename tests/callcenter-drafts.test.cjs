@@ -376,6 +376,11 @@ test('card inteiro retoma e a lixeira separada descarta sem retomar', () => {
   assert.equal(vm.runInContext('drafts.length', context), 0);
 });
 
+test('clique no card não mostra contorno, mas teclado mantém indicação de foco', () => {
+  assert.match(script, /\.tm-draft-resume-hitbox:focus:not\(:focus-visible\)\s*\{\s*outline: none !important;/);
+  assert.match(script, /\.tm-draft-resume-hitbox:focus-visible\s*\{\s*outline: 2px solid #007bff !important;/);
+});
+
 test('guarda a data preferida mesmo sem vaga previamente escolhida', () => {
   const context = setup();
   const vue = booking();
