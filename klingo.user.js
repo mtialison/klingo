@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.20
+// @version      26.21
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -4740,15 +4740,27 @@ function setDateCalculatorOpen(isOpen) {
     const patient = data.paciente?.st_nome || snapshot.cadastro_temporario?.st_nome || 'Paciente a identificar';
     const procedures = snapshot.procedimentos || [];
     const name = procedures.map((item) => item.procedimento?.search).filter(Boolean).slice(0, 2).join(' · ');
-    return { patient, procedure: name || data.procedimento?.search || 'Procedimento a definir' };
+    const display = (value) => typeof value === 'string' ? value.trim() :
+      ['search', 'st_nome', 'nome', 'nm_pessoa', 'descricao', 'st_descricao']
+        .map((key) => value?.[key]).find((text) => typeof text === 'string' && text.trim())?.trim() || '';
+    const professional = procedures.map((item) => display(item.medico || item.profissional))
+      .find(Boolean) || display(data.medico || data.profissional) || 'Profissional a definir';
+    const operator = display(data.plano || data.operadora || procedures[0]?.plano) || 'Operadora a definir';
+    return { patient, procedure: name || data.procedimento?.search || 'Procedimento a definir',
+      professional, operator };
+  }
+
+  function displayDate(date) {
+    const value = String(date || '');
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)}` : '';
   }
 
   function selectedTimes(snapshot) {
     return (snapshot.procedimentos || []).filter((item) => item.data && item.hora)
       .map((item) => {
-        const date = String(item.data);
-        return `${date.slice(8, 10)}/${date.slice(5, 7)} ${item.hora}`;
-      }).slice(0, 3);
+        const date = displayDate(item.data);
+        return date ? `${date} às ${item.hora}` : '';
+      }).filter(Boolean).slice(0, 3);
   }
 
   function preferredSlot(vue) {
@@ -4829,7 +4841,7 @@ function setDateCalculatorOpen(isOpen) {
     drafts.unshift({ id: nextId++, user: owner, created: Date.now(), ...captured,
       ...description, times: selectedTimes(captured.snapshot) });
     open = true;
-    notice = 'Salvo nesta aba. A data e a vaga serão conferidas ao retomar.';
+    notice = '';
     render();
     try {
       const modal = document.querySelector('#cadastroModal.show');
@@ -4924,7 +4936,7 @@ function setDateCalculatorOpen(isOpen) {
     vue.selecionar_horario(slot);
     for (let attempt = 0; attempt < 120; attempt++) {
       if (document.querySelector('#cadastroModal.show')) {
-        return 'Horário conferido e modal reaberto. Revise os dados antes de confirmar.';
+        return '';
       }
       if (component() !== vue) throw new Error('A página mudou durante a reserva da vaga.');
       await new Promise((resolve) => window.setTimeout(resolve, 100));
@@ -4991,14 +5003,15 @@ function setDateCalculatorOpen(isOpen) {
     style.id = STYLE_ID;
     style.textContent = `
       #${DOCK_ID} { position: relative; display: flex; align-items: center;
-        font: 13px Arial, sans-serif; color: #343a40; margin-right: 8px; }
+        font-family: "Open Sans", "Helvetica Neue", sans-serif; font-size: 13px;
+        color: #343a40; margin-right: 8px; }
       #${DOCK_ID} .tm-draft-trigger { background: transparent; color: #fff; border: 1px solid #ffffff80;
         border-radius: 5px; padding: 6px 9px; white-space: nowrap; }
       #${DOCK_ID} .tm-draft-trigger:hover, #${DOCK_ID} .tm-draft-trigger[aria-expanded="true"] {
         background: #ffffff24; }
       #${DOCK_ID} .tm-draft-actions { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 8px; }
       #${DOCK_ID} button { border: 1px solid #adb5bd; background: #fff; color: #344054;
-        border-radius: 5px; padding: 7px 10px; cursor: pointer; }
+        border-radius: 5px; padding: 7px 10px; cursor: pointer; font: inherit; }
       #${DOCK_ID} button:hover { background: #f1f4f7; }
       #${DOCK_ID} button:disabled { opacity: .55; cursor: default; }
       #${DOCK_ID} .tm-draft-save { background: #0d6efd; border-color: #0d6efd; color: #fff; }
@@ -5007,11 +5020,20 @@ function setDateCalculatorOpen(isOpen) {
         width: min(370px, calc(100vw - 24px)); z-index: 1100; max-height: min(460px, 75vh);
         overflow: auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 7px;
         box-shadow: 0 8px 24px #0003; padding: 10px; }
-      #${DOCK_ID} .tm-draft-item { border-top: 1px solid #e6e9ed; padding: 9px 0; }
+      #${DOCK_ID} .tm-draft-item { border-top: 1px solid #e6e9ed; padding: 11px 0; }
       #${DOCK_ID} .tm-draft-item:first-of-type { border-top: 0; }
-      #${DOCK_ID} .tm-draft-sub { color: #667085; margin: 3px 0 6px; overflow-wrap: anywhere; }
+      #${DOCK_ID} .tm-draft-name { display: block; color: #273444; margin-bottom: 4px; }
+      #${DOCK_ID} .tm-draft-line { color: #526171; line-height: 1.45; overflow-wrap: anywhere; }
+      #${DOCK_ID} .tm-draft-date { display: inline-block; margin: 7px 0 9px;
+        padding: 4px 8px; border-radius: 4px; background: #e7f1ff; color: #0755a6;
+        font-weight: 600; }
+      #${DOCK_ID} .tm-draft-item-actions { display: flex; gap: 8px; }
       #${DOCK_ID} .tm-draft-note { margin-top: 7px; color: #6b4d00; }
       #${DOCK_ID} .tm-draft-empty { color: #667085; }
+      #cadastroModal #${MODAL_BUTTON_ID}.btn-primary { background: #007bff;
+        border-color: #007bff; color: #fff; }
+      #cadastroModal #${MODAL_BUTTON_ID}.btn-primary:hover { background: #0069d9;
+        border-color: #0062cc; }
     `;
     document.head.appendChild(style);
   }
@@ -5030,7 +5052,7 @@ function setDateCalculatorOpen(isOpen) {
     const button = document.createElement('button');
     button.id = MODAL_BUTTON_ID;
     button.type = 'button';
-    button.className = 'btn btn-outline-primary mr-auto';
+    button.className = 'btn btn-primary mr-auto';
     button.textContent = 'Colocar em espera';
     button.disabled = saving || restoring;
     button.addEventListener('click', save);
@@ -5112,10 +5134,20 @@ function setDateCalculatorOpen(isOpen) {
         const item = document.createElement('div');
         item.className = 'tm-draft-item';
         const name = document.createElement('strong');
+        name.className = 'tm-draft-name';
         name.textContent = draft.patient;
-        const description = document.createElement('div');
-        description.className = 'tm-draft-sub';
-        description.textContent = [draft.procedure, ...draft.times].join(' · ');
+        const line = (text) => {
+          const element = document.createElement('div');
+          element.className = 'tm-draft-line';
+          element.textContent = text;
+          return element;
+        };
+        const date = document.createElement('div');
+        date.className = 'tm-draft-date';
+        date.textContent = draft.times.length ? draft.times.join(' · ') :
+          displayDate(draft.preferred?.date) || 'Data a definir';
+        const actions = document.createElement('div');
+        actions.className = 'tm-draft-item-actions';
         const resumeButton = document.createElement('button');
         resumeButton.type = 'button';
         resumeButton.dataset.action = 'resume';
@@ -5128,7 +5160,9 @@ function setDateCalculatorOpen(isOpen) {
         discard.dataset.id = String(draft.id);
         discard.textContent = 'Descartar';
         discard.disabled = saving || restoring;
-        item.append(name, description, resumeButton, discard);
+        actions.append(resumeButton, discard);
+        item.append(name, line(draft.procedure), line(`Profissional: ${draft.professional}`),
+          line(`Operadora: ${draft.operator}`), date, actions);
         panel.appendChild(item);
       }
       if (notice) {
@@ -5138,10 +5172,6 @@ function setDateCalculatorOpen(isOpen) {
         message.textContent = notice;
         panel.appendChild(message);
       }
-      const limitation = document.createElement('div');
-      limitation.className = 'tm-draft-sub';
-      limitation.textContent = 'Em espera não segura vaga. Rascunhos somem ao fechar ou recarregar esta aba.';
-      panel.appendChild(limitation);
       dock.appendChild(panel);
     }
   }

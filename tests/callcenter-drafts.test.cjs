@@ -45,6 +45,32 @@ function booking() {
   };
 }
 
+test('resumo do rascunho mostra profissional, plano e data completos', () => {
+  const context = setup();
+  const summary = vm.runInContext(`label({
+    dados: { plano: { search: 'ASSIM SAÚDE / RIOSERV MAX QC' } },
+    cadastro_temporario: { st_nome: 'Paciente de teste' },
+    procedimentos: [{
+      procedimento: { search: 'CONSULTA MEDICA' },
+      medico: { search: 'PAULO AFONSO ALVES DE SOUZA' },
+      data: '2026-10-20', hora: '17:15'
+    }]
+  })`, context);
+  assert.equal(summary.patient, 'Paciente de teste');
+  assert.equal(summary.procedure, 'CONSULTA MEDICA');
+  assert.equal(summary.professional, 'PAULO AFONSO ALVES DE SOUZA');
+  assert.equal(summary.operator, 'ASSIM SAÚDE / RIOSERV MAX QC');
+  assert.equal(vm.runInContext("selectedTimes({ procedimentos: [{ data: '2026-10-20', hora: '17:15' }] })[0]", context),
+    '20/10/2026 às 17:15');
+});
+
+test('resumo informa profissional e operadora ainda não definidos', () => {
+  const context = setup();
+  const summary = vm.runInContext('label({ dados: {}, procedimentos: [] })', context);
+  assert.equal(summary.professional, 'Profissional a definir');
+  assert.equal(summary.operator, 'Operadora a definir');
+});
+
 test('restaura procedimento sem reaproveitar horário ou reserva', async () => {
   const context = setup();
   const vue = booking();
