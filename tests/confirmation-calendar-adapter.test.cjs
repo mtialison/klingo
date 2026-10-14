@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const script = fs.readFileSync(path.join(__dirname, '..', 'klingo.user.js'), 'utf8');
 const start = script.indexOf('const tmConfirmationCalendarAdapter = (() => {');
-const end = script.indexOf('/* =========================\n   CONFIRMAÇÃO - FILTRO', start);
+const end = script.indexOf('/* =========================\n   CALL CENTER / CONFIRMAÇÃO - CALENDÁRIO DE ATENDIMENTOS', start);
 assert.ok(start >= 0 && end > start);
 
 function setup() {
