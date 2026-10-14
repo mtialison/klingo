@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.31
+// @version      26.32
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -6920,6 +6920,7 @@ const tmConfirmationCalendarAdapter = (() => {
   const STYLE_ID = 'tm-confirmacao-calendario-style';
   const POPOVER_ID = 'tm-confirmacao-calendario-popover';
   const BUTTON_CLASS = 'tm-confirmacao-calendario-botao';
+  const INPUT_CLASS = 'tm-confirmacao-calendario-input';
   const state = { input: null, month: null, days: new Map(), loading: false, error: '', request: 0 };
   let mounted = [null, null], contextKey = '', preloadTimer = null, warmTimer = null;
   let generation = 0, paintFrame = null;
@@ -6951,7 +6952,7 @@ const tmConfirmationCalendarAdapter = (() => {
       paintFrame = requestAnimationFrame(() => {
         paintFrame = null;
         const current = tmConfirmationCalendarAdapter.read();
-        if (!current || !state.month) return;
+      if (!current || !state.month || state.input !== current.startInput) return;
         state.days = source.read(calendarDates(state.month), current.context.doctor, current.context.unit);
         paintDays();
       });
@@ -7034,6 +7035,7 @@ const tmConfirmationCalendarAdapter = (() => {
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
+      input.${INPUT_CLASS}[type="date"]::-webkit-calendar-picker-indicator { display: none !important; }
       .${BUTTON_CLASS} { height: 100%; min-width: 42px; border-radius: 0 .25rem .25rem 0; }
       #${POPOVER_ID} { position: fixed; z-index: 1080; width: 322px; max-width: calc(100vw - 16px);
         background: #fff; color: #344054; border: 1px solid #cbd5e1; border-radius: 8px;
@@ -7078,15 +7080,16 @@ const tmConfirmationCalendarAdapter = (() => {
   function paintDays() {
     const popover = document.getElementById(POPOVER_ID);
     if (!popover) return;
+    const painted = state.input === tmConfirmationCalendarAdapter.read()?.startInput;
     popover.querySelectorAll('button[data-date]').forEach((day) => {
-      const detail = state.days.get(day.dataset.date);
+      const detail = painted ? state.days.get(day.dataset.date) : null;
       day.dataset.kind = detail?.kind || '';
-      day.title = dayTitle(detail);
+      day.title = painted ? dayTitle(detail) : 'Selecionar data';
       day.setAttribute('aria-label', day.dataset.date + ': ' + day.title);
     });
     const message = popover.querySelector('.tm-cal-status');
-    if (message) message.textContent = state.loading ? 'Buscando...' : state.error;
-    popover.setAttribute('aria-busy', String(state.loading));
+    if (message) message.textContent = painted ? (state.loading ? 'Buscando...' : state.error) : '';
+    popover.setAttribute('aria-busy', String(painted && state.loading));
   }
 
   function render() {
@@ -7133,8 +7136,15 @@ const tmConfirmationCalendarAdapter = (() => {
   async function loadMonth() {
     const current = tmConfirmationCalendarAdapter.read();
     if (!current || !state.month || document.hidden) return;
-    clearTimeout(preloadTimer); clearTimeout(warmTimer);
     const request = ++state.request, dates = calendarDates(state.month);
+    if (state.input === current.endInput) {
+      state.days = new Map();
+      state.loading = false;
+      state.error = '';
+      render();
+      return;
+    }
+    clearTimeout(preloadTimer); clearTimeout(warmTimer);
     const { doctor, unit } = current.context;
     state.days = source.read(dates, doctor, unit);
     state.error = '';
@@ -7182,7 +7192,8 @@ const tmConfirmationCalendarAdapter = (() => {
     const popover = document.createElement('div');
     popover.id = POPOVER_ID;
     popover.setAttribute('role', 'dialog');
-    popover.setAttribute('aria-label', 'Calendário de atendimentos');
+    popover.setAttribute('aria-label', input === tmConfirmationCalendarAdapter.read()?.startInput ?
+      'Calendário de atendimentos' : 'Calendário da data final');
     popover.addEventListener('click', (event) => {
       event.stopPropagation();
       if (!(event.target instanceof Element)) return;
@@ -7207,12 +7218,14 @@ const tmConfirmationCalendarAdapter = (() => {
         stopWork(); contextKey = ''; mounted = [null, null];
         closeCalendar();
         document.querySelectorAll(`.${BUTTON_CLASS}`).forEach((button) => button.parentElement?.remove());
+        document.querySelectorAll(`input.${INPUT_CLASS}`).forEach((input) => input.classList.remove(INPUT_CLASS));
         document.getElementById(STYLE_ID)?.remove();
       }
       return;
     }
     injectStyle();
     [current.startInput, current.endInput].forEach((input, index) => {
+      input.classList.add(INPUT_CLASS);
       if (mounted[index] === input && input.parentElement?.querySelector(`.${BUTTON_CLASS}`)) return;
       const group = input.closest('.input-group');
       if (!group) return;
@@ -7221,9 +7234,11 @@ const tmConfirmationCalendarAdapter = (() => {
       button.type = 'button'; button.className = `btn btn-outline-secondary ${BUTTON_CLASS}`;
       button.innerHTML = '<i class="fas fa-calendar-alt" aria-hidden="true"></i>';
       button.setAttribute('aria-label', index ? 'Abrir calendário da data final' : 'Abrir calendário da data inicial');
-      button.title = 'Calendário de atendimentos e bloqueios';
-      button.addEventListener('pointerenter', preload);
-      button.addEventListener('focus', preload);
+      button.title = index ? 'Selecionar data final' : 'Calendário de atendimentos e bloqueios';
+      if (!index) {
+        button.addEventListener('pointerenter', preload);
+        button.addEventListener('focus', preload);
+      }
       button.addEventListener('click', (event) => {
         event.preventDefault(); event.stopPropagation(); openCalendar(input);
       });
