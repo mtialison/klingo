@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.22
+// @version      26.23
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -4741,7 +4741,7 @@ function setDateCalculatorOpen(isOpen) {
     const procedures = snapshot.procedimentos || [];
     const name = procedures.map((item) => item.procedimento?.search).filter(Boolean).slice(0, 2).join(' · ');
     const display = (value) => typeof value === 'string' ? value.trim() :
-      ['search', 'st_nome', 'nome', 'nm_pessoa', 'descricao', 'st_descricao']
+      ['search', 'st_nome_exibicao', 'st_nome', 'nome', 'nm_pessoa', 'descricao', 'st_descricao']
         .map((key) => value?.[key]).find((text) => typeof text === 'string' && text.trim())?.trim() || '';
     const professional = procedures.map((item) => display(item.medico || item.profissional))
       .find(Boolean) || display(data.medico || data.profissional);
@@ -4759,7 +4759,7 @@ function setDateCalculatorOpen(isOpen) {
     return (snapshot.procedimentos || []).filter((item) => item.data && item.hora)
       .map((item) => {
         const date = displayDate(item.data);
-        return date ? `${date} às ${item.hora}` : '';
+        return date ? `${date} • ${item.hora}` : '';
       }).filter(Boolean).slice(0, 3);
   }
 
@@ -5024,13 +5024,10 @@ function setDateCalculatorOpen(isOpen) {
         display: flex; align-items: center; justify-content: center;
         background: #fff; color: #075d48; border: 1px solid #075d48;
         font-size: 10px; font-weight: 700; line-height: 1; }
-      #${DOCK_ID} .tm-draft-actions { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 8px; }
       #${DOCK_ID} button { border: 1px solid #adb5bd; background: #fff; color: #344054;
         border-radius: 5px; padding: 7px 10px; cursor: pointer; font: inherit; }
       #${DOCK_ID} button:hover { background: #f1f4f7; }
       #${DOCK_ID} button:disabled { opacity: .55; cursor: default; }
-      #${DOCK_ID} .tm-draft-save { background: #0d6efd; border-color: #0d6efd; color: #fff; }
-      #${DOCK_ID} .tm-draft-save:hover { background: #0b5ed7; }
       #${DOCK_ID} .tm-draft-panel { position: absolute; top: calc(100% + 8px); right: 0;
         width: min(370px, calc(100vw - 24px)); z-index: 1100; max-height: min(460px, 75vh);
         overflow: auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 7px;
@@ -5097,7 +5094,6 @@ function setDateCalculatorOpen(isOpen) {
         const button = event.target.closest('button[data-action]');
         if (!button) return;
         const action = button.dataset.action, id = Number(button.dataset.id);
-        if (action === 'save') save();
         if (action === 'toggle') { open = !open; notice = ''; render(); }
         if (action === 'resume') resume(id);
         if (action === 'discard' && !saving && !restoring) {
@@ -5126,7 +5122,7 @@ function setDateCalculatorOpen(isOpen) {
     const icon = document.createElement('span');
     icon.className = 'tm-draft-icon';
     icon.setAttribute('aria-hidden', 'true');
-    icon.textContent = '⏸️';
+    icon.textContent = '📅';
     toggle.appendChild(icon);
     if (drafts.length) {
       const count = document.createElement('span');
@@ -5139,18 +5135,6 @@ function setDateCalculatorOpen(isOpen) {
     if (open) {
       const panel = document.createElement('div');
       panel.className = 'tm-draft-panel';
-      if (canSave) {
-        const actions = document.createElement('div');
-        actions.className = 'tm-draft-actions';
-        const saveButton = document.createElement('button');
-        saveButton.type = 'button';
-        saveButton.className = 'tm-draft-save';
-        saveButton.dataset.action = 'save';
-        saveButton.textContent = 'Colocar em espera';
-        saveButton.disabled = saving || restoring;
-        actions.appendChild(saveButton);
-        panel.appendChild(actions);
-      }
       if (!drafts.length) {
         const empty = document.createElement('div');
         empty.className = 'tm-draft-empty';
