@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.23
+// @version      26.24
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -476,32 +476,6 @@ function tmParseDateInput(rawValue) {
         display: none !important;
       }
 
-      .tm-datecalc-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 12px 14px;
-        background: #1679e8;
-        color: #fff;
-      }
-
-      .tm-datecalc-title {
-        font-size: 16px;
-        font-weight: 400;
-        line-height: 1.2;
-      }
-
-      .tm-datecalc-close {
-        border: 0;
-        background: transparent;
-        color: inherit;
-        font-size: 22px;
-        line-height: 1;
-        cursor: pointer;
-        padding: 0;
-      }
-
       .tm-datecalc-body {
         padding: 14px;
       }
@@ -830,6 +804,8 @@ function setDateCalculatorOpen(isOpen) {
     panel.classList.toggle('tm-datecalc-hidden', !isOpen);
     if (isOpen) positionDateCalculatorPanel();
 
+    if (isOpen) document.dispatchEvent(new Event('tm-datecalc-opened'));
+
     if (!isOpen) {
       panel.querySelectorAll('#tm-datecalc-start, #tm-datecalc-days, #tm-datecalc-end')
         .forEach((input) => {
@@ -1046,6 +1022,11 @@ function setDateCalculatorOpen(isOpen) {
         return;
       }
 
+      const panel = getDateCalculatorPanel();
+      if (panel && !panel.classList.contains('tm-datecalc-hidden') && !panel.contains(e.target)) {
+        setDateCalculatorOpen(false);
+      }
+
       const copyDateResultBtn = e.target.closest('[data-tm-copy-date-result="1"]');
       if (copyDateResultBtn) {
         e.preventDefault();
@@ -1086,14 +1067,6 @@ function setDateCalculatorOpen(isOpen) {
           input.value = `${yyyy}-${mm}-${dd}`;
           input.dispatchEvent(new Event('input', {bubbles:true}));
         }
-        return;
-      }
-
-            const closeBtn = e.target.closest('[data-tm-datecalc-close="1"]');
-      if (closeBtn) {
-        e.preventDefault();
-        e.stopPropagation();
-        setDateCalculatorOpen(false);
         return;
       }
 
@@ -5212,6 +5185,12 @@ function setDateCalculatorOpen(isOpen) {
       render();
     }
   });
+  document.addEventListener('tm-datecalc-opened', () => {
+    if (open) {
+      open = false;
+      render();
+    }
+  });
 
   tmRuntime.register('rascunhos de agendamento do Call Center', ensureDrafts);
 })();
@@ -7069,43 +7048,6 @@ function setDateCalculatorOpen(isOpen) {
         position: fixed !important;
       }
 
-      .tm-datecalc-final-close-row {
-        display: flex !important;
-        justify-content: flex-end !important;
-        align-items: center !important;
-        width: 100% !important;
-        height: 18px !important;
-        margin: -2px 0 4px 0 !important;
-        padding: 0 !important;
-      }
-
-      .tm-datecalc-final-close {
-        position: static !important;
-        z-index: 100000 !important;
-        border: 0 !important;
-        border-color: transparent !important;
-        background: transparent !important;
-        color: #dc3545 !important;
-        font-size: 20px !important;
-        font-weight: 700 !important;
-        line-height: 1 !important;
-        padding: 0 2px !important;
-        cursor: pointer !important;
-        appearance: none !important;
-        -webkit-appearance: none !important;
-      }
-
-      .tm-datecalc-final-close:hover,
-      .tm-datecalc-final-close:focus,
-      .tm-datecalc-final-close:active,
-      .tm-datecalc-final-close:focus-visible {
-        color: #b02a37 !important;
-        border: 0 !important;
-        border-color: transparent !important;
-        background: transparent !important;
-      }
-
-      .tm-datecalc-final-close:focus-visible,
       .tm-datecalc-final-root .tm-datecalc-hoje-btn:focus-visible,
       .tm-datecalc-final-root .tm-datecalc-copy-result:focus-visible {
         outline: 2px solid #1679e8 !important;
@@ -7172,37 +7114,6 @@ function setDateCalculatorOpen(isOpen) {
     const root = document.getElementById('tm-datecalc-panel');
     return root && !root.classList.contains('tm-datecalc-hidden') ? root : null;
   }
-  function clearCalculatorFields(root) {
-    if (!root) return;
-
-    const startInput = root.querySelector('#tm-datecalc-start');
-    const daysInput = root.querySelector('#tm-datecalc-days');
-    const resultDate = root.querySelector('#tm-datecalc-result-date');
-    const copyButton = root.querySelector('[data-tm-copy-date-result="1"]');
-
-    [startInput, daysInput].filter(Boolean).forEach((input) => {
-      input.value = '';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    if (resultDate) {
-      resultDate.textContent = '';
-    }
-
-    if (copyButton) {
-      copyButton.disabled = true;
-      copyButton.textContent = '📋';
-      copyButton.blur();
-    }
-  }
-
-  function closeRoot(root) {
-    clearCalculatorFields(root);
-    root.classList.add('tm-datecalc-hidden');
-    document.querySelector('[data-tm-datecalc-header-trigger="1"]')?.focus({ preventScroll: true });
-  }
-
   function cleanupOldResultLabelNodes(root) {
     if (!root) return;
 
@@ -7237,7 +7148,7 @@ function setDateCalculatorOpen(isOpen) {
     root.classList.add('tm-datecalc-final-root');
 
     cleanupOldResultLabelNodes(root);
-    root.querySelectorAll('.tm-datecalc-close-btn, .tm-datecalc-close-main, .tm-datecalc-safe-close, .tm-datecalc-safe-close-row')
+    root.querySelectorAll('.tm-datecalc-final-close-row, .tm-datecalc-close-btn, .tm-datecalc-close-main, .tm-datecalc-safe-close, .tm-datecalc-safe-close-row')
       .forEach((node) => node.remove());
 
     const prazoInput = root.querySelector('#tm-datecalc-days, input[type="number"]');
@@ -7256,36 +7167,6 @@ function setDateCalculatorOpen(isOpen) {
         section.style.setProperty('display', 'none', 'important');
       }
     });
-
-    let row = root.querySelector(':scope > .tm-datecalc-final-close-row');
-
-    if (!row) {
-      row = document.createElement('div');
-      row.className = 'tm-datecalc-final-close-row';
-      root.insertBefore(row, root.firstElementChild || null);
-    }
-
-    let btn = row.querySelector(':scope > .tm-datecalc-final-close');
-
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'tm-datecalc-final-close';
-      btn.textContent = '×';
-      btn.title = 'Fechar';
-      btn.setAttribute('aria-label', 'Fechar calculadora');
-      row.appendChild(btn);
-    }
-
-    if (btn.dataset.tmDatecalcFinalBound !== '1') {
-      btn.dataset.tmDatecalcFinalBound = '1';
-
-      btn.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        closeRoot(root);
-      }, true);
-    }
   }
 
   document.addEventListener('click', () => {

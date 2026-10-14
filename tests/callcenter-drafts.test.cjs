@@ -73,6 +73,13 @@ test('resumo deixa vazios os itens ainda não selecionados', () => {
   assert.equal(summary.operator, '');
 });
 
+test('abrir a calculadora fecha o menu Em espera', () => {
+  const context = setup();
+  vm.runInContext('open = true;', context);
+  context.eventHandlers['tm-datecalc-opened']();
+  assert.equal(vm.runInContext('open', context), false);
+});
+
 test('restaura procedimento sem reaproveitar horário ou reserva', async () => {
   const context = setup();
   const vue = booking();
