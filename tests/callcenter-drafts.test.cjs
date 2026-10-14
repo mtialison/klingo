@@ -64,11 +64,13 @@ test('resumo do rascunho mostra profissional, plano e data completos', () => {
     '20/10/2026 às 17:15');
 });
 
-test('resumo informa profissional e operadora ainda não definidos', () => {
+test('resumo deixa vazios os itens ainda não selecionados', () => {
   const context = setup();
   const summary = vm.runInContext('label({ dados: {}, procedimentos: [] })', context);
-  assert.equal(summary.professional, 'Profissional a definir');
-  assert.equal(summary.operator, 'Operadora a definir');
+  assert.equal(summary.patient, '');
+  assert.equal(summary.procedure, '');
+  assert.equal(summary.professional, '');
+  assert.equal(summary.operator, '');
 });
 
 test('restaura procedimento sem reaproveitar horário ou reserva', async () => {

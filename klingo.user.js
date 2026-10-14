@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.21
+// @version      26.22
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -4737,16 +4737,16 @@ function setDateCalculatorOpen(isOpen) {
 
   function label(snapshot) {
     const data = snapshot.dados || {};
-    const patient = data.paciente?.st_nome || snapshot.cadastro_temporario?.st_nome || 'Paciente a identificar';
+    const patient = data.paciente?.st_nome || snapshot.cadastro_temporario?.st_nome || '';
     const procedures = snapshot.procedimentos || [];
     const name = procedures.map((item) => item.procedimento?.search).filter(Boolean).slice(0, 2).join(' · ');
     const display = (value) => typeof value === 'string' ? value.trim() :
       ['search', 'st_nome', 'nome', 'nm_pessoa', 'descricao', 'st_descricao']
         .map((key) => value?.[key]).find((text) => typeof text === 'string' && text.trim())?.trim() || '';
     const professional = procedures.map((item) => display(item.medico || item.profissional))
-      .find(Boolean) || display(data.medico || data.profissional) || 'Profissional a definir';
-    const operator = display(data.plano || data.operadora || procedures[0]?.plano) || 'Operadora a definir';
-    return { patient, procedure: name || data.procedimento?.search || 'Procedimento a definir',
+      .find(Boolean) || display(data.medico || data.profissional);
+    const operator = display(data.plano || data.operadora || procedures[0]?.plano);
+    return { patient, procedure: name || data.procedimento?.search || '',
       professional, operator };
   }
 
@@ -5005,10 +5005,25 @@ function setDateCalculatorOpen(isOpen) {
       #${DOCK_ID} { position: relative; display: flex; align-items: center;
         font-family: "Open Sans", "Helvetica Neue", sans-serif; font-size: 13px;
         color: #343a40; margin-right: 8px; }
-      #${DOCK_ID} .tm-draft-trigger { background: transparent; color: #fff; border: 1px solid #ffffff80;
-        border-radius: 5px; padding: 6px 9px; white-space: nowrap; }
-      #${DOCK_ID} .tm-draft-trigger:hover, #${DOCK_ID} .tm-draft-trigger[aria-expanded="true"] {
-        background: #ffffff24; }
+      #${DOCK_ID} .tm-draft-trigger { position: relative; display: inline-flex;
+        align-items: center; justify-content: center; width: 38px; height: 38px;
+        min-width: 38px; min-height: 38px; padding: 0; border-radius: 13px;
+        border: 1px solid rgba(255,255,255,.34); background: rgba(255,255,255,.12);
+        color: #fff; line-height: 1; box-shadow: 0 4px 10px rgba(0,0,0,.10);
+        backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+        transition: transform .16s ease, background .16s ease, border-color .16s ease,
+          box-shadow .16s ease; }
+      #${DOCK_ID} .tm-draft-trigger:hover, #${DOCK_ID} .tm-draft-trigger:focus,
+      #${DOCK_ID} .tm-draft-trigger[aria-expanded="true"] { background: rgba(255,255,255,.22);
+        border-color: rgba(255,255,255,.58); box-shadow: 0 7px 16px rgba(0,0,0,.18);
+        transform: translateY(-1px); }
+      #${DOCK_ID} .tm-draft-trigger:active { transform: translateY(0); }
+      #${DOCK_ID} .tm-draft-icon { font-size: 20px; line-height: 1; }
+      #${DOCK_ID} .tm-draft-count { position: absolute; top: -5px; right: -5px;
+        min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px;
+        display: flex; align-items: center; justify-content: center;
+        background: #fff; color: #075d48; border: 1px solid #075d48;
+        font-size: 10px; font-weight: 700; line-height: 1; }
       #${DOCK_ID} .tm-draft-actions { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 8px; }
       #${DOCK_ID} button { border: 1px solid #adb5bd; background: #fff; color: #344054;
         border-radius: 5px; padding: 7px 10px; cursor: pointer; font: inherit; }
@@ -5022,12 +5037,11 @@ function setDateCalculatorOpen(isOpen) {
         box-shadow: 0 8px 24px #0003; padding: 10px; }
       #${DOCK_ID} .tm-draft-item { border-top: 1px solid #e6e9ed; padding: 11px 0; }
       #${DOCK_ID} .tm-draft-item:first-of-type { border-top: 0; }
-      #${DOCK_ID} .tm-draft-name { display: block; color: #273444; margin-bottom: 4px; }
-      #${DOCK_ID} .tm-draft-line { color: #526171; line-height: 1.45; overflow-wrap: anywhere; }
-      #${DOCK_ID} .tm-draft-date { display: inline-block; margin: 7px 0 9px;
-        padding: 4px 8px; border-radius: 4px; background: #e7f1ff; color: #0755a6;
-        font-weight: 600; }
-      #${DOCK_ID} .tm-draft-item-actions { display: flex; gap: 8px; }
+      #${DOCK_ID} .tm-draft-name { display: block; color: #273444; }
+      #${DOCK_ID} .tm-draft-line { min-height: 1.45em; color: #526171;
+        line-height: 1.45; overflow-wrap: anywhere; }
+      #${DOCK_ID} .tm-draft-item-actions { display: flex; justify-content: flex-end;
+        gap: 8px; margin-top: 9px; }
       #${DOCK_ID} .tm-draft-note { margin-top: 7px; color: #6b4d00; }
       #${DOCK_ID} .tm-draft-empty { color: #667085; }
       #cadastroModal #${MODAL_BUTTON_ID}.btn-primary { background: #007bff;
@@ -5106,8 +5120,21 @@ function setDateCalculatorOpen(isOpen) {
     toggle.type = 'button';
     toggle.className = 'tm-draft-trigger';
     toggle.dataset.action = 'toggle';
-    toggle.textContent = `Em espera (${drafts.length})`;
+    toggle.title = `Em espera (${drafts.length})`;
+    toggle.setAttribute('aria-label', `Em espera (${drafts.length})`);
     toggle.setAttribute('aria-expanded', String(open));
+    const icon = document.createElement('span');
+    icon.className = 'tm-draft-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '⏸️';
+    toggle.appendChild(icon);
+    if (drafts.length) {
+      const count = document.createElement('span');
+      count.className = 'tm-draft-count';
+      count.setAttribute('aria-hidden', 'true');
+      count.textContent = String(drafts.length);
+      toggle.appendChild(count);
+    }
     dock.appendChild(toggle);
     if (open) {
       const panel = document.createElement('div');
@@ -5142,10 +5169,8 @@ function setDateCalculatorOpen(isOpen) {
           element.textContent = text;
           return element;
         };
-        const date = document.createElement('div');
-        date.className = 'tm-draft-date';
-        date.textContent = draft.times.length ? draft.times.join(' · ') :
-          displayDate(draft.preferred?.date) || 'Data a definir';
+        const date = line(draft.times.length ? draft.times.join(' · ') :
+          displayDate(draft.preferred?.date));
         const actions = document.createElement('div');
         actions.className = 'tm-draft-item-actions';
         const resumeButton = document.createElement('button');
@@ -5160,9 +5185,9 @@ function setDateCalculatorOpen(isOpen) {
         discard.dataset.id = String(draft.id);
         discard.textContent = 'Descartar';
         discard.disabled = saving || restoring;
-        actions.append(resumeButton, discard);
-        item.append(name, line(draft.procedure), line(`Profissional: ${draft.professional}`),
-          line(`Operadora: ${draft.operator}`), date, actions);
+        actions.append(discard, resumeButton);
+        item.append(name, line(draft.procedure), line(draft.professional),
+          line(draft.operator), date, actions);
         panel.appendChild(item);
       }
       if (notice) {
