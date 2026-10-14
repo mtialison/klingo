@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.29
+// @version      26.30
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -6855,6 +6855,57 @@ function setDateCalculatorOpen(isOpen) {
   tmRuntime.register('ocultar prévia da agenda na Recepção', hideSchedulePreview);
 })();
 
+
+/* =========================
+   CALL CENTER / CONFIRMAÇÃO - ADAPTADOR DO CALENDÁRIO
+========================= */
+const tmConfirmationCalendarAdapter = (() => {
+  const ROUTE = '#/call-center/confirmacao';
+  const EVENT = 'tm-confirmacao-calendar-context';
+  let lastContext = '';
+
+  function selectByPlaceholder(root, label) {
+    return [...root.querySelectorAll('select')].find((select) =>
+      select.options[0]?.textContent.trim() === label) || null;
+  }
+
+  function read(root = document, route = window.location.hash) {
+    if (route !== ROUTE) return null;
+    const refresh = root.querySelector('#refresh-button');
+    const toolbar = refresh?.closest('.card.dashcard');
+    const startInput = refresh?.closest('.input-group')?.querySelector('input[type="date"]');
+    const endInput = [...(toolbar?.querySelectorAll('input[type="date"]') || [])]
+      .find((input) => input !== startInput);
+    const unitSelect = toolbar && selectByPlaceholder(toolbar, 'Unidades...');
+    const doctorSelect = toolbar && selectByPlaceholder(toolbar, 'Todos os Médicos...');
+    if (!toolbar || !startInput || !endInput || !unitSelect || !doctorSelect) return null;
+    return {
+      startInput, endInput, unitSelect, doctorSelect, refresh,
+      context: {
+        start: startInput.value, end: endInput.value,
+        unit: unitSelect.value, doctor: doctorSelect.value
+      }
+    };
+  }
+
+  function sync() {
+    const current = read();
+    const key = current ? JSON.stringify(current.context) : '';
+    if (key === lastContext) return;
+    lastContext = key;
+    document.dispatchEvent(new CustomEvent(EVENT, { detail: current?.context || null }));
+  }
+
+  // Só publica o contexto da tela. A futura pintura deverá validar as
+  // consultas e manter o intervalo início/fim sob controle do Klingo.
+  document.addEventListener('change', (event) => {
+    const current = read();
+    if (current && [current.startInput, current.endInput, current.unitSelect,
+      current.doctorSelect].includes(event.target)) tmRuntime.schedule(0);
+  });
+  tmRuntime.register('contexto do calendário da Confirmação', sync);
+  return { read, event: EVENT };
+})();
 
 /* =========================
    CONFIRMAÇÃO - FILTRO POR TIPO DE AGENDAMENTO
