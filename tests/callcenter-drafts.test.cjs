@@ -20,7 +20,7 @@ function setup() {
     eventHandlers
   });
   vm.runInContext(script.slice(start, end), context);
-  vm.runInContext('render = () => {};', context);
+  vm.runInContext('actualRender = render; render = () => {};', context);
   return context;
 }
 
@@ -300,6 +300,57 @@ test('clique no botão recriado mantém a lista aberta; clique fora a fecha', ()
   assert.equal(vm.runInContext('open', context), true);
   context.eventHandlers.click({ target: { closest: () => null }, composedPath: () => [] });
   assert.equal(vm.runInContext('open', context), false);
+});
+
+test('card inteiro retoma e a lixeira separada descarta sem retomar', () => {
+  const context = setup();
+  let dock;
+  let resumed = 0;
+  const host = {
+    querySelector: () => null,
+    insertBefore(element) { dock = element; element.parentElement = host; }
+  };
+  function element(tag) {
+    return {
+      tag, children: [], dataset: {}, classList: { values: [], add(value) { this.values.push(value); } },
+      setAttribute() {}, addEventListener(type, callback) { this[type] = callback; },
+      append(...nodes) { this.children.push(...nodes); },
+      appendChild(node) { this.children.push(node); },
+      replaceChildren(...nodes) { this.children = nodes; }
+    };
+  }
+  context.document.querySelector = selector => selector.startsWith('nav.navbar ul') ? host : null;
+  context.document.getElementById = () => dock || null;
+  context.document.createElement = element;
+  context.window.confirm = () => true;
+  vm.runInContext(`component = () => null; headerUserId = () => '20';
+    checkOwner = () => true; ensureModalSave = () => {}; ensureStyle = () => {};
+    resume = id => { resumed = id; }; open = true;
+    drafts.push({ id: 7, patient: 'Paciente teste', procedure: 'Consulta',
+      professional: 'Médica', operator: 'Particular', times: ['20/10/2026 • 17:15'] });`, context);
+  context.resumed = 0;
+  assert.equal(vm.runInContext('headerUserId()', context), '20');
+  assert.equal(vm.runInContext('!!document.querySelector("nav.navbar ul.navbar-nav.ml-auto")', context), true);
+  vm.runInContext('resume = id => { resumed = id; }; render = actualRender; render();', context);
+  assert.ok(dock.children[1], JSON.stringify({
+    open: vm.runInContext('open', context),
+    children: dock.children.map(child => child.className)
+  }));
+  const item = dock.children[1].children[0];
+  const buttons = item.children.filter(child => child.tag === 'button');
+  assert.equal(buttons.length, 2);
+  assert.equal(buttons[0].className, 'tm-draft-resume-hitbox');
+  assert.ok(!buttons[0].textContent);
+  assert.equal(buttons[1].className, 'tm-draft-discard');
+  assert.equal(buttons[1].children[0].className, 'far fa-trash-alt');
+  assert.equal(item.children[4].classList.values[0], 'tm-draft-date');
+
+  dock.click({ target: { closest: () => buttons[0] } });
+  assert.equal(context.resumed, 7);
+  context.resumed = 0;
+  dock.click({ target: { closest: () => buttons[1] } });
+  assert.equal(context.resumed, 0);
+  assert.equal(vm.runInContext('drafts.length', context), 0);
 });
 
 test('guarda a data preferida mesmo sem vaga previamente escolhida', () => {

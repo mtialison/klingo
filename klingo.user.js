@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.25
+// @version      26.26
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -5066,13 +5066,31 @@ function setDateCalculatorOpen(isOpen) {
         width: min(370px, calc(100vw - 24px)); z-index: 1100; max-height: min(460px, 75vh);
         overflow: auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 7px;
         box-shadow: 0 8px 24px #0003; padding: 10px; }
-      #${DOCK_ID} .tm-draft-item { border-top: 1px solid #e6e9ed; padding: 11px 0; }
+      #${DOCK_ID} .tm-draft-item { position: relative; border-top: 1px solid #e6e9ed;
+        padding: 11px 0; cursor: pointer; transition: background .15s ease; }
       #${DOCK_ID} .tm-draft-item:first-of-type { border-top: 0; }
+      #${DOCK_ID} .tm-draft-item:hover, #${DOCK_ID} .tm-draft-item:focus-within {
+        background: #f5f8fb; }
       #${DOCK_ID} .tm-draft-name { display: block; color: #273444; }
       #${DOCK_ID} .tm-draft-line { min-height: 1.45em; color: #526171;
         line-height: 1.45; overflow-wrap: anywhere; }
-      #${DOCK_ID} .tm-draft-item-actions { display: flex; justify-content: flex-end;
-        gap: 8px; margin-top: 9px; }
+      #${DOCK_ID} .tm-draft-date { padding-right: 36px; }
+      #${DOCK_ID} .tm-draft-resume-hitbox { position: absolute; inset: 0; z-index: 1;
+        width: 100%; height: 100%; padding: 0; border: 0 !important;
+        background: transparent !important; box-shadow: none !important; }
+      #${DOCK_ID} .tm-draft-resume-hitbox:focus-visible { outline: 2px solid #007bff;
+        outline-offset: -2px; }
+      #${DOCK_ID} .tm-draft-discard { position: absolute; right: 3px; bottom: 7px;
+        z-index: 2; width: 28px; height: 28px; padding: 0; border: 0;
+        background: transparent; color: #dc3545; font-size: 16px;
+        opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+      #${DOCK_ID} .tm-draft-discard:hover { background: #fff1f2; color: #bd2130; }
+      #${DOCK_ID} .tm-draft-item:hover .tm-draft-discard,
+      #${DOCK_ID} .tm-draft-item:focus-within .tm-draft-discard {
+        opacity: 1; pointer-events: auto; }
+      @media (hover: none) {
+        #${DOCK_ID} .tm-draft-discard { opacity: 1; pointer-events: auto; }
+      }
       #${DOCK_ID} .tm-draft-note { margin-top: 7px; color: #6b4d00; }
       #${DOCK_ID} .tm-draft-empty { color: #667085; }
       #cadastroModal #${MODAL_BUTTON_ID}.btn-primary { background: #007bff;
@@ -5189,23 +5207,29 @@ function setDateCalculatorOpen(isOpen) {
         };
         const date = line(draft.times.length ? draft.times.join(' · ') :
           displayDate(draft.preferred?.date));
-        const actions = document.createElement('div');
-        actions.className = 'tm-draft-item-actions';
+        date.classList.add('tm-draft-date');
         const resumeButton = document.createElement('button');
         resumeButton.type = 'button';
+        resumeButton.className = 'tm-draft-resume-hitbox';
         resumeButton.dataset.action = 'resume';
         resumeButton.dataset.id = String(draft.id);
-        resumeButton.textContent = 'Retomar';
+        resumeButton.setAttribute('aria-label', `Retomar agendamento de ${draft.patient}`);
+        resumeButton.title = `Retomar agendamento de ${draft.patient}`;
         resumeButton.disabled = saving || restoring;
         const discard = document.createElement('button');
         discard.type = 'button';
+        discard.className = 'tm-draft-discard';
         discard.dataset.action = 'discard';
         discard.dataset.id = String(draft.id);
-        discard.textContent = 'Descartar';
+        discard.setAttribute('aria-label', `Descartar rascunho de ${draft.patient}`);
+        discard.title = 'Descartar rascunho';
         discard.disabled = saving || restoring;
-        actions.append(discard, resumeButton);
+        const trash = document.createElement('i');
+        trash.className = 'far fa-trash-alt';
+        trash.setAttribute('aria-hidden', 'true');
+        discard.appendChild(trash);
         item.append(name, line(draft.procedure), line(draft.professional),
-          line(draft.operator), date, actions);
+          line(draft.operator), date, resumeButton, discard);
         panel.appendChild(item);
       }
       if (notice) {
