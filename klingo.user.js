@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.26
+// @version      26.27
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -5067,10 +5067,8 @@ function setDateCalculatorOpen(isOpen) {
         overflow: auto; background: #fff; border: 1px solid #cbd5e1; border-radius: 7px;
         box-shadow: 0 8px 24px #0003; padding: 10px; }
       #${DOCK_ID} .tm-draft-item { position: relative; border-top: 1px solid #e6e9ed;
-        padding: 11px 0; cursor: pointer; transition: background .15s ease; }
+        padding: 11px 0; cursor: pointer; }
       #${DOCK_ID} .tm-draft-item:first-of-type { border-top: 0; }
-      #${DOCK_ID} .tm-draft-item:hover, #${DOCK_ID} .tm-draft-item:focus-within {
-        background: #f5f8fb; }
       #${DOCK_ID} .tm-draft-name { display: block; color: #273444; }
       #${DOCK_ID} .tm-draft-line { min-height: 1.45em; color: #526171;
         line-height: 1.45; overflow-wrap: anywhere; }
@@ -5214,7 +5212,6 @@ function setDateCalculatorOpen(isOpen) {
         resumeButton.dataset.action = 'resume';
         resumeButton.dataset.id = String(draft.id);
         resumeButton.setAttribute('aria-label', `Retomar agendamento de ${draft.patient}`);
-        resumeButton.title = `Retomar agendamento de ${draft.patient}`;
         resumeButton.disabled = saving || restoring;
         const discard = document.createElement('button');
         discard.type = 'button';

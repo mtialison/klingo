@@ -341,6 +341,7 @@ test('card inteiro retoma e a lixeira separada descarta sem retomar', () => {
   assert.equal(buttons.length, 2);
   assert.equal(buttons[0].className, 'tm-draft-resume-hitbox');
   assert.ok(!buttons[0].textContent);
+  assert.equal(buttons[0].title, undefined);
   assert.equal(buttons[1].className, 'tm-draft-discard');
   assert.equal(buttons[1].children[0].className, 'far fa-trash-alt');
   assert.equal(item.children[4].classList.values[0], 'tm-draft-date');
