@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.36
+// @version      26.37
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -5468,6 +5468,17 @@ function setDateCalculatorOpen(isOpen) {
     return column?.querySelector('input[type="checkbox"]') || null;
   }
 
+  function localDateKey(date = new Date()) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  function receptionAppointmentDate(modal, component) {
+    const componentDate = component?.data;
+    const pageDate = document.querySelector('input#ref-data[type="date"]')?.value;
+    const match = String(componentDate || pageDate || '').match(/^\d{4}-\d{2}-\d{2}/);
+    return match?.[0] || '';
+  }
+
   function applyExtraDefault(modal) {
     const visible = modal.classList.contains('show') || getComputedStyle(modal).display !== 'none';
     if (!visible) {
@@ -5482,12 +5493,17 @@ function setDateCalculatorOpen(isOpen) {
     if (extraDefaultApplied) return;
 
     const checkbox = extraCheckbox(modal);
-    if (!checkbox) return;
+    const component = receptionBookingComponent(modal);
+    const appointmentDate = receptionAppointmentDate(modal, component);
+    if (!checkbox || !appointmentDate) return;
     extraDefaultApplied = true;
-    if (checkbox.checked) return;
-    checkbox.checked = true;
-    checkbox.dispatchEvent(new Event('input', { bubbles: true }));
-    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    const shouldBeExtra = appointmentDate === localDateKey();
+    if (component && component.extra !== shouldBeExtra) component.extra = shouldBeExtra;
+    if (checkbox.checked !== shouldBeExtra) {
+      checkbox.checked = shouldBeExtra;
+      checkbox.dispatchEvent(new Event('input', { bubbles: true }));
+      checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    }
   }
 
   function isOriginField(field) {
