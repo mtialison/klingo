@@ -7,29 +7,39 @@ const vm = require('node:vm');
 const root = path.join(__dirname, '..');
 const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
 
-test('arquivo distribuído corresponde exatamente aos módulos e recursos externos', () => {
+test('os dois arquivos finais têm o mesmo código e incorporam os recursos originais', () => {
   const files = fs.readdirSync(path.join(root, 'src')).filter((name) => /^\d{2}-.*\.js$/.test(name)).sort();
   assert.ok(files.length > 10);
-  assert.equal(files.map((name) => read(path.join('src', name)).trimEnd()).join('\n\n') + '\n', read('klingo.user.js'));
+  const source = files.map((name) => read(path.join('src', name)).trimEnd()).join('\n\n') + '\n';
+  const main = read('klingo.user.js');
+  const draft = read('klingo.test.user.js');
   assert.equal(fs.readFileSync(path.join(root, 'assets/login-icon.png')).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
   assert.equal(fs.readFileSync(path.join(root, 'assets/message-alert.mp3')).subarray(0, 3).toString(), 'ID3');
-  const previous = read(path.join('release', 'klingo.user.js'));
-  const image = previous.match(/data:image\/png;base64,([A-Za-z0-9+/=]+)/)?.[1];
-  const sound = previous.match(/data:audio\/mpeg;base64,([A-Za-z0-9+/=]+)/)?.[1];
+  const image = main.match(/data:image\/png;base64,([A-Za-z0-9+/=]+)/)?.[1];
+  const sound = main.match(/data:audio\/mpeg;base64,([A-Za-z0-9+/=]+)/)?.[1];
   assert.ok(image && sound);
   assert.deepEqual(Buffer.from(image, 'base64'), fs.readFileSync(path.join(root, 'assets/login-icon.png')));
   assert.deepEqual(Buffer.from(sound, 'base64'), fs.readFileSync(path.join(root, 'assets/message-alert.mp3')));
-  assert.doesNotMatch(read('klingo.user.js'), /data:(?:image|audio)\/|i\.imgur\.com/);
+  const expectedMain = source
+    .replace("'__TM_LOGIN_ICON_DATA__'", JSON.stringify(`data:image/png;base64,${image}`))
+    .replace("'__TM_MESSAGE_SOUND_DATA__'", JSON.stringify(`data:audio/mpeg;base64,${sound}`));
+  assert.equal(main, expectedMain);
+  const endHeader = '// ==/UserScript==\n';
+  assert.equal(draft.slice(draft.indexOf(endHeader) + endHeader.length),
+    main.slice(main.indexOf(endHeader) + endHeader.length));
+  assert.doesNotMatch(main, /i\.imgur\.com|@resource|GM_getResourceURL/);
 });
 
-test('canal estável tem metadados próprios e não aponta para o arquivo de testes', () => {
-  const stable = read(path.join('release', 'klingo.user.js'));
-  const meta = read(path.join('release', 'klingo.meta.js'));
-  const header = stable.match(/^\/\/ ==UserScript==[\s\S]*?^\/\/ ==\/UserScript==/m)?.[0];
-  assert.equal(meta, `${header}\n`);
-  assert.match(meta, /\/testes-codex\/release\/klingo\.meta\.js/);
-  assert.match(meta, /\/testes-codex\/release\/klingo\.user\.js/);
-  assert.match(read('klingo.user.js'), /\/testes-codex\/release\/klingo\.meta\.js/);
+test('arquivo para copiar à main não aponta para a branch de testes', () => {
+  const main = read('klingo.user.js').split('// ==/UserScript==')[0];
+  const draft = read('klingo.test.user.js').split('// ==/UserScript==')[0];
+  assert.match(main, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/mtialison\/klingo\/main\/klingo\.user\.js/);
+  assert.match(main, /@downloadURL\s+https:\/\/raw\.githubusercontent\.com\/mtialison\/klingo\/main\/klingo\.user\.js/);
+  assert.doesNotMatch(main, /testes-codex/);
+  assert.match(draft, /@name\s+klingo \(testes\)/);
+  assert.match(draft, /@namespace\s+http:\/\/tampermonkey\.net\/klingo-testes/);
+  assert.match(draft, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/mtialison\/klingo\/testes-codex\/klingo\.test\.user\.js/);
+  assert.match(draft, /@downloadURL\s+https:\/\/raw\.githubusercontent\.com\/mtialison\/klingo\/testes-codex\/klingo\.test\.user\.js/);
 });
 
 test('runtime reage a mudanças e executa só os módulos da rota ativa', () => {

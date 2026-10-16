@@ -4,18 +4,17 @@
 // @version      26.38
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
-// @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/release/klingo.meta.js
-// @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/testes-codex/release/klingo.user.js
+// @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
+// @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
 // @author       alison
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_addValueChangeListener
-// @grant        GM_getResourceURL
 // @grant        GM_info
-// @resource     tmLoginIcon https://raw.githubusercontent.com/mtialison/klingo/testes-codex/assets/login-icon.png
-// @resource     tmMessageSound https://raw.githubusercontent.com/mtialison/klingo/testes-codex/assets/message-alert.mp3
 // @run-at       document-idle
 // ==/UserScript==
+
+const TM_LOGIN_ICON_DATA = '__TM_LOGIN_ICON_DATA__';
 
 // Uma única fila coordena atualizações dos recursos da página ativa.
 const tmRuntime = (() => {
@@ -212,7 +211,7 @@ function tmParseDateInput(rawValue) {
 
     const loginIcon = document.createElement('img');
     loginIcon.id = 'tm-login-icon';
-    loginIcon.src = GM_getResourceURL('tmLoginIcon');
+    loginIcon.src = TM_LOGIN_ICON_DATA;
     loginIcon.alt = '';
     loginIcon.setAttribute('aria-hidden', 'true');
 

@@ -3,8 +3,8 @@
    v25.11 - alerta e fechamento coordenados entre as guias
 ========================= */
 (function(){
-  // MP3 fornecido pelo usuário e disponibilizado como recurso do userscript.
-  const NOTIFICATION_AUDIO_DATA = GM_getResourceURL('tmMessageSound');
+  // MP3 fornecido pelo usuário, embutido no arquivo final para facilitar a promoção à main.
+  const NOTIFICATION_AUDIO_DATA = '__TM_MESSAGE_SOUND_DATA__';
   const OWNER_KEY = 'klingo_message_alert_owner_v1';
   const DISMISS_KEY = 'klingo_message_alert_dismiss_v1';
   const OWNER_TTL = 7000;
