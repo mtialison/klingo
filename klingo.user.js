@@ -4,8 +4,8 @@
 // @version      26.35
 // @description  xd
 // @match        https://*.klingo.app/*
-// @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
-// @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
+// @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
+// @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
 // @author       alison
 // @grant        GM_getValue
 // @grant        GM_setValue
