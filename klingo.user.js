@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.35
+// @version      26.36
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -5311,6 +5311,12 @@ function setDateCalculatorOpen(isOpen) {
   let observationStopped = false;
   let extraWasVisible = false;
   let extraDefaultApplied = false;
+  let originTemplate = null;
+  let originRequest = null;
+  let originUnavailable = false;
+  let originLastAttempt = 0;
+  let originWasVisible = false;
+  let originInjectedComponent = null;
 
   function setClass(element, className, active) {
     if (element.classList.contains(className) !== active) {
@@ -5484,6 +5490,109 @@ function setDateCalculatorOpen(isOpen) {
     checkbox.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  function isOriginField(field) {
+    const content = JSON.stringify(field || {}).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return /origem do agendamento/i.test(content);
+  }
+
+  function hasOriginField(config) {
+    return Array.isArray(config?.js_campos) && config.js_campos.some(isOriginField);
+  }
+
+  function cloneConfig(config) {
+    return JSON.parse(JSON.stringify(config));
+  }
+
+  function receptionBookingComponent(modal) {
+    let element = modal;
+    while (element) {
+      const component = element.__vue__;
+      if (component?.origem === 'recep' && typeof component.marcar === 'function') return component;
+      const marcacao = component?.$refs?.marcacao;
+      if (marcacao?.origem === 'recep' && typeof marcacao.marcar === 'function') return marcacao;
+      element = element.parentElement;
+    }
+
+    // O modal pode ser montado fora da árvore DOM do componente pai.
+    element = document.getElementById('filtro-medico');
+    while (element) {
+      const marcacao = element.__vue__?.$refs?.marcacao;
+      if (marcacao?.origem === 'recep' && typeof marcacao.marcar === 'function') return marcacao;
+      element = element.parentElement;
+    }
+    return null;
+  }
+
+  function installOriginConfig(component, config) {
+    if (!hasOriginField(config)) return false;
+    const existing = component.campos_customizados_base;
+    if (Array.isArray(existing?.js_campos) && existing.js_campos.length && !hasOriginField(existing)) {
+      // Preserva outros campos específicos da agenda que o Klingo já carregou.
+      for (const field of config.js_campos.filter(isOriginField)) {
+        existing.js_campos.push(cloneConfig(field));
+      }
+    } else {
+      component.campos_customizados_base = cloneConfig(config);
+    }
+    component.force_exibir_campos_customizados = true;
+    originInjectedComponent = component;
+    return true;
+  }
+
+  function ensureOriginField(modal) {
+    const visible = modal.classList.contains('show') || getComputedStyle(modal).display !== 'none';
+    if (!visible) {
+      originWasVisible = false;
+      return;
+    }
+    if (!modal.querySelector('.modal-body') || !modal.textContent.includes('Concluir')) return;
+
+    const component = receptionBookingComponent(modal);
+    if (!component?.dados) return;
+
+    if (!originWasVisible) {
+      originWasVisible = true;
+      // O componente Vue é reutilizado entre atendimentos: não reaproveite a origem anterior.
+      if (originInjectedComponent === component && hasOriginField(component.campos_customizados_base)) {
+        for (const field of component.campos_customizados_base.js_campos.filter(isOriginField)) {
+          field.value = null;
+        }
+        component.force_exibir_campos_customizados = true;
+        return;
+      }
+    }
+
+    if (hasOriginField(component.campos_customizados_base)) {
+      component.force_exibir_campos_customizados = true;
+      return;
+    }
+    if (installOriginConfig(component, component.faixaHorarios?.campos_customizados)) return;
+    if (installOriginConfig(component, originTemplate)) return;
+    if (originRequest || originUnavailable || Date.now() - originLastAttempt < 15000 ||
+        typeof component.axios?.post !== 'function') return;
+
+    const query = { q: [{ name: 'marcacoes.campos_customizados', id: 'campos_custom', parms: {} }] };
+    originLastAttempt = Date.now();
+    originRequest = component.axios.post('/aql?a=marcacoes.campos_customizados', query)
+      .then((response) => {
+        const result = response?.data?.campos_custom;
+        if (result?.status !== 200 || !hasOriginField(result.data)) {
+          originUnavailable = true;
+          console.warn('[TM] Origem do Agendamento indisponível na configuração do Klingo.');
+          return;
+        }
+        originTemplate = cloneConfig(result.data);
+        if (observedModal === modal && modal.isConnected && component.dados &&
+            (modal.classList.contains('show') || getComputedStyle(modal).display !== 'none')) {
+          installOriginConfig(component, originTemplate);
+        }
+      })
+      .catch((error) => {
+        console.warn('[TM] Não foi possível carregar Origem do Agendamento.', error);
+      })
+      .finally(() => { originRequest = null; });
+  }
+
   function applyReceptionLayout() {
     const modal = observedModal;
     if (!modal?.isConnected) return;
@@ -5506,6 +5615,7 @@ function setDateCalculatorOpen(isOpen) {
       !!backButton?.closest('.row.w3-animate-opacity') && !!concludeButton);
 
     applyExtraDefault(modal);
+    ensureOriginField(modal);
 
     const social = fieldByLabel(modal, 'Nome Social');
     const phone = fieldByLabel(modal, 'Telefone');
@@ -5584,6 +5694,7 @@ function setDateCalculatorOpen(isOpen) {
     observationWindowStart = performance.now();
     extraWasVisible = false;
     extraDefaultApplied = false;
+    originWasVisible = false;
     observedModal = modal;
     if (!modal) return;
     modalObserver = new MutationObserver(onReceptionMutations);
