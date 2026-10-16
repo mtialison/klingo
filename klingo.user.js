@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.37
+// @version      26.38
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.user.js
@@ -5457,6 +5457,43 @@ function setDateCalculatorOpen(isOpen) {
     return label?.closest('.col') || null;
   }
 
+  function requiredReceptionField(modal, labelText) {
+    const column = fieldByLabel(modal, labelText);
+    const input = column?.querySelector('input');
+    if (input) {
+      input.required = true;
+      input.setAttribute('aria-required', 'true');
+    }
+    return input || null;
+  }
+
+  function validateRequiredReceptionFields(event) {
+    const button = event.target?.closest?.('button');
+    const modal = button?.closest?.(`#${MODAL_ID}`);
+    if (!modal || norm(button.textContent) !== 'Concluir') return;
+
+    const fields = [
+      { input: requiredReceptionField(modal, 'CPF'), name: 'CPF' },
+      { input: requiredReceptionField(modal, 'e-mail'), name: 'e-mail' }
+    ];
+    const missing = fields.filter(({ input }) => input && !norm(input.value));
+    if (!missing.length) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    const component = receptionBookingComponent(modal);
+    for (const { name } of missing) {
+      component?.$toast?.add?.({
+        severity: 'error',
+        summary: 'Atenção',
+        detail: `O campo ${name} é obrigatório.`,
+        life: 5000
+      });
+    }
+    missing[0].input.focus();
+  }
+
   function extraCheckbox(modal) {
     const column = Array.from(modal.querySelectorAll('.col.col-12.col-md-3')).find((col) =>
       col.closest('.modal') === modal &&
@@ -5636,6 +5673,8 @@ function setDateCalculatorOpen(isOpen) {
     const social = fieldByLabel(modal, 'Nome Social');
     const phone = fieldByLabel(modal, 'Telefone');
     const cpf = fieldByLabel(modal, 'CPF');
+    requiredReceptionField(modal, 'CPF');
+    requiredReceptionField(modal, 'e-mail');
     const observationLabel = Array.from(modal.querySelectorAll('small, label'))
       .find((element) => element.closest('.modal') === modal &&
         norm(element.textContent) === 'Observação');
@@ -5724,6 +5763,7 @@ function setDateCalculatorOpen(isOpen) {
   }
 
   injectStyle();
+  document.addEventListener('click', validateRequiredReceptionFields, true);
   for (const eventName of ['input', 'change']) {
     document.addEventListener(eventName, (event) => {
       if (observationStopped) return;
