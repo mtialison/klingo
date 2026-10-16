@@ -398,7 +398,7 @@ test('Recepção inicia pelo filtro sem clique, temporizador ou espera pelo carr
   f.ui.source.stop();
 });
 
-test('prioridade de pré-busca é mês de referência, +1, +2 e -1; reabrir lê cache', async () => {
+test('carrega o mês selecionado imediatamente e prepara apenas o próximo mês em repouso', async () => {
   const f = uiFixture(), requested = [];
   const ensure = f.ui.source.ensure;
   f.ui.source.ensure = (...args) => {
@@ -407,8 +407,11 @@ test('prioridade de pré-busca é mês de referência, +1, +2 e -1; reabrir lê 
   };
   await f.ui.prefetchSelectedMonth();
   await delay();
-  assert.deepEqual(requested.map((x) => x.month), ['2026-10', '2026-11', '2026-12', '2026-09']);
-  assert.deepEqual(requested.map((x) => x.priority), [0, 1, 1, 1]);
+  assert.deepEqual(requested.map((x) => x.month), ['2026-10']);
+  f.runTimer(2000);
+  await delay();
+  assert.deepEqual(requested.map((x) => x.month), ['2026-10', '2026-11']);
+  assert.deepEqual(requested.map((x) => x.priority), [0, 1]);
   const count = f.posts();
   f.ui.openCalendar();
   assert.equal(f.ui.state.days.size, 42, 'cores disponíveis antes de qualquer resposta nova');
