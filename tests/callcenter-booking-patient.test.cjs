@@ -142,8 +142,51 @@ test('confirmar bloqueia celular vazio e usa o balão nativo', () => {
   assert.equal(notifications[0].detail, 'O campo celular é obrigatório.');
 });
 
-test('indicadores só aparecem após confirmar e são aplicados a todos os inválidos', () => {
+test('aviso adicional só é usado no celular após confirmar', () => {
   assert.match(source, /modal\.dataset\.tmPacienteValidationAttempted !== '1'\) return;/);
-  assert.match(source, /for \(const \{ control, missing, malformed \} of patientFieldProblems\(modal\)\) \{\s*patientSetWarning\(control, missing \|\| malformed\);/);
-  assert.match(source, /warning\.classList\.toggle\('tm-paciente-warning-visible', invalid\)/);
+  const calls = [];
+  sourceFunction('patientRefreshWarnings', 'patientBookingComponent', {
+    patientFieldProblems: () => [
+      { key: 'origem', control: {}, missing: true, malformed: false },
+      { key: 'celular', control: {}, missing: true, malformed: false }
+    ],
+    patientSetWarning: (...args) => calls.push(args)
+  })({ classList: { contains: () => true }, dataset: { tmPacienteValidationAttempted: '1' } });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][1], true);
+});
+
+test('não cria segundo aviso quando o Klingo já exibe o indicador nativo', () => {
+  let created = 0;
+  let warningClass = null;
+  const host = {
+    querySelector: (selector) => selector.includes('input-group-prepend') ? {} : null,
+    classList: { add() {} }
+  };
+  const control = {
+    parentElement: host,
+    classList: { toggle(_name, visible) { warningClass = visible; } }
+  };
+  sourceFunction('patientSetWarning', 'patientRefreshWarnings', {
+    document: { createElement() { created += 1; return {}; } }, Math
+  })(control, true);
+  assert.equal(created, 0);
+  assert.equal(warningClass, false);
+  assert.match(source, /\.input-group:has\(> \.input-group-prepend > \.input-group-text\.invalid\) > \.tm-paciente-required-warning \{\s*display: none !important;/);
+  assert.match(source, /\.tm-paciente-field \.input-group \{\s*display: flex !important;\s*flex-wrap: nowrap !important;/);
+});
+
+test('celular aceita apenas 10 ou 11 dígitos, sem sequência toda igual', () => {
+  const values = ['11987654321', '(11) 98765-4321', '1132654321', '123456789', '11111111111'];
+  const fieldByLabel = (_modal, label) => label === 'Celular' ? {
+    querySelector: () => ({ value: values.shift(), tagName: 'INPUT', validity: { valid: true } })
+  } : null;
+  const problems = sourceFunction('patientFieldProblems', 'patientSetWarning', {
+    fieldByLabel, norm: (value) => String(value || '').trim()
+  });
+  assert.equal(problems({}).find(({ key }) => key === 'celular').malformed, false);
+  assert.equal(problems({}).find(({ key }) => key === 'celular').malformed, false);
+  assert.equal(problems({}).find(({ key }) => key === 'celular').malformed, false);
+  assert.equal(problems({}).find(({ key }) => key === 'celular').malformed, true);
+  assert.equal(problems({}).find(({ key }) => key === 'celular').malformed, true);
 });

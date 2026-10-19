@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.18
+// @version      1.19
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -4038,6 +4038,27 @@ const tmBookingModalWatch = (() => {
         min-width: 0 !important;
       }
 
+      #cadastroModal.tm-paciente-layout .tm-paciente-field .input-group {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-field .input-group > .form-control {
+        flex: 1 1 auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-field .input-group > .input-group-prepend,
+      #cadastroModal.tm-paciente-layout .tm-paciente-field .input-group > .input-group-append {
+        display: flex !important;
+        flex: 0 0 auto !important;
+        width: auto !important;
+        max-width: none !important;
+      }
+
       #cadastroModal.tm-paciente-layout .tm-paciente-nome input,
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento input,
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group,
@@ -4133,8 +4154,16 @@ const tmBookingModalWatch = (() => {
         display: inline-flex;
       }
 
+      #cadastroModal.tm-paciente-layout .input-group:has(> .input-group-prepend > .input-group-text.invalid) > .tm-paciente-required-warning {
+        display: none !important;
+      }
+
       #cadastroModal.tm-paciente-layout .tm-paciente-warning-control {
         padding-left: 30px !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .input-group:has(> .input-group-prepend > .input-group-text.invalid) > .tm-paciente-warning-control {
+        padding-left: 6px !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-sexo {
@@ -4446,28 +4475,36 @@ const tmBookingModalWatch = (() => {
   function patientSetWarning(control, invalid) {
     if (!control?.parentElement) return;
     const host = control.parentElement;
-    host.classList.add('tm-paciente-warning-host');
+    const hasNativeWarning = !!host.querySelector(':scope > .input-group-prepend > .input-group-text.invalid');
+    const showCustomWarning = invalid && !hasNativeWarning;
     let warning = host.querySelector(':scope > .tm-paciente-required-warning');
-    if (!warning) {
+    if (!warning && showCustomWarning) {
+      host.classList.add('tm-paciente-warning-host');
       warning = document.createElement('span');
       warning.className = 'tm-paciente-required-warning';
       warning.textContent = '!';
       warning.setAttribute('aria-hidden', 'true');
       host.appendChild(warning);
     }
-    warning.style.top = `${control.offsetTop + 1}px`;
-    warning.style.left = `${control.offsetLeft + 1}px`;
-    warning.style.height = `${Math.max(0, control.offsetHeight - 2)}px`;
-    warning.classList.toggle('tm-paciente-warning-visible', invalid);
-    control.classList.toggle('tm-paciente-warning-control', invalid);
+    if (warning) {
+      const hostRect = host.getBoundingClientRect();
+      const controlRect = control.getBoundingClientRect();
+      const top = `${controlRect.top - hostRect.top + 1}px`;
+      const left = `${controlRect.left - hostRect.left + 1}px`;
+      const height = `${Math.max(0, controlRect.height - 2)}px`;
+      if (warning.style.top !== top) warning.style.top = top;
+      if (warning.style.left !== left) warning.style.left = left;
+      if (warning.style.height !== height) warning.style.height = height;
+      warning.classList.toggle('tm-paciente-warning-visible', showCustomWarning);
+    }
+    control.classList.toggle('tm-paciente-warning-control', showCustomWarning);
   }
 
   function patientRefreshWarnings(modal) {
     if (!modal?.classList.contains('tm-paciente-layout') ||
         modal.dataset.tmPacienteValidationAttempted !== '1') return;
-    for (const { control, missing, malformed } of patientFieldProblems(modal)) {
-      patientSetWarning(control, missing || malformed);
-    }
+    const celular = patientFieldProblems(modal).find(({ key }) => key === 'celular');
+    if (celular) patientSetWarning(celular.control, celular.missing || celular.malformed);
   }
 
   function patientBookingComponent(modal) {
@@ -5098,6 +5135,7 @@ const tmBookingModalWatch = (() => {
 
   tmBookingModalWatch.subscribe((modal) => {
     if (modal !== observedPacienteModal) observePacienteModal(modal);
+    else if (modal?.classList.contains('tm-paciente-layout')) patientRefreshWarnings(modal);
     else applyPacienteBeforePaint();
   });
 
