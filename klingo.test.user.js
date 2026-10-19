@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      26.38
-// @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
+// @version      1.0
+// @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
 // @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -5262,7 +5262,7 @@ const tmBookingModalWatch = (() => {
       if (!drafts.length) {
         const empty = document.createElement('div');
         empty.className = 'tm-draft-empty';
-        empty.textContent = 'Nenhuma marcação em espera nesta aba.';
+        empty.textContent = 'Nenhuma marcação em espera';
         panel.appendChild(empty);
       }
       for (const draft of drafts) {
