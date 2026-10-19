@@ -6,7 +6,7 @@ O código-fonte fica em `src/`, na ordem numérica. Para gerar os dois arquivos 
 node tools/build.cjs
 ```
 
-- `klingo.user.js` é o arquivo **pronto para copiar inteiro para a branch `main`**. Suas URLs de atualização apontam para `main`.
+- `klingo.user.js` é gerado apenas localmente e fica fora da branch `testes-codex`. Ele está **pronto para copiar inteiro para a branch `main`**; suas URLs de atualização apontam para `main`.
 - `klingo.test.user.js` é exclusivo de `testes-codex`; suas URLs de atualização apontam para `testes-codex`. Instale-o apenas no ambiente de teste. Como ambos atuam nas mesmas páginas, não deixe as duas instalações habilitadas ao mesmo tempo no mesmo perfil do navegador.
 
 Se você já instalou o antigo arquivo de testes `klingo.user.js`, desative ou remova aquela instalação antes de instalar `klingo.test.user.js`. Esta migração é feita uma vez; depois, cada arquivo segue sua própria branch.
