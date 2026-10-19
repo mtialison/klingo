@@ -330,13 +330,29 @@ const tmBookingModalWatch = (() => {
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card,
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card * {
+        font-family: inherit !important;
         font-size: 11.2px !important;
-        line-height: 1.35 !important;
+        font-weight: 600 !important;
+        font-style: normal !important;
+        line-height: 1.4 !important;
+        letter-spacing: normal !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card {
+        position: relative !important;
+        padding-bottom: 40px !important;
       }
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-title {
         margin-bottom: 6px !important;
-        font-weight: 400 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-ocupar {
+        position: absolute !important;
+        right: 12px !important;
+        bottom: 10px !important;
+        z-index: 2;
+        margin: 0 !important;
       }
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-info-wrap {
@@ -571,7 +587,7 @@ const tmBookingModalWatch = (() => {
     if (!modal || !tmCadIsPrimeiraVez(modal)) return;
     for (const { field, control, missing, malformed } of tmCadRequiredProblems(modal)) {
       tmCadSetRequiredWarning(field, control,
-        !!control && (force || control.dataset.tmCadTouched === '1') && (missing || malformed));
+        !!control && force && (missing || malformed));
     }
   }
 
@@ -1143,6 +1159,15 @@ const tmBookingModalWatch = (() => {
     return row;
   }
 
+  function tmCadPositionOcuparButton(item) {
+    const button = Array.from(item.querySelectorAll('button'))
+      .find((candidate) => /^Ocupar\b/i.test(tmCadNorm(candidate.textContent)));
+    if (!button) return;
+    const group = button.closest('.btn-group, .dropdown');
+    const target = group && item.contains(group) ? group : button;
+    target.classList.add('tm-cad-header-ocupar');
+  }
+
   function tmCadApplyHeaderLayout(modal) {
     if (!modal) return;
 
@@ -1198,6 +1223,7 @@ const tmBookingModalWatch = (() => {
         }
 
         item.classList.add('tm-cad-header-card');
+        tmCadPositionOcuparButton(item);
         title.classList.add('tm-cad-header-title');
         infoWrap.classList.add('tm-cad-header-info-wrap');
         left.classList.add('tm-cad-header-left');
@@ -1310,7 +1336,6 @@ const tmBookingModalWatch = (() => {
     modal.querySelectorAll('.tm-cad-origem-inline-row').forEach((row) => row.remove());
     modal.querySelectorAll('.tm-cad-required-warning').forEach((warning) => warning.remove());
     delete modal.dataset.tmCadValidationAttempted;
-    modal.querySelectorAll('[data-tm-cad-touched]').forEach((input) => delete input.dataset.tmCadTouched);
 
     if (cpfInput?.isConnected) {
       cpfInput.required = cpfRequired;
@@ -1451,14 +1476,13 @@ const tmBookingModalWatch = (() => {
     }
   }, true);
 
-  for (const name of ['focusout', 'input', 'change']) {
+  for (const name of ['input', 'change']) {
     document.addEventListener(name, (event) => {
       const modal = event.target?.closest?.('#cadastroModal.tm-primeira-vez-layout');
-      if (!modal || !event.target.matches('input, select')) return;
+      if (!modal || modal.dataset.tmCadValidationAttempted !== '1' || !event.target.matches('input, select')) return;
       const field = event.target.closest('.tm-cad-order-nome, .tm-cad-order-cpf, .tm-cad-order-celular, .tm-cad-order-origem, .tm-cad-order-sexo');
       if (!field) return;
-      if (name === 'focusout') event.target.dataset.tmCadTouched = '1';
-      tmCadRefreshRequiredWarnings(modal, modal.dataset.tmCadValidationAttempted === '1');
+      tmCadRefreshRequiredWarnings(modal, true);
     }, true);
   }
 

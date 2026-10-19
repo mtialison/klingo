@@ -123,6 +123,18 @@ test('confirmação marca todos os campos inválidos, não apenas o CPF', () => 
   assert.deepEqual(marked, problems.map(({ field }) => [field, true]));
 });
 
+test('sair de um campo antes de confirmar não exibe o indicador', () => {
+  const marked = [];
+  const refresh = sourceFunction('tmCadRefreshRequiredWarnings', 'tmCadBookingComponent', {
+    tmCadIsPrimeiraVez: () => true,
+    tmCadRequiredProblems: () => [{ field: 'cpf', control: { dataset: { tmCadTouched: '1' } }, missing: true, malformed: false }],
+    tmCadSetRequiredWarning: (_field, _control, invalid) => marked.push(invalid)
+  });
+  refresh({}, false);
+  assert.deepEqual(marked, [false]);
+  assert.doesNotMatch(source, /\['focusout', 'input', 'change'\]/);
+});
+
 test('usa o serviço de notificações nativo no componente do Call Center', () => {
   const findComponent = sourceFunction('tmCadBookingComponent', 'tmCadValidateRequiredFields', {
     document: { querySelector: () => null, querySelectorAll: () => [] },

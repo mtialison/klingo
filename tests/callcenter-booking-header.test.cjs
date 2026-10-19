@@ -56,8 +56,22 @@ test('cada cabeçalho ganha linhas distintas para data e horário', () => {
 
 test('tipografia uniforme vale também para vários procedimentos', () => {
   const style = source.slice(source.indexOf('  function tmCadInjectStyle()'), source.indexOf('  function tmCadVisibleModal()'));
-  assert.match(style, /\.tm-cad-header-card \* \{\s*font-size: 11\.2px !important;/);
+  assert.match(style, /\.tm-cad-header-card \* \{\s*font-family: inherit !important;\s*font-size: 11\.2px !important;\s*font-weight: 600 !important;/);
   assert.doesNotMatch(style, /tm-cad-multiple-headers[^\{]*\{\s*font-size: (?:15|18)px/);
   assert.match(style, /\.tm-cad-header-time-line \{\s*margin-top: 2px !important;/);
   assert.match(style, /\.tm-cad-native-icon-hidden \{\s*display: none !important;/);
+});
+
+test('botão Ocupar é ancorado no canto inferior direito de cada cartão', () => {
+  const added = [];
+  const group = { classList: { add: (name) => added.push(name) } };
+  const button = { textContent: 'Ocupar', closest: () => group };
+  const item = { querySelectorAll: () => [button], contains: (element) => element === group };
+  const position = sourceFunction('tmCadPositionOcuparButton', 'tmCadApplyHeaderLayout', {
+    tmCadNorm: (value) => String(value || '').trim()
+  });
+  position(item);
+  assert.deepEqual(added, ['tm-cad-header-ocupar']);
+  assert.match(source, /\.tm-cad-header-card \.tm-cad-header-ocupar \{\s*position: absolute !important;\s*right: 12px !important;\s*bottom: 10px !important;/);
+  assert.match(source, /headerItems\.forEach\(\(item\) => \{[\s\S]*?tmCadPositionOcuparButton\(item\)/);
 });
