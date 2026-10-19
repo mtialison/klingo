@@ -159,7 +159,7 @@ const tmBookingModalWatch = (() => {
         grid-row: 3 !important;
       }
 
-      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-email {
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-origem {
         grid-column: 2 / 4 !important;
         grid-row: 3 !important;
       }
@@ -176,11 +176,6 @@ const tmBookingModalWatch = (() => {
 
       #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-validade {
         grid-column: 3 !important;
-        grid-row: 4 !important;
-      }
-
-      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-origem {
-        grid-column: 4 !important;
         grid-row: 4 !important;
       }
 
@@ -214,7 +209,7 @@ const tmBookingModalWatch = (() => {
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-order-carteira { order: 70 !important; }
       #cadastroModal.tm-primeira-vez-layout .tm-cad-order-validade { order: 80 !important; }
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-order-origem { order: 90 !important; }
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-order-origem { order: 50 !important; }
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-origem-col,
       #cadastroModal.tm-primeira-vez-layout .tm-cad-origem-col .form-group,
@@ -457,6 +452,10 @@ const tmBookingModalWatch = (() => {
         display: none !important;
       }
 
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-origem-title-hidden {
+        display: none !important;
+      }
+
       @media (max-width: 720px) {
         #cadastroModal.tm-primeira-vez-layout #cadTemp {
           grid-template-columns: minmax(0, 1fr) !important;
@@ -507,6 +506,44 @@ const tmBookingModalWatch = (() => {
     return !!tmCadFieldByLabel(modal, labelText);
   }
 
+  function tmCadIsValidCpf(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+
+    for (let length = 9; length <= 10; length += 1) {
+      let sum = 0;
+      for (let index = 0; index < length; index += 1) {
+        sum += Number(digits[index]) * (length + 1 - index);
+      }
+      const remainder = (sum * 10) % 11;
+      if (Number(digits[length]) !== (remainder === 10 ? 0 : remainder)) return false;
+    }
+    return true;
+  }
+
+  function tmCadValidateCpf(modal, event) {
+    if (!modal || !tmCadIsPrimeiraVez(modal)) return true;
+    const input = tmCadFieldByLabel(modal, 'CPF')?.querySelector('input');
+    const value = input?.value?.trim() || '';
+    const message = !value ? 'O campo CPF é obrigatório.' :
+      !tmCadIsValidCpf(value) ? 'Informe um CPF válido.' : '';
+    if (!message) {
+      input?.setCustomValidity('');
+      return true;
+    }
+
+    event?.preventDefault();
+    event?.stopImmediatePropagation();
+    if (input) {
+      input.setCustomValidity(message);
+      input.focus();
+      input.reportValidity();
+    } else {
+      window.alert(message);
+    }
+    return false;
+  }
+
   function tmCadIsPrimeiraVez(modal) {
     if (!modal || modal.id !== 'cadastroModal') return false;
 
@@ -555,13 +592,11 @@ const tmBookingModalWatch = (() => {
     field.style.setProperty('display', 'none', 'important');
   }
 
-  function tmCadPlaceOrigemAfterValidade(modal, origemField) {
+  function tmCadPlaceOrigemInDados(modal, origemField) {
     if (!modal || !origemField) return;
 
     const cadTemp = modal.querySelector('#cadTemp');
-    const validade = tmCadFieldByLabel(modal, 'Validade da Carteira');
-
-    if (!cadTemp || !validade) return;
+    if (!cadTemp) return;
 
     let inlineRow = cadTemp.querySelector(':scope > .tm-cad-origem-inline-row');
     if (!inlineRow) {
@@ -1144,10 +1179,14 @@ const tmBookingModalWatch = (() => {
     if (!modal) return;
 
     const labels = Array.from(modal.querySelectorAll('small')).filter((small) => {
-      return ['ORIGEM DE PACIENTES', 'ORIGEM DO AGENDAMENTO'].includes(tmCadNorm(small.innerText || small.textContent || ''));
+      return ['ORIGEM DE PACIENTES', 'ORIGEM DO AGENDAMENTO'].includes(
+        tmCadNorm(small.innerText || small.textContent || '').toUpperCase());
     });
 
     labels.forEach((label) => {
+      const title = label.closest('.border-bottom.hover-title-bg');
+      if (title && modal.contains(title)) title.classList.add('tm-cad-origem-title-hidden');
+
       const row = label.closest('.row');
       if (!row || !modal.contains(row)) return;
 
@@ -1172,12 +1211,20 @@ const tmBookingModalWatch = (() => {
     modal.querySelectorAll('.tm-cad-header-convenio-injetado, textarea.tm-cad-observacao-textarea')
       .forEach((node) => node.remove());
 
-    const { origem } = baseline;
+    const { origem, cpfInput, cpfRequired, cpfAriaRequired, emailInput, emailRequired } = baseline;
     if (origem?.element.isConnected && origem.parent.isConnected) {
       const next = origem.next?.parentNode === origem.parent ? origem.next : null;
       origem.parent.insertBefore(origem.element, next);
     }
     modal.querySelectorAll('.tm-cad-origem-inline-row').forEach((row) => row.remove());
+
+    if (cpfInput?.isConnected) {
+      cpfInput.required = cpfRequired;
+      if (cpfAriaRequired === null) cpfInput.removeAttribute('aria-required');
+      else cpfInput.setAttribute('aria-required', cpfAriaRequired);
+      cpfInput.setCustomValidity('');
+    }
+    if (emailInput?.isConnected) emailInput.required = emailRequired;
 
     tmRestoreAttributes(baseline.attributes);
     tmRestoreHeaderContents(baseline.headers);
@@ -1205,9 +1252,16 @@ const tmBookingModalWatch = (() => {
 
     if (!modalBaselines.has(modal)) {
       const origemField = tmCadFieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
+      const cpfInput = tmCadFieldByLabel(modal, 'CPF')?.querySelector('input');
+      const emailInput = tmCadFieldByLabel(modal, 'e-mail')?.querySelector('input');
       modalBaselines.set(modal, {
         attributes: tmCaptureAttributes(modal),
         headers: tmCaptureHeaderContents(modal),
+        cpfInput,
+        cpfRequired: cpfInput?.required,
+        cpfAriaRequired: cpfInput?.getAttribute('aria-required') ?? null,
+        emailInput,
+        emailRequired: emailInput?.required,
         origem: origemField ? {
           element: origemField,
           parent: origemField.parentNode,
@@ -1247,10 +1301,22 @@ const tmBookingModalWatch = (() => {
     tmCadSetField(origem, 'tm-cad-col-4', 'tm-cad-order-origem');
     origem?.classList.add('tm-cad-origem-col');
 
-    tmCadPlaceOrigemAfterValidade(modal, origem);
+    tmCadPlaceOrigemInDados(modal, origem);
 
     tmCadHideField(telefone);
     tmCadHideField(nomeSocial);
+    tmCadHideField(email);
+    const cpfInput = cpf?.querySelector('input');
+    if (cpfInput) {
+      cpfInput.required = true;
+      cpfInput.setAttribute('aria-required', 'true');
+      if (!cpfInput.dataset.tmCadCpfGuard) {
+        cpfInput.dataset.tmCadCpfGuard = '1';
+        cpfInput.addEventListener('input', () => cpfInput.setCustomValidity(''));
+      }
+    }
+    const emailInput = email?.querySelector('input');
+    if (emailInput) emailInput.required = false;
 
     tmCadApplyHeaderLayout(modal);
     tmCadMoveObservacaoSelect(modal);
@@ -1272,6 +1338,23 @@ const tmBookingModalWatch = (() => {
   document.addEventListener('hidden.bs.modal', (event) => {
     if (event.target?.id === 'cadastroModal') {
       tmCadClearPrimeiraVezLayout(event.target);
+    }
+  }, true);
+
+  document.addEventListener('click', (event) => {
+    if (!window.location.hash.startsWith('#/call-center')) return;
+    const button = event.target?.closest?.('button');
+    const modal = button?.closest?.('#cadastroModal');
+    if (modal && /^Confirmar$/i.test(tmCadNorm(button.textContent))) {
+      tmCadValidateCpf(modal, event);
+    }
+  }, true);
+
+  document.addEventListener('submit', (event) => {
+    if (!window.location.hash.startsWith('#/call-center')) return;
+    const modal = event.target?.closest?.('#cadastroModal');
+    if (modal && !/^Reservar$/i.test(tmCadNorm(event.submitter?.textContent))) {
+      tmCadValidateCpf(modal, event);
     }
   }, true);
 

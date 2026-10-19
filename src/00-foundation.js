@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.38
+// @version      26.39
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
