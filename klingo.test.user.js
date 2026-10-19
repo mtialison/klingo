@@ -4811,21 +4811,36 @@ const tmBookingModalWatch = (() => {
       }).filter(Boolean).slice(0, 3);
   }
 
-  function preferredSlot(vue) {
-    const selected = (vue.procedimentos || []).find((item) => item.data && item.hora);
-    const source = selected || vue.horario_selecionado || null;
-    const date = String(source?.data || Object.keys(vue.exibicao || {})[vue.selecao?.dia] || '');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-    if (!source?.hora) return { date };
+  function slotPreference(source, fallbackIndex = null) {
+    const date = String(source?.data || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !source?.hora) return null;
     return {
       date,
       time: String(source.hora),
       agendaId: Number(source.id_agenda) || null,
-      procedureIndex: Number.isInteger(source.index) ? source.index : null,
+      procedureIndex: Number.isInteger(source.index) ? source.index : fallbackIndex,
       doctorId: Number(source.medico?.id_pessoa || source.id_medico) || null,
       procedureId: Number(source.procedimento?.id_procedimento) || null,
       unitId: Number(source.id_unidade_operacao) || null
     };
+  }
+
+  function preferredSlots(vue) {
+    const procedures = vue.procedimentos || [];
+    const selected = procedures.map((item, index) =>
+      slotPreference(item, procedures.length > 1 ? index : null)).filter(Boolean);
+    if (selected.length) return selected;
+    const fallback = slotPreference(vue.horario_selecionado);
+    return fallback ? [fallback] : [];
+  }
+
+  function preferredSlot(vue) {
+    const selected = preferredSlots(vue)[0];
+    if (selected) return selected;
+    const source = vue.horario_selecionado || null;
+    const date = String(source?.data || Object.keys(vue.exibicao || {})[vue.selecao?.dia] || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    return { date };
   }
 
   function capture(vue) {
@@ -4839,7 +4854,8 @@ const tmBookingModalWatch = (() => {
     const values = Object.fromEntries(savedFields.map((field) => [field, vue[field]]));
     const snapshot = clone(values);
     if (JSON.stringify(snapshot).length > 250000) throw new Error('Este preenchimento é grande demais para ficar em espera.');
-    return { flow: vue.fluxo, snapshot, preferred: preferredSlot(vue) };
+    return { flow: vue.fluxo, snapshot, preferred: preferredSlot(vue),
+      preferredSlots: preferredSlots(vue) };
   }
 
   function clearTimes(snapshot) {
@@ -4874,6 +4890,19 @@ const tmBookingModalWatch = (() => {
     notice = message;
     open = true;
     render();
+  }
+
+  function notifyUnavailable(vue, message) {
+    if (typeof vue.$toast?.add === 'function') {
+      try {
+        vue.$toast.add({ severity: 'error', summary: 'Vaga indisponível',
+          detail: message, life: 8000 });
+        return;
+      } catch (error) {
+        console.warn('[TM] Não foi possível exibir o alerta de vaga indisponível.', error);
+      }
+    }
+    notify(message);
   }
 
   async function save() {
@@ -4947,8 +4976,9 @@ const tmBookingModalWatch = (() => {
     throw new Error('A busca de horários demorou demais. Use Buscar Horários para tentar novamente.');
   }
 
-  function matchingSlot(vue, preferred) {
+  function matchingSlot(vue, preferred, used = new Set()) {
     return (vue.horarios || []).find((slot) =>
+      !used.has(slot) &&
       slot.status === 'livre' && !slot.bloqueado && !slot.restricao &&
       Number.isInteger(slot.index) &&
       slot.data === preferred.date &&
@@ -4960,8 +4990,10 @@ const tmBookingModalWatch = (() => {
       (!preferred.unitId || Number(slot.id_unidade_operacao) === preferred.unitId));
   }
 
-  async function restoreDate(vue, preferred) {
+  async function restoreDate(vue, preference) {
     if (typeof vue.buscarHorarios !== 'function') return '';
+    const preferences = Array.isArray(preference) ? preference : preference ? [preference] : [];
+    const preferred = preferences[0];
     if (!preferred) {
       if (!vue.procedimentos?.length && !vue.dados?.procedimento) {
         return 'Preenchimento retomado. Adicione um procedimento para buscar horários.';
@@ -4972,16 +5004,38 @@ const tmBookingModalWatch = (() => {
     }
     const today = new Date();
     const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    if (preferred.date < todayIso) return 'A data preferida já passou. Escolha uma nova data.';
-    vue.buscadoAte = dayBefore(preferred.date);
+    if (preferences.some((item) => item.date < todayIso)) {
+      return 'Uma das datas preferidas já passou. Escolha novas vagas.';
+    }
+    vue.buscadoAte = dayBefore(preferences.reduce((earliest, item) =>
+      item.date < earliest ? item.date : earliest, preferred.date));
     vue.buscarHorarios();
     await waitForSearch(vue);
     // listaPacientes abre a agenda completa do dia, não o cadastro do paciente.
     // A vaga já está na busca; selecioná-la diretamente abre apenas o cadastro.
-    if (!preferred.time) return 'Horários atualizados. Escolha uma vaga disponível na lista.';
-    const slot = matchingSlot(vue, preferred);
-    if (!slot) return 'A vaga anterior não está livre. Selecione outro horário na lista.';
-    vue.selecionar_horario(slot);
+    if (preferences.some((item) => !item.time)) {
+      return 'Horários atualizados. Escolha uma vaga disponível na lista.';
+    }
+    const used = new Set();
+    const slots = preferences.map((item) => {
+      const slot = matchingSlot(vue, item, used);
+      if (slot) used.add(slot);
+      return slot;
+    });
+    const missing = preferences.filter((item, index) => !slots[index]);
+    if (missing.length) {
+      const when = missing.slice(0, 2).map((item) =>
+        `${displayDate(item.date)} • ${item.time}`).join(', ');
+      const message = missing.length === 1 ?
+        `A vaga de ${when} não está mais disponível. Escolha outro horário na lista.` :
+        `${missing.length} vagas não estão mais disponíveis (${when}). Escolha outros horários na lista.`;
+      return { unavailable: true, message };
+    }
+    for (const slot of slots) {
+      if (component() !== vue) throw new Error('A página mudou durante a reserva das vagas.');
+      await vue.selecionar_horario(slot);
+      await new Promise((resolve) => vue.$nextTick(resolve));
+    }
     for (let attempt = 0; attempt < 120; attempt++) {
       if (document.querySelector('#cadastroModal.show')) {
         return '';
@@ -4989,7 +5043,8 @@ const tmBookingModalWatch = (() => {
       if (component() !== vue) throw new Error('A página mudou durante a reserva da vaga.');
       await new Promise((resolve) => window.setTimeout(resolve, 100));
     }
-    return 'A vaga não pôde ser reaberta. Confira os horários exibidos.';
+    return { unavailable: true,
+      message: 'Não foi possível reabrir as vagas. Elas podem ter sido ocupadas durante a retomada. Confira os horários exibidos.' };
   }
 
   async function resume(id) {
@@ -5031,8 +5086,9 @@ const tmBookingModalWatch = (() => {
       open = false;
       notice = '';
       try {
-        const status = await restoreDate(vue, draft.preferred);
-        if (status) notify(status);
+        const status = await restoreDate(vue, draft.preferredSlots?.length ? draft.preferredSlots : draft.preferred);
+        if (status?.unavailable) notifyUnavailable(vue, status.message);
+        else if (status) notify(status);
       } catch (error) {
         notify(error.message || 'Preenchimento retomado; faça a busca de horários manualmente.');
       }

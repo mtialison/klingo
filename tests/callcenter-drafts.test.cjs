@@ -199,6 +199,103 @@ test('retomada confere a vaga e abre só o cadastro com os dados preservados', a
   assert.equal(vm.runInContext('drafts.length', context), 0);
 });
 
+test('retomada seleciona as vagas de todos os procedimentos antes de abrir o cadastro', async () => {
+  const context = setup();
+  const vue = booking();
+  vue.dados.plano = { id_plano: 100, search: 'Particular' };
+  vue.procedimentos.push(
+    { procedimento: { id_procedimento: 200, search: 'ECG' }, medico: { id_pessoa: 400 },
+      data: '2026-10-20', hora: '08:00', id_agenda: 300, selected: true },
+    { procedimento: { id_procedimento: 201, search: 'Consulta' }, medico: { id_pessoa: 401 },
+      data: '2026-10-21', hora: '12:00', id_agenda: 301, selected: true }
+  );
+  context.vue = vue;
+  vm.runInContext('component = () => vue;', context);
+  await vm.runInContext('save()', context);
+  assert.equal(vm.runInContext('drafts[0].preferredSlots.length', context), 2);
+  assert.equal(vm.runInContext('drafts[0].preferredSlots[1].procedureIndex', context), 1);
+
+  let modalOpen = false;
+  const selected = [];
+  context.document.querySelector = selector => selector === '#cadastroModal.show' && modalOpen ? {} : null;
+  vue.buscarHorarios = () => {
+    vue.horarios = [
+      { data: '2026-10-20', hora: '08:00', status: 'livre', id_agenda: 300,
+        index: 0, medico: { id_pessoa: 400 }, procedimento: { id_procedimento: 200 } },
+      { data: '2026-10-21', hora: '12:00', status: 'livre', id_agenda: 301,
+        index: 1, medico: { id_pessoa: 401 }, procedimento: { id_procedimento: 201 } }
+    ];
+    vue.buscando = false;
+  };
+  vue.selecionar_horario = slot => {
+    assert.equal(modalOpen, false);
+    selected.push(slot.index);
+    if (selected.length === 2) modalOpen = true;
+  };
+  await vm.runInContext('resume(1)', context);
+  assert.deepEqual(selected, [0, 1]);
+  assert.equal(modalOpen, true);
+  assert.equal(vm.runInContext('drafts.length', context), 0);
+  assert.equal(vm.runInContext('notice', context), '');
+});
+
+test('não seleciona parcialmente procedimentos quando uma das vagas desapareceu', async () => {
+  const context = setup();
+  const vue = booking();
+  vue.procedimentos.push(
+    { procedimento: { id_procedimento: 200 }, data: '2026-10-20', hora: '08:00',
+      id_agenda: 300, selected: true },
+    { procedimento: { id_procedimento: 201 }, data: '2026-10-21', hora: '12:00',
+      id_agenda: 301, selected: true }
+  );
+  context.vue = vue;
+  vm.runInContext('component = () => vue;', context);
+  await vm.runInContext('save()', context);
+  let calls = 0;
+  vue.buscarHorarios = () => {
+    vue.horarios = [
+      { data: '2026-10-20', hora: '08:00', status: 'livre', id_agenda: 300,
+        index: 0, procedimento: { id_procedimento: 200 } },
+      { data: '2026-10-21', hora: '12:00', status: 'ocupado', id_agenda: 301,
+        index: 1, procedimento: { id_procedimento: 201 } }
+    ];
+    vue.buscando = false;
+  };
+  vue.selecionar_horario = () => { calls++; };
+  await vm.runInContext('resume(1)', context);
+  assert.equal(calls, 0);
+  assert.match(vm.runInContext('notice', context), /21\/10\/2026 • 12:00 não está mais disponível/);
+});
+
+test('alerta no Klingo identifica a vaga indisponível e não abre o cadastro', async () => {
+  const context = setup();
+  const vue = booking();
+  const toasts = [];
+  vue.$toast = { add(message) { toasts.push(message); } };
+  vue.procedimentos.push({ procedimento: { search: 'ECG' }, data: '2026-10-20',
+    hora: '08:00', id_agenda: 300, selected: true });
+  context.vue = vue;
+  vm.runInContext('component = () => vue;', context);
+  await vm.runInContext('save()', context);
+  let selected = false;
+  let modalOpen = false;
+  context.document.querySelector = selector => selector === '#cadastroModal.show' && modalOpen ? {} : null;
+  vue.buscarHorarios = () => {
+    vue.horarios = [{ data: '2026-10-20', hora: '08:00', status: 'ocupado',
+      id_agenda: 300, index: 0 }];
+    vue.buscando = false;
+  };
+  vue.selecionar_horario = () => { selected = true; modalOpen = true; };
+  await vm.runInContext('resume(1)', context);
+  assert.equal(selected, false);
+  assert.equal(modalOpen, false);
+  assert.equal(toasts.length, 1);
+  assert.equal(toasts[0].severity, 'error');
+  assert.equal(toasts[0].summary, 'Vaga indisponível');
+  assert.match(toasts[0].detail, /20\/10\/2026 • 08:00 não está mais disponível/);
+  assert.equal(vm.runInContext('open', context), false);
+});
+
 test('sem horário salvo, atualiza a lista sem abrir a agenda completa do dia', async () => {
   const context = setup();
   const vue = booking();
@@ -232,7 +329,7 @@ test('vaga ocupada não é reservada automaticamente', async () => {
   vue.selecionar_horario = () => { called = true; };
   await vm.runInContext('resume(1)', context);
   assert.equal(called, false);
-  assert.match(vm.runInContext('notice', context), /não está livre/);
+  assert.match(vm.runInContext('notice', context), /não está mais disponível/);
   assert.equal(vue.dados.plano.search, 'Particular');
 });
 
