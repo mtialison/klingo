@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.15
+// @version      1.16
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -4131,6 +4131,22 @@ const tmBookingModalWatch = (() => {
         grid-row: 3 !important;
       }
 
+      #cadastroModal.tm-paciente-layout .tm-paciente-origem .input-group {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-origem .input-group > select.form-control {
+        flex: 1 1 auto !important;
+        width: 0 !important;
+        min-width: 0 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-origem .input-group > :not(select) {
+        flex: 0 0 auto !important;
+      }
+
       #cadastroModal.tm-paciente-layout .tm-paciente-hidden {
         display: none !important;
       }
@@ -4209,19 +4225,43 @@ const tmBookingModalWatch = (() => {
         min-width: 0 !important;
       }
 
+      #cadastroModal.tm-paciente-layout div.mt-3.mb-5 {
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        flex-grow: 0 !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 16px !important;
+      }
+
       #cadastroModal.tm-paciente-layout .tm-paciente-header-card,
-      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-title,
-      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-row,
-      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-row small,
-      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data,
-      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data small,
-      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data span {
-        font-weight: 400 !important;
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card * {
+        font-family: inherit !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        font-style: normal !important;
+        line-height: 1.4 !important;
+        letter-spacing: normal !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card {
+        position: relative !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-title {
         margin-bottom: 6px !important;
-        font-weight: 400 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-procedure-emoji {
+        margin-right: 5px !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-ocupar {
+        position: absolute !important;
+        right: 12px !important;
+        bottom: 10px !important;
+        z-index: 2;
+        margin: 0 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-info-wrap {
@@ -4245,52 +4285,53 @@ const tmBookingModalWatch = (() => {
         white-space: normal !important;
       }
 
-      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data,
-      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data small,
-      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data span {
-        font-size: 18.75px !important;
-        line-height: 1.35 !important;
-        font-weight: 400 !important;
-        text-transform: uppercase !important;
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-profissional {
+        order: 2 !important;
       }
 
-      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data small {
-        display: inline-flex !important;
-        align-items: center !important;
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-convenio {
+        order: 3 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-unidade {
+        order: 4 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data {
+        order: 5 !important;
+        display: block !important;
+        width: 100% !important;
+        margin-top: 0 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-date-line,
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-time-line {
+        display: block !important;
+        width: 100% !important;
         margin-left: 0 !important;
       }
 
-      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data .fa-calendar-alt {
-        width: 1.25em !important;
-        min-width: 1.25em !important;
-        max-width: 1.25em !important;
-        text-align: center !important;
-        margin-right: 6px !important;
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-time-line {
+        margin-top: 2px !important;
       }
 
-      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-data small.mx-2 {
-        margin-left: 8px !important;
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-native-icon-hidden {
+        display: none !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-emoji {
+        display: inline-block !important;
+        width: 1.5em !important;
+        margin-right: 4px !important;
+        vertical-align: baseline !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-header-card .tm-paciente-header-sala {
-        font-size: 18.75px !important;
-        line-height: 1.35 !important;
+        font-size: 13px !important;
       }
 
-      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card .tm-paciente-header-title,
-      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card .tm-paciente-header-title * {
-        font-size: 18px !important;
-        line-height: 1.3 !important;
-      }
-
-      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card .tm-paciente-header-row,
-      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card .tm-paciente-header-row *,
-      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card .tm-paciente-header-data,
-      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card .tm-paciente-header-data *,
-      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card blockquote,
-      #cadastroModal.tm-paciente-layout.tm-paciente-multiple-headers .tm-paciente-header-card blockquote * {
-        font-size: 15px !important;
-        line-height: 1.3 !important;
+      #cadastroModal.tm-paciente-layout .tm-paciente-header-card blockquote {
+        margin-top: 6px !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-convenio-externo-oculto {
@@ -4401,12 +4442,10 @@ const tmBookingModalWatch = (() => {
   function hideOrigemSection(modal) {
     Array.from(modal.querySelectorAll('small')).forEach((small) => {
       if (!['ORIGEM DE PACIENTES', 'ORIGEM DO AGENDAMENTO'].includes(norm(small.innerText || small.textContent || ''))) return;
-
-      const row = small.closest('.row');
-      if (!row) return;
-
-      row.classList.add('tm-paciente-origem-section-hidden');
-      row.style.setProperty('display', 'none', 'important');
+      const title = small.closest('.border-bottom.hover-title-bg');
+      if (title && !title.querySelector('select, input')) {
+        title.classList.add('tm-paciente-origem-section-hidden');
+      }
     });
   }
 
@@ -4539,6 +4578,53 @@ const tmBookingModalWatch = (() => {
     calendarSmall.appendChild(document.createTextNode(dateText));
   }
 
+  function addProcedureEmoji(title) {
+    if (!title || title.querySelector(':scope > .tm-paciente-header-procedure-emoji')) return;
+    const icon = document.createElement('span');
+    icon.className = 'tm-paciente-header-procedure-emoji';
+    icon.textContent = '🩺';
+    icon.setAttribute('aria-hidden', 'true');
+    title.prepend(icon);
+  }
+
+  function emojifyHeaderIcon(container, selector, emoji) {
+    const icon = container?.querySelector(selector);
+    if (!icon) return;
+    icon.classList.add('tm-paciente-native-icon-hidden');
+    if (icon.previousElementSibling?.classList.contains('tm-paciente-header-emoji')) {
+      icon.previousElementSibling.textContent = emoji;
+      return;
+    }
+    const replacement = document.createElement('span');
+    replacement.className = 'tm-paciente-header-emoji';
+    replacement.textContent = emoji;
+    replacement.setAttribute('aria-hidden', 'true');
+    icon.before(replacement);
+  }
+
+  function decorateHeader(profissional, convenio, unidade, dateBlock) {
+    emojifyHeaderIcon(profissional, '.fa-user-md', '👨‍⚕️');
+    emojifyHeaderIcon(convenio, '.fa-credit-card', '💳');
+    emojifyHeaderIcon(unidade, '.fa-building', '🏥');
+    const dateSmall = Array.from(dateBlock.querySelectorAll('small'))
+      .find((small) => !!small.querySelector('.fa-calendar-alt'));
+    const timeSmall = Array.from(dateBlock.querySelectorAll('small'))
+      .find((small) => small !== dateSmall && /\d{1,2}:\d{2}/.test(small.textContent || ''));
+    dateSmall?.classList.add('tm-paciente-header-date-line');
+    timeSmall?.classList.add('tm-paciente-header-time-line');
+    emojifyHeaderIcon(dateSmall, '.fa-calendar-alt', '📅');
+    emojifyHeaderIcon(timeSmall, 'i', '🕒');
+  }
+
+  function positionOcuparButton(item) {
+    const button = Array.from(item.querySelectorAll('button'))
+      .find((candidate) => /^Ocupar\b/i.test(norm(candidate.textContent)));
+    if (!button) return;
+    const group = button.closest('.btn-group, .dropdown');
+    const target = group && item.contains(group) ? group : button;
+    target.classList.add('tm-paciente-header-ocupar');
+  }
+
   function getExternalConvenioForHeaderList(listGroup) {
     if (!listGroup) return '';
 
@@ -4626,13 +4712,15 @@ const tmBookingModalWatch = (() => {
         }
 
         item.classList.add('tm-paciente-header-card');
+        positionOcuparButton(item);
         title.classList.add('tm-paciente-header-title');
+        addProcedureEmoji(title);
         infoWrap.classList.add('tm-paciente-header-info-wrap');
         left.classList.add('tm-paciente-header-left');
 
-        profissional.classList.add('tm-paciente-header-row');
-        convenio?.classList.add('tm-paciente-header-row');
-        unidade.classList.add('tm-paciente-header-row');
+        profissional.classList.add('tm-paciente-header-row', 'tm-paciente-header-profissional');
+        convenio?.classList.add('tm-paciente-header-row', 'tm-paciente-header-convenio');
+        unidade.classList.add('tm-paciente-header-row', 'tm-paciente-header-unidade');
         dateBlock.classList.add('tm-paciente-header-data');
 
         unidade.querySelectorAll('small.text-muted').forEach((small) => {
@@ -4640,6 +4728,7 @@ const tmBookingModalWatch = (() => {
         });
 
         normalizeHeaderDate(dateBlock);
+        decorateHeader(profissional, convenio, unidade, dateBlock);
       });
     });
 
@@ -4666,6 +4755,66 @@ const tmBookingModalWatch = (() => {
       input.value = parsed;
       input.dispatchEvent(new Event('input', { bubbles: true }));
       input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, true);
+  }
+
+  function protectBirthDate(field) {
+    const input = field?.querySelector('input[type="date"]');
+    if (!input || input.dataset.tmPacienteBirthDateGuard === '1') return;
+    input.dataset.tmPacienteBirthDateGuard = '1';
+    let lastValue = input.value;
+    let yearDigits = 0;
+    let yearActive = false;
+    let replacement = '';
+    let writing = false;
+    const parts = (value) => /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+    const reset = () => {
+      lastValue = input.value;
+      yearDigits = 0;
+      yearActive = false;
+      replacement = '';
+    };
+    input.addEventListener('pointerdown', reset, true);
+    input.addEventListener('focus', reset, true);
+    input.addEventListener('keydown', (event) => {
+      if (/^(?:Arrow|Backspace|Delete|Tab|Home|End)/.test(event.key)) {
+        reset();
+        return;
+      }
+      if (!/^\d$/.test(event.key) || event.ctrlKey || event.metaKey || event.altKey) return;
+      const current = parts(input.value);
+      if (!current || (!replacement && (!yearActive || yearDigits < 4))) return;
+
+      event.preventDefault();
+      replacement = replacement.length === 4 ? event.key : replacement + event.key;
+      const year = replacement.padStart(4, '0');
+      if (Number(year) === 0) return;
+      const next = `${year}-${current[2]}-${current[3]}`;
+      if (input.value !== next) {
+        writing = true;
+        input.value = next;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        writing = false;
+      }
+      lastValue = input.value;
+      yearActive = true;
+      yearDigits = replacement.length;
+    }, true);
+    input.addEventListener('input', () => {
+      if (writing) return;
+      const before = parts(lastValue);
+      const after = parts(input.value);
+      if (after && (!before || before[1] !== after[1]) &&
+          (!before || (before[2] === after[2] && before[3] === after[3]))) {
+        yearActive = true;
+        yearDigits = Math.min(4, yearDigits + 1);
+      } else if (!after || (before && (before[2] !== after[2] || before[3] !== after[3]))) {
+        yearActive = false;
+        yearDigits = 0;
+        replacement = '';
+      }
+      lastValue = input.value;
     }, true);
   }
 
@@ -4749,6 +4898,7 @@ const tmBookingModalWatch = (() => {
     });
 
     enableDatePaste(nascimento);
+    protectBirthDate(nascimento);
     enableDatePaste(validade);
   }
 
@@ -4757,7 +4907,7 @@ const tmBookingModalWatch = (() => {
     const baseline = modalBaselines.get(modal);
     if (!baseline) return;
 
-    modal.querySelectorAll('.tm-paciente-header-convenio-injetado, textarea.tm-paciente-observacao-textarea')
+    modal.querySelectorAll('.tm-paciente-header-emoji, .tm-paciente-header-procedure-emoji, .tm-paciente-header-convenio-injetado, textarea.tm-paciente-observacao-textarea')
       .forEach((node) => node.remove());
 
     const { origem } = baseline;
