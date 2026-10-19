@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.17
+// @version      1.18
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -4260,6 +4260,10 @@ const tmBookingModalWatch = (() => {
         margin-bottom: 16px !important;
       }
 
+      #cadastroModal.tm-paciente-layout div.mt-3.mb-5 > br {
+        display: none !important;
+      }
+
       #cadastroModal.tm-paciente-layout .tm-paciente-header-card,
       #cadastroModal.tm-paciente-layout .tm-paciente-header-card * {
         font-family: inherit !important;
@@ -4549,7 +4553,7 @@ const tmBookingModalWatch = (() => {
 
   function hideOrigemSection(modal) {
     Array.from(modal.querySelectorAll('small')).forEach((small) => {
-      if (!['ORIGEM DE PACIENTES', 'ORIGEM DO AGENDAMENTO'].includes(norm(small.innerText || small.textContent || ''))) return;
+      if (!['ORIGEM DE PACIENTES', 'ORIGEM DO AGENDAMENTO'].includes(norm(small.innerText || small.textContent || '').toUpperCase())) return;
       const title = small.closest('.border-bottom.hover-title-bg');
       if (title && !title.querySelector('select, input')) {
         title.classList.add('tm-paciente-origem-section-hidden');

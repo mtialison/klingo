@@ -69,12 +69,29 @@ test('origem mantém aviso e seletor na mesma linha, oculta só o título e comp
   assert.match(source, /small\.closest\('\.border-bottom\.hover-title-bg'\)/);
   assert.match(source, /if \(title && !title\.querySelector\('select, input'\)\)/);
   assert.match(source, /div\.mt-3\.mb-5 \{\s*height: auto !important;\s*min-height: 0 !important;/);
+  assert.match(source, /div\.mt-3\.mb-5 > br \{\s*display: none !important;/);
 });
 
 test('telefone fica oculto sem apagar o valor e e-mail ocupa o espaço livre', () => {
   assert.match(source, /\.tm-paciente-telefone \{\s*display: none !important;/);
   assert.match(source, /\.tm-paciente-email \{\s*grid-column: 2 \/ 5 !important;/);
   assert.doesNotMatch(source, /telefone\.value\s*=/);
+});
+
+test('título azul de origem é encontrado sem depender de maiúsculas', () => {
+  let hidden = false;
+  const title = {
+    querySelector: () => null,
+    classList: { add(value) { hidden = value === 'tm-paciente-origem-section-hidden'; } }
+  };
+  const modal = { querySelectorAll: () => [{
+    innerText: 'Origem do Agendamento',
+    closest: () => title
+  }] };
+  sourceFunction('hideOrigemSection', 'findObservacaoRow', {
+    norm: (value) => String(value || '').trim()
+  })(modal);
+  assert.equal(hidden, true);
 });
 
 test('celular vazio é obrigatório independentemente do telefone preenchido', () => {
