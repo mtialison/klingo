@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         klingo
-// @namespace    http://tampermonkey.net/
-// @version      26.63
-// @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
+// @name         klingo (testes)
+// @namespace    http://tampermonkey.net/klingo-testes
+// @version      1.6
+// @description  🐒
 // @match        https://*.klingo.app/*
-// @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
-// @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
+// @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
+// @downloadURL  https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
 // @author       alison
 // @grant        GM_getValue
 // @grant        GM_setValue
