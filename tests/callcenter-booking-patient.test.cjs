@@ -72,10 +72,20 @@ test('origem mantém aviso e seletor na mesma linha, oculta só o título e comp
   assert.match(source, /div\.mt-3\.mb-5 > br \{\s*display: none !important;/);
 });
 
-test('telefone fica oculto sem apagar o valor e e-mail ocupa o espaço livre', () => {
+test('paciente organiza nome e nascimento, depois celular, origem e sexo, sem alterar larguras fixas', () => {
   assert.match(source, /\.tm-paciente-telefone \{\s*display: none !important;/);
-  assert.match(source, /\.tm-paciente-email \{\s*grid-column: 2 \/ 5 !important;/);
+  assert.match(source, /\.tm-paciente-email \{\s*display: none !important;/);
+  assert.match(source, /grid-template-columns: 200px minmax\(0, 1fr\) 200px 200px !important;/);
+  assert.match(source, /\.tm-paciente-nome \{\s*grid-column: 1 \/ 3 !important;\s*grid-row: 2 !important;/);
+  assert.match(source, /\.tm-paciente-nascimento \{\s*grid-column: 3 !important;\s*grid-row: 2 !important;/);
+  assert.match(source, /\.tm-paciente-celular \{\s*grid-column: 1 !important;\s*grid-row: 3 !important;/);
+  assert.match(source, /\.tm-paciente-origem \{\s*grid-column: 2 \/ 4 !important;\s*grid-row: 3 !important;/);
+  assert.match(source, /\.tm-paciente-sexo \{\s*grid-column: 4 !important;\s*grid-row: 3 !important;/);
+  assert.match(source, /\.tm-paciente-validade \{\s*grid-column: 3 !important;\s*grid-row: 4 !important;/);
   assert.doesNotMatch(source, /telefone\.value\s*=/);
+  assert.doesNotMatch(source, /email\.value\s*=/);
+  assert.match(source, /if \(emailInput\) emailInput\.required = false;/);
+  assert.match(source, /baseline\.emailInput\.required = baseline\.emailRequired;/);
 });
 
 test('campos digitáveis do paciente usam a tipografia medida no fluxo Primeira Vez', () => {

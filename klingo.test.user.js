@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.21
+// @version      1.22
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -4141,8 +4141,7 @@ const tmBookingModalWatch = (() => {
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-email {
-        grid-column: 2 / 5 !important;
-        grid-row: 3 !important;
+        display: none !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-warning-host {
@@ -4182,7 +4181,7 @@ const tmBookingModalWatch = (() => {
 
       #cadastroModal.tm-paciente-layout .tm-paciente-sexo {
         grid-column: 4 !important;
-        grid-row: 2 !important;
+        grid-row: 3 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-carteira {
@@ -4196,8 +4195,8 @@ const tmBookingModalWatch = (() => {
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-origem {
-        grid-column: 4 !important;
-        grid-row: 4 !important;
+        grid-column: 2 / 4 !important;
+        grid-row: 3 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-origem .input-group {
@@ -5016,10 +5015,13 @@ const tmBookingModalWatch = (() => {
     if (!modalBaselines.has(modal)) {
       const origemField = fieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
       const nameLabel = fieldByLabel(modal, 'Nome do Paciente')?.querySelector('small.form-text.text-muted');
+      const emailInput = fieldByLabel(modal, 'e-mail')?.querySelector('input');
       modalBaselines.set(modal, {
         attributes: tmCaptureAttributes(modal),
         headers: tmCaptureHeaderContents(modal),
         nameLabel: nameLabel ? { element: nameLabel, text: nameLabel.textContent } : null,
+        emailInput,
+        emailRequired: emailInput?.required,
         origem: origemField ? {
           element: origemField,
           parent: origemField.parentNode,
@@ -5055,6 +5057,8 @@ const tmBookingModalWatch = (() => {
     addField(cpf, 'tm-paciente-cpf');
     addField(celular, 'tm-paciente-celular');
     addField(email, 'tm-paciente-email');
+    const emailInput = email?.querySelector('input');
+    if (emailInput) emailInput.required = false;
     addField(telefone, 'tm-paciente-telefone');
     addField(sexo, 'tm-paciente-sexo');
     addField(carteira, 'tm-paciente-carteira');
@@ -5104,6 +5108,7 @@ const tmBookingModalWatch = (() => {
     if (baseline.nameLabel?.element.isConnected) {
       baseline.nameLabel.element.textContent = baseline.nameLabel.text;
     }
+    if (baseline.emailInput?.isConnected) baseline.emailInput.required = baseline.emailRequired;
 
     const { origem } = baseline;
     if (origem?.element.isConnected && origem.parent.isConnected) {
