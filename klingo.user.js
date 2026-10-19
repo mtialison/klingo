@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.49
+// @version      26.50
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
@@ -2682,6 +2682,15 @@ const tmBookingModalWatch = (() => {
         padding-bottom: 6px !important;
         box-sizing: border-box !important;
         font: inherit !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout div.mt-3.mb-5 {
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        flex-grow: 0 !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 16px !important;
       }
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card,
