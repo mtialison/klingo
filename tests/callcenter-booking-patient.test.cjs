@@ -83,6 +83,51 @@ test('campos digitáveis do paciente usam a tipografia medida no fluxo Primeira 
   assert.doesNotMatch(source, /\.tm-paciente-observacao-textarea \{[^}]*font-size: 13\.125px/s);
 });
 
+test('título Dados Pessoais replica a estrutura do outro fluxo sem duplicar', () => {
+  const children = [];
+  const createElement = (tag) => ({ tag, children: [], appendChild(node) { this.children.push(node); },
+    append(...nodes) { this.children.push(...nodes); } });
+  const dados = {
+    firstChild: null,
+    querySelector: () => children.find((node) => node.className?.includes('tm-paciente-dados-heading')),
+    insertBefore(node) { children.unshift(node); }
+  };
+  const ensure = sourceFunction('ensurePersonalDataHeader', 'renamePatientName', {
+    document: { createElement }
+  });
+  ensure(dados);
+  ensure(dados);
+  assert.equal(children.length, 1);
+  assert.match(children[0].className, /border-bottom mb-1 d-flex justify-content-between hover-title-bg text-primary/);
+  assert.equal(children[0].children[0].children[0].textContent, 'Dados Pessoais');
+  assert.match(source, /\.tm-paciente-dados-grid > \.tm-paciente-dados-heading \{\s*grid-column: 1 \/ -1 !important;\s*grid-row: 1 !important;/);
+});
+
+test('rótulo Nome é visualmente renomeado sem confundir o fluxo Primeira Vez', () => {
+  const label = { textContent: 'Nome do Paciente' };
+  const rename = sourceFunction('renamePatientName', 'moveOrigem', {
+    norm: (value) => String(value || '').trim()
+  });
+  rename({ querySelectorAll: () => [label] });
+  assert.equal(label.textContent, 'Nome');
+  assert.match(source, /baseline\.nameLabel\.element\.textContent = baseline\.nameLabel\.text/);
+  const firstVisitSource = fs.readFileSync(path.join(__dirname, '..', 'src', '03-modal-agendamento-primeira-vez.js'), 'utf8');
+  assert.match(firstVisitSource, /if \(modal\.classList\.contains\('tm-paciente-layout'\)\) return false;/);
+});
+
+test('Nome só identifica paciente existente quando o modal já está marcado como Paciente', () => {
+  const isPaciente = sourceFunction('isPacienteModal', 'addField', {
+    fieldByLabel(_modal, label) { return label === 'Nome do Paciente' ? null : {}; }
+  });
+  const modal = {
+    id: 'cadastroModal', innerText: '',
+    classList: { contains: (value) => value === 'tm-paciente-layout' }
+  };
+  assert.equal(isPaciente(modal), true);
+  modal.classList.contains = () => false;
+  assert.equal(isPaciente(modal), false);
+});
+
 test('título azul de origem é encontrado sem depender de maiúsculas', () => {
   let hidden = false;
   const title = {

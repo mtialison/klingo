@@ -646,6 +646,7 @@ const tmBookingModalWatch = (() => {
 
   function tmCadIsPrimeiraVez(modal) {
     if (!modal || modal.id !== 'cadastroModal') return false;
+    if (modal.classList.contains('tm-paciente-layout')) return false;
 
     const title = tmCadNorm(modal.querySelector('.modal-title')?.innerText || modal.querySelector('.modal-title')?.textContent || '');
 

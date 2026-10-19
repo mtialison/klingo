@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.20
+// @version      1.21
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -2997,6 +2997,7 @@ const tmBookingModalWatch = (() => {
 
   function tmCadIsPrimeiraVez(modal) {
     if (!modal || modal.id !== 'cadastroModal') return false;
+    if (modal.classList.contains('tm-paciente-layout')) return false;
 
     const title = tmCadNorm(modal.querySelector('.modal-title')?.innerText || modal.querySelector('.modal-title')?.textContent || '');
 
@@ -4021,6 +4022,12 @@ const tmBookingModalWatch = (() => {
         display: contents !important;
       }
 
+      #cadastroModal.tm-paciente-layout .tm-paciente-dados-grid > .tm-paciente-dados-heading {
+        grid-column: 1 / -1 !important;
+        grid-row: 1 !important;
+        width: 100% !important;
+      }
+
       #cadastroModal.tm-paciente-layout .tm-paciente-field {
         flex: initial !important;
         max-width: none !important;
@@ -4085,22 +4092,22 @@ const tmBookingModalWatch = (() => {
 
       #cadastroModal.tm-paciente-layout .tm-paciente-nome {
         grid-column: 1 / 3 !important;
-        grid-row: 1 !important;
+        grid-row: 2 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento {
         grid-column: 3 !important;
-        grid-row: 1 !important;
+        grid-row: 2 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-cpf {
         grid-column: 4 !important;
-        grid-row: 4 !important;
+        grid-row: 5 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-celular {
         grid-column: 1 !important;
-        grid-row: 2 !important;
+        grid-row: 3 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-telefone {
@@ -4135,7 +4142,7 @@ const tmBookingModalWatch = (() => {
 
       #cadastroModal.tm-paciente-layout .tm-paciente-email {
         grid-column: 2 / 5 !important;
-        grid-row: 2 !important;
+        grid-row: 3 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-warning-host {
@@ -4175,22 +4182,22 @@ const tmBookingModalWatch = (() => {
 
       #cadastroModal.tm-paciente-layout .tm-paciente-sexo {
         grid-column: 4 !important;
-        grid-row: 1 !important;
+        grid-row: 2 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-carteira {
         grid-column: 1 / 3 !important;
-        grid-row: 3 !important;
+        grid-row: 4 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-validade {
         grid-column: 3 !important;
-        grid-row: 3 !important;
+        grid-row: 4 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-origem {
         grid-column: 4 !important;
-        grid-row: 3 !important;
+        grid-row: 4 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-origem .input-group {
@@ -4455,7 +4462,7 @@ const tmBookingModalWatch = (() => {
 
   function patientFieldProblems(modal) {
     const definitions = [
-      ['nome', 'Nome do Paciente', 'input:not([type="hidden"])', true],
+      ['nome', 'Nome do Paciente|Nome', 'input:not([type="hidden"])', true],
       ['nascimento', 'Data de Nascimento', 'input:not([type="hidden"])', true],
       ['sexo', 'Sexo', 'select', true],
       ['celular', 'Celular', 'input:not([type="hidden"])', true],
@@ -4549,11 +4556,13 @@ const tmBookingModalWatch = (() => {
     const text = modal.innerText || modal.textContent || '';
     const hasEditar = /Editar Marcação|Reenviar e-mail da marcação/i.test(text);
     const hasRemarcacao = /Remarcação de/i.test(text);
+    const hasPatientName = fieldByLabel(modal, 'Nome do Paciente') ||
+      (modal.classList.contains('tm-paciente-layout') && fieldByLabel(modal, 'Nome'));
 
     if (hasEditar || hasRemarcacao) return false;
 
     return (
-      !!fieldByLabel(modal, 'Nome do Paciente') &&
+      !!hasPatientName &&
       !!fieldByLabel(modal, 'Data de Nascimento') &&
       !!fieldByLabel(modal, 'Celular') &&
       !!fieldByLabel(modal, 'e-mail') &&
@@ -4574,9 +4583,27 @@ const tmBookingModalWatch = (() => {
   }
 
   function findDadosContainer(modal) {
-    const nome = fieldByLabel(modal, 'Nome do Paciente');
+    const nome = fieldByLabel(modal, 'Nome do Paciente|Nome');
     const mt3 = nome?.closest('.mt-3');
     return mt3 || nome?.parentElement?.parentElement || null;
+  }
+
+  function ensurePersonalDataHeader(dados) {
+    if (dados.querySelector(':scope > .tm-paciente-dados-heading')) return;
+    const header = document.createElement('div');
+    header.className = 'border-bottom mb-1 d-flex justify-content-between hover-title-bg text-primary tm-paciente-dados-heading';
+    const title = document.createElement('div');
+    const small = document.createElement('small');
+    small.textContent = 'Dados Pessoais';
+    title.appendChild(small);
+    header.append(title, document.createElement('div'));
+    dados.insertBefore(header, dados.firstChild);
+  }
+
+  function renamePatientName(field) {
+    const label = Array.from(field?.querySelectorAll('small.form-text.text-muted') || [])
+      .find((small) => norm(small.textContent) === 'Nome do Paciente');
+    if (label) label.textContent = 'Nome';
   }
 
   function moveOrigem(modal, dados) {
@@ -4988,9 +5015,11 @@ const tmBookingModalWatch = (() => {
 
     if (!modalBaselines.has(modal)) {
       const origemField = fieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
+      const nameLabel = fieldByLabel(modal, 'Nome do Paciente')?.querySelector('small.form-text.text-muted');
       modalBaselines.set(modal, {
         attributes: tmCaptureAttributes(modal),
         headers: tmCaptureHeaderContents(modal),
+        nameLabel: nameLabel ? { element: nameLabel, text: nameLabel.textContent } : null,
         origem: origemField ? {
           element: origemField,
           parent: origemField.parentNode,
@@ -5007,8 +5036,9 @@ const tmBookingModalWatch = (() => {
     if (!dados) return;
 
     dados.classList.add('tm-paciente-dados-grid');
+    ensurePersonalDataHeader(dados);
 
-    const nome = fieldByLabel(modal, 'Nome do Paciente');
+    const nome = fieldByLabel(modal, 'Nome do Paciente|Nome');
     const nascimento = fieldByLabel(modal, 'Data de Nascimento');
     const cpf = fieldByLabel(modal, 'CPF');
     const celular = fieldByLabel(modal, 'Celular');
@@ -5020,6 +5050,7 @@ const tmBookingModalWatch = (() => {
     const nomeSocial = fieldByLabel(modal, 'Nome Social');
 
     addField(nome, 'tm-paciente-nome');
+    renamePatientName(nome);
     addField(nascimento, 'tm-paciente-nascimento');
     addField(cpf, 'tm-paciente-cpf');
     addField(celular, 'tm-paciente-celular');
@@ -5069,6 +5100,10 @@ const tmBookingModalWatch = (() => {
     modal.querySelectorAll('.tm-paciente-warning-host').forEach((node) => node.classList.remove('tm-paciente-warning-host'));
     modal.querySelectorAll('.tm-paciente-warning-control').forEach((node) => node.classList.remove('tm-paciente-warning-control'));
     delete modal.dataset.tmPacienteValidationAttempted;
+    modal.querySelectorAll('.tm-paciente-dados-heading').forEach((node) => node.remove());
+    if (baseline.nameLabel?.element.isConnected) {
+      baseline.nameLabel.element.textContent = baseline.nameLabel.text;
+    }
 
     const { origem } = baseline;
     if (origem?.element.isConnected && origem.parent.isConnected) {
