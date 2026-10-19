@@ -986,9 +986,10 @@ function setDateCalculatorOpen(isOpen) {
     trigger.setAttribute('data-tm-datecalc-header-trigger', '1');
     trigger.setAttribute('title', 'Calculadora de datas');
     trigger.setAttribute('aria-label', 'Calculadora de datas');
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-calculator tm-datecalc-trigger-icon';
+    const icon = document.createElement('span');
+    icon.className = 'tm-datecalc-trigger-icon';
     icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '🧮';
     trigger.appendChild(icon);
 
     triggerLi.appendChild(trigger);
