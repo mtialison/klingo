@@ -139,6 +139,7 @@ const tmBookingModalWatch = (() => {
         max-width: 200px !important;
       }
 
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-celular .input-group-prepend,
       #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-celular .tm-cad-phone-country-hidden {
         display: none !important;
       }
@@ -336,7 +337,7 @@ const tmBookingModalWatch = (() => {
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card * {
         font-family: inherit !important;
         font-size: 11.2px !important;
-        font-weight: 600 !important;
+        font-weight: 500 !important;
         font-style: normal !important;
         line-height: 1.4 !important;
         letter-spacing: normal !important;
@@ -679,15 +680,12 @@ const tmBookingModalWatch = (() => {
   }
 
   function tmCadHidePhoneCountry(field) {
-    const input = field?.querySelector('input[type="tel"], input:not([type="hidden"])');
-    const group = input?.closest('.input-group');
-    if (!group) return;
-    for (const child of group.children) {
-      if (child === input || child.contains(input)) continue;
-      if (!/^BR\b/i.test(tmCadNorm(child.textContent))) continue;
-      if (child.matches('button, select') || child.querySelector('button, select')) {
-        child.classList.add('tm-cad-phone-country-hidden');
-      }
+    if (!field) return;
+    for (const control of field.querySelectorAll('button, select')) {
+      if (!/^BR\b/i.test(tmCadNorm(control.textContent))) continue;
+      const wrapper = control.closest('.input-group-prepend, .btn-group, .dropdown');
+      (wrapper && field.contains(wrapper) ? wrapper : control)
+        .classList.add('tm-cad-phone-country-hidden');
     }
   }
 

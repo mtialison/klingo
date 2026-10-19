@@ -180,19 +180,17 @@ test('o nono dígito não apaga uma data de nascimento já completa', () => {
 
 test('oculta apenas o seletor BR do celular, preservando o campo de número', () => {
   const classes = [];
-  const input = {};
-  const country = {
-    textContent: 'BR', contains: () => false,
-    matches: () => false, querySelector: () => ({}),
-    classList: { add: (name) => classes.push(name) }
+  const wrapper = { classList: { add: (name) => classes.push(name) } };
+  const country = { textContent: 'BR', closest: () => wrapper };
+  const field = {
+    querySelectorAll: () => [country],
+    contains: (element) => element === wrapper
   };
-  const group = { children: [country, input] };
-  input.closest = () => group;
-  const field = { querySelector: () => input };
   const hide = sourceFunction('tmCadHidePhoneCountry', 'tmCadPlaceOrigemInDados', {
     tmCadNorm: (value) => String(value || '').trim()
   });
   hide(field);
   assert.deepEqual(classes, ['tm-cad-phone-country-hidden']);
+  assert.match(source, /\.tm-cad-order-celular \.input-group-prepend,/);
   assert.match(source, /\.tm-cad-order-celular \.tm-cad-phone-country-hidden \{\s*display: none !important;/);
 });
