@@ -66,6 +66,13 @@
         min-width: 0 !important;
       }
 
+      #cadastroModal.tm-paciente-layout .tm-paciente-dados-grid .tm-paciente-field .form-control {
+        font-family: "Open Sans", "Helvetica Neue", sans-serif !important;
+        font-size: 13.125px !important;
+        font-weight: 400 !important;
+        color: #495057 !important;
+      }
+
       #cadastroModal.tm-paciente-layout .tm-paciente-field .input-group {
         display: flex !important;
         flex-wrap: nowrap !important;

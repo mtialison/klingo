@@ -78,6 +78,11 @@ test('telefone fica oculto sem apagar o valor e e-mail ocupa o espaço livre', (
   assert.doesNotMatch(source, /telefone\.value\s*=/);
 });
 
+test('campos digitáveis do paciente usam a tipografia medida no fluxo Primeira Vez', () => {
+  assert.match(source, /\.tm-paciente-dados-grid \.tm-paciente-field \.form-control \{\s*font-family: "Open Sans", "Helvetica Neue", sans-serif !important;\s*font-size: 13\.125px !important;\s*font-weight: 400 !important;\s*color: #495057 !important;/);
+  assert.doesNotMatch(source, /\.tm-paciente-observacao-textarea \{[^}]*font-size: 13\.125px/s);
+});
+
 test('título azul de origem é encontrado sem depender de maiúsculas', () => {
   let hidden = false;
   const title = {
