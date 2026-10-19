@@ -173,6 +173,11 @@ test('o nono dígito não apaga uma data de nascimento já completa', () => {
   handlers.keydown({ key: '9', preventDefault });
   handlers.beforeinput({ data: '9', preventDefault });
   assert.equal(prevented, 2);
+  for (const partialYear of ['0001-12-07', '0019-12-07', '0199-12-07']) {
+    input.value = partialYear;
+    handlers.keydown({ key: '9', preventDefault });
+    assert.equal(prevented, 2, `ano parcial ${partialYear} deve aceitar o próximo dígito`);
+  }
   input.value = '';
   handlers.keydown({ key: '0', preventDefault });
   assert.equal(prevented, 2);

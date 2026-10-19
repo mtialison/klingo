@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.46
+// @version      26.47
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
@@ -2688,7 +2688,7 @@ const tmBookingModalWatch = (() => {
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card * {
         font-family: inherit !important;
         font-size: 11.2px !important;
-        font-weight: 500 !important;
+        font-weight: 600 !important;
         font-style: normal !important;
         line-height: 1.4 !important;
         letter-spacing: normal !important;
@@ -3341,7 +3341,12 @@ const tmBookingModalWatch = (() => {
     const input = field?.querySelector('input[type="date"]');
     if (!input || input.dataset.tmBirthDateDigitGuard === '1') return;
     input.dataset.tmBirthDateDigitGuard = '1';
-    const isComplete = () => /^\d{4}-\d{2}-\d{2}$/.test(input.value);
+    // O input date nativo preenche o ano como 0001, 0019, 0199 antes de 1999.
+    // Esses estados intermediários não são uma data terminada pelo usuário.
+    const isComplete = () => {
+      const match = /^(\d{4})-\d{2}-\d{2}$/.exec(input.value);
+      return !!match && Number(match[1]) >= 1000;
+    };
     input.addEventListener('keydown', (event) => {
       if (!event.ctrlKey && !event.metaKey && !event.altKey && /^\d$/.test(event.key) && isComplete()) {
         event.preventDefault();
