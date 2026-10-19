@@ -351,6 +351,10 @@ const tmBookingModalWatch = (() => {
         margin-bottom: 6px !important;
       }
 
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-procedure-emoji {
+        margin-right: 5px !important;
+      }
+
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-ocupar {
         position: absolute !important;
         right: 12px !important;
@@ -1134,11 +1138,23 @@ const tmBookingModalWatch = (() => {
     dateBlock.dataset.tmHeaderDateNormalized = '1';
   }
 
+  function tmCadAddProcedureEmoji(title) {
+    if (!title || title.querySelector(':scope > .tm-cad-header-procedure-emoji')) return;
+    const icon = document.createElement('span');
+    icon.className = 'tm-cad-header-procedure-emoji';
+    icon.textContent = '🩺';
+    icon.setAttribute('aria-hidden', 'true');
+    title.prepend(icon);
+  }
+
   function tmCadEmojifyHeaderIcon(container, selector, emoji) {
     const icon = container?.querySelector(selector);
     if (!icon) return;
     icon.classList.add('tm-cad-native-icon-hidden');
-    if (icon.previousElementSibling?.classList.contains('tm-cad-header-emoji')) return;
+    if (icon.previousElementSibling?.classList.contains('tm-cad-header-emoji')) {
+      icon.previousElementSibling.textContent = emoji;
+      return;
+    }
 
     const replacement = document.createElement('span');
     replacement.className = 'tm-cad-header-emoji';
@@ -1148,7 +1164,7 @@ const tmBookingModalWatch = (() => {
   }
 
   function tmCadDecorateHeader(profissional, convenio, unidade, dateBlock) {
-    tmCadEmojifyHeaderIcon(profissional, '.fa-user-md', '🩺');
+    tmCadEmojifyHeaderIcon(profissional, '.fa-user-md', '👨‍⚕️');
     tmCadEmojifyHeaderIcon(convenio, '.fa-credit-card', '💳');
     tmCadEmojifyHeaderIcon(unidade, '.fa-building', '🏥');
 
@@ -1268,6 +1284,7 @@ const tmBookingModalWatch = (() => {
         item.classList.add('tm-cad-header-card');
         tmCadPositionOcuparButton(item);
         title.classList.add('tm-cad-header-title');
+        tmCadAddProcedureEmoji(title);
         infoWrap.classList.add('tm-cad-header-info-wrap');
         left.classList.add('tm-cad-header-left');
 

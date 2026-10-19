@@ -12,6 +12,23 @@ function sourceFunction(name, nextName, context = {}) {
   return vm.runInNewContext(`${source.slice(start, end)}\n${name}`, context);
 }
 
+test('procedimento recebe 🩺 uma única vez em cada cabeçalho', () => {
+  const inserted = [];
+  let emoji = null;
+  const title = {
+    querySelector: () => emoji,
+    prepend: (node) => { emoji = node; inserted.push(node); }
+  };
+  const add = sourceFunction('tmCadAddProcedureEmoji', 'tmCadEmojifyHeaderIcon', {
+    document: { createElement: () => ({ setAttribute() {} }) }
+  });
+  add(title);
+  add(title);
+  assert.equal(inserted.length, 1);
+  assert.equal(emoji.textContent, '🩺');
+  assert.match(source, /tmCadAddProcedureEmoji\(title\)/);
+});
+
 test('emojis substituem ícones sem duplicar em reaplicações', () => {
   const inserted = [];
   const icon = {
@@ -49,7 +66,7 @@ test('cada cabeçalho ganha linhas distintas para data e horário', () => {
   decorate({}, {}, {}, dateBlock);
   assert.equal(dateClasses.includes('tm-cad-header-date-line'), true);
   assert.equal(timeClasses.includes('tm-cad-header-time-line'), true);
-  assert.deepEqual(calls.slice(0, 5).map(([, emoji]) => emoji), ['🩺', '💳', '🏥', '📅', '🕒']);
+  assert.deepEqual(calls.slice(0, 5).map(([, emoji]) => emoji), ['👨‍⚕️', '💳', '🏥', '📅', '🕒']);
   assert.match(source, /headerItems\.forEach\(\(item\) => \{/);
   assert.match(source, /tmCadDecorateHeader\(profissional, convenio, unidade, dateBlock\)/);
 });
