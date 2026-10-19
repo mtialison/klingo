@@ -220,6 +220,7 @@ test('nascimento textual sincroniza a data real do Klingo e preserva o calendár
   handlers.input();
   assert.equal(native.value, '');
   assert.equal(text.validationMessage, 'Data de nascimento inválida.');
+  assert.match(source, /\.tm-cad-order-nascimento \.input-group > input\.tm-cad-birth-date-picker \{[\s\S]*?flex: 0 0 34px !important;[\s\S]*?height: 29px !important;/);
   assert.match(source, /tm-cad-birth-date-picker::-webkit-calendar-picker-indicator/);
 });
 

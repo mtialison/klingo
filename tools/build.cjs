@@ -26,7 +26,7 @@ if (main.includes('__TM_')) throw new Error('Restou um recurso não resolvido.')
 const test = main
   .replace(/^\/\/ @name\s+.*$/m, '// @name         klingo (testes)')
   .replace(/^\/\/ @namespace\s+.*$/m, '// @namespace    http://tampermonkey.net/klingo-testes')
-  .replace(/^\/\/ @version\s+.*$/m, '// @version      1.13')
+  .replace(/^\/\/ @version\s+.*$/m, '// @version      1.14')
   .replace(/^\/\/ @description\s+.*$/m, '// @description  🐒')
   .replace(/^\/\/ @updateURL\s+.*$/m,
     '// @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js')

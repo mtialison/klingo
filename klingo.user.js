@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.51
+// @version      26.52
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
@@ -2490,20 +2490,21 @@ const tmBookingModalWatch = (() => {
         max-width: 200px !important;
       }
 
-      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-nascimento .tm-cad-birth-date-text {
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-nascimento .input-group > input.tm-cad-birth-date-text {
         flex: 1 1 auto !important;
         width: 0 !important;
         min-width: 0 !important;
       }
 
-      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-nascimento .tm-cad-birth-date-picker {
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-nascimento .input-group > input.tm-cad-birth-date-picker {
         flex: 0 0 34px !important;
         width: 34px !important;
         min-width: 34px !important;
         max-width: 34px !important;
+        height: 29px !important;
         padding: 0 5px !important;
         color: transparent !important;
-        font-size: 0 !important;
+        font-size: 11.2px !important;
       }
 
       #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-nascimento .tm-cad-birth-date-picker::-webkit-calendar-picker-indicator {
