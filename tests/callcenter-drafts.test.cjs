@@ -9,6 +9,11 @@ const start = script.indexOf("  const DOCK_ID = 'tm-callcenter-drafts';");
 const end = script.indexOf("  tmRuntime.register('rascunhos de agendamento do Call Center'", start);
 assert.ok(start >= 0 && end > start);
 
+test('botão Em espera é atualizado em todas as páginas, não só no Call Center', () => {
+  assert.match(script.slice(end, end + 150),
+    /tmRuntime\.register\('rascunhos de agendamento do Call Center', ensureDrafts\);/);
+});
+
 function setup() {
   const eventHandlers = {};
   const windowHandlers = {};

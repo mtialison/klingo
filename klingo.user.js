@@ -5348,7 +5348,8 @@ const tmBookingModalWatch = (() => {
     }
   });
 
-  tmRuntime.register('rascunhos de agendamento do Call Center', ensureDrafts, ['#/call-center']);
+  // O botão mora no cabeçalho global; somente salvar/retomar exige o Call Center.
+  tmRuntime.register('rascunhos de agendamento do Call Center', ensureDrafts);
 })();
 
 /* =========================
