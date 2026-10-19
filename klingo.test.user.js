@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.12
+// @version      1.13
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -2490,6 +2490,28 @@ const tmBookingModalWatch = (() => {
         max-width: 200px !important;
       }
 
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-nascimento .tm-cad-birth-date-text {
+        flex: 1 1 auto !important;
+        width: 0 !important;
+        min-width: 0 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-nascimento .tm-cad-birth-date-picker {
+        flex: 0 0 34px !important;
+        width: 34px !important;
+        min-width: 34px !important;
+        max-width: 34px !important;
+        padding: 0 5px !important;
+        color: transparent !important;
+        font-size: 0 !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-nascimento .tm-cad-birth-date-picker::-webkit-calendar-picker-indicator {
+        opacity: 1 !important;
+        margin: 0 !important;
+        cursor: pointer !important;
+      }
+
       #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-celular .input-group-prepend,
       #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-celular .tm-cad-phone-country-hidden {
         display: none !important;
@@ -2913,7 +2935,7 @@ const tmBookingModalWatch = (() => {
   function tmCadRequiredProblems(modal) {
     const labels = [
       ['nome', 'Nome', 'input'],
-      ['nascimento', 'Data de Nascimento', 'input[type="date"], input'],
+      ['nascimento', 'Data de Nascimento', 'input.tm-cad-birth-date-text, input[type="date"]'],
       ['cpf', 'CPF', 'input'],
       ['celular', 'Celular', 'input[type="tel"], input:not([type="hidden"])'],
       ['origem', 'Origem de Pacientes|Origem do Agendamento', 'select'],
@@ -3350,36 +3372,76 @@ const tmBookingModalWatch = (() => {
     }, true);
   }
 
-  function tmCadProtectBirthDate(field) {
-    const input = field?.querySelector('input[type="date"]');
-    if (!input || input.dataset.tmBirthDateDigitGuard === '1') return;
-    input.dataset.tmBirthDateDigitGuard = '1';
-    let yearDigits = 0;
-    const reset = () => { yearDigits = 0; };
-    input.addEventListener('pointerdown', reset, true);
-    input.addEventListener('focus', reset, true);
-    input.addEventListener('keydown', (event) => {
-      if (!/^\d$/.test(event.key) || event.ctrlKey || event.metaKey || event.altKey) {
-        if (/^(?:Arrow|Backspace|Delete|Tab)/.test(event.key)) reset();
-        return;
-      }
-      // O navegador representa os primeiros dígitos do ano como 0001, 0019,
-      // 0199. Só a quinta tecla na mesma sequência do ano deve ser bloqueada.
-      if (yearDigits >= 4 && /^(?:[1-9]\d{3})-\d{2}-\d{2}$/.test(input.value)) {
-        event.preventDefault();
-      }
-    }, true);
-    input.addEventListener('input', () => {
-      const year = /^(\d{4})-\d{2}-\d{2}$/.exec(input.value)?.[1];
-      if (year && Number(year) < 1000) yearDigits = Math.min(4, yearDigits + 1);
-      else if (yearDigits > 0 && year) yearDigits = 4;
-    }, true);
+  function tmCadBirthDateText(iso) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    return match ? `${match[3]}/${match[2]}/${match[1]}` : '';
+  }
+
+  function tmCadBirthDateMask(raw) {
+    const digits = String(raw || '').replace(/\D/g, '').slice(0, 8);
+    return [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('/');
+  }
+
+  function tmCadEnableBirthDateText(field) {
+    const native = field?.querySelector('input[type="date"]');
+    const group = native?.parentElement;
+    if (!native || !group) return;
+    let text = group.querySelector('input.tm-cad-birth-date-text');
+    if (!text) {
+      text = document.createElement('input');
+      text.type = 'text';
+      text.className = 'form form-control tm-cad-birth-date-text';
+      text.placeholder = 'dd/mm/aaaa';
+      text.inputMode = 'numeric';
+      text.autocomplete = 'bday';
+      text.maxLength = 10;
+      text.setAttribute('aria-label', 'Data de Nascimento');
+      native.before(text);
+      native.classList.add('tm-cad-birth-date-picker');
+      native.setAttribute('tabindex', '-1');
+
+      text.addEventListener('input', () => {
+        const digitsBeforeCaret = text.value.slice(0, text.selectionStart ?? text.value.length).replace(/\D/g, '').length;
+        const masked = tmCadBirthDateMask(text.value);
+        if (text.value !== masked) {
+          text.value = masked;
+          let cursor = 0;
+          let digitsSeen = 0;
+          while (cursor < masked.length && digitsSeen < digitsBeforeCaret) {
+            if (/\d/.test(masked[cursor])) digitsSeen += 1;
+            cursor += 1;
+          }
+          text.setSelectionRange(cursor, cursor);
+        }
+        const iso = tmCadParseClipboardDate(masked);
+        text.setCustomValidity(masked && !iso ? 'Data de nascimento inválida.' : '');
+        if (native.value === iso) return;
+        native.value = iso;
+        native.dispatchEvent(new Event('input', { bubbles: true }));
+        native.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
+    if (native.dataset.tmBirthDateTextSync !== '1') {
+      native.dataset.tmBirthDateTextSync = '1';
+      const sync = () => {
+        const currentText = group.querySelector('input.tm-cad-birth-date-text');
+        if (currentText && document.activeElement !== currentText) {
+          currentText.value = tmCadBirthDateText(native.value);
+          currentText.setCustomValidity('');
+        }
+      };
+      native.addEventListener('input', sync);
+      native.addEventListener('change', sync);
+    }
+    if (document.activeElement !== text) {
+      text.value = tmCadBirthDateText(native.value);
+      text.setCustomValidity('');
+    }
   }
 
   function tmCadEnableDatePastes(modal) {
     const nascimento = tmCadFieldByLabel(modal, 'Data de Nascimento');
-    tmCadEnableDatePaste(nascimento);
-    tmCadProtectBirthDate(nascimento);
+    tmCadEnableBirthDateText(nascimento);
     tmCadEnableDatePaste(tmCadFieldByLabel(modal, 'Validade da Carteira'));
   }
 
@@ -3745,7 +3807,7 @@ const tmBookingModalWatch = (() => {
     const baseline = modalBaselines.get(modal);
     if (!baseline) return;
 
-    modal.querySelectorAll('.tm-cad-header-emoji, .tm-cad-header-convenio-injetado, textarea.tm-cad-observacao-textarea')
+    modal.querySelectorAll('.tm-cad-header-emoji, .tm-cad-header-convenio-injetado, textarea.tm-cad-observacao-textarea, input.tm-cad-birth-date-text')
       .forEach((node) => node.remove());
 
     const { origem, cpfInput, cpfRequired, cpfAriaRequired, emailInput, emailRequired } = baseline;
