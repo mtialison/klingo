@@ -158,70 +158,39 @@ test('layout oculta e-mail, move origem e desenha indicadores em todos os campos
   assert.match(source, /\.tm-cad-order-nascimento, \.tm-cad-order-cpf/);
 });
 
-test('máscara de nascimento aceita oito dígitos e deixa corrigir dia, mês e ano', () => {
-  const mask = sourceFunction('tmCadBirthDateMask', 'tmCadEnableBirthDateText');
-  const display = sourceFunction('tmCadBirthDateText', 'tmCadBirthDateMask');
-  assert.equal(mask('0'), '0');
-  assert.equal(mask('0712'), '07/12');
-  assert.equal(mask('07121999'), '07/12/1999');
-  assert.equal(mask('071219999'), '07/12/1999');
-  assert.equal(mask('08/12/1999'), '08/12/1999');
-  assert.equal(mask('08/12/2000'), '08/12/2000');
-  assert.equal(display('1999-12-07'), '07/12/1999');
-  assert.equal(display(''), '');
-  assert.match(source, /native\.dispatchEvent\(new Event\('input', \{ bubbles: true \}\)\)/);
-  assert.match(source, /native\.dispatchEvent\(new Event\('change', \{ bubbles: true \}\)\)/);
+test('nascimento mantém somente o input date nativo, e cabeçalho usa 13px', () => {
+  assert.doesNotMatch(source, /tm-cad-birth-date-text|tm-cad-birth-date-picker/);
+  assert.match(source, /\['nascimento', 'Data de Nascimento', 'input\[type="date"\]'\]/);
+  assert.match(source, /\.tm-cad-header-card \* \{[\s\S]*?font-size: 13px !important;/);
+  assert.match(source, /\.tm-cad-header-sala \{\s*font-size: 13px !important;/);
 });
 
-test('nascimento textual sincroniza a data real do Klingo e preserva o calendário', () => {
+test('ano nativo pode ser reescrito sem apagar dia e mês; setas voltam a outros segmentos', () => {
   const handlers = {};
   const emitted = [];
-  const text = {
-    value: '', selectionStart: 0,
-    setAttribute() {}, setSelectionRange() {},
-    setCustomValidity(value) { this.validationMessage = value; },
-    addEventListener(type, fn) { handlers[type] = fn; }
-  };
-  const group = { querySelector: () => group.text || null };
-  const native = {
-    value: '', dataset: {}, parentElement: group,
-    classList: { add() {} }, setAttribute() {},
-    before(input) { group.text = input; },
-    addEventListener() {},
+  const input = {
+    value: '', dataset: {},
+    addEventListener(type, fn) { handlers[type] = fn; },
     dispatchEvent(event) { emitted.push(event.type); }
   };
-  const field = { querySelector: () => native };
-  const document = { activeElement: null, createElement: () => text };
-  const enable = sourceFunction('tmCadEnableBirthDateText', 'tmCadEnableDatePastes', {
-    document, Event,
-    tmCadBirthDateText: sourceFunction('tmCadBirthDateText', 'tmCadBirthDateMask'),
-    tmCadBirthDateMask: sourceFunction('tmCadBirthDateMask', 'tmCadEnableBirthDateText'),
-    tmCadParseClipboardDate: (value) => ({
-      '07/12/1999': '1999-12-07',
-      '08/12/1999': '1999-12-08'
-    })[value] || ''
-  });
-  enable(field);
-  document.activeElement = text;
-  text.value = '07121999';
-  text.selectionStart = 8;
-  handlers.input();
-  assert.equal(text.value, '07/12/1999');
-  assert.equal(native.value, '1999-12-07');
-  assert.deepEqual(emitted, ['input', 'change']);
+  const protect = sourceFunction('tmCadProtectBirthDate', 'tmCadEnableDatePastes', { Event });
+  protect({ querySelector: () => input });
+  for (const year of ['0001', '0019', '0199', '1999']) {
+    input.value = `${year}-12-07`;
+    handlers.input();
+  }
+  let prevented = false;
+  handlers.keydown({ key: '2', preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(input.value, '0002-12-07');
+  for (const key of ['0', '0', '0']) handlers.keydown({ key, preventDefault() {} });
+  assert.equal(input.value, '2000-12-07');
+  assert.deepEqual(emitted, ['input', 'change', 'input', 'change', 'input', 'change', 'input', 'change']);
 
-  text.value = '08/12/1999';
-  text.selectionStart = 2;
-  handlers.input();
-  assert.equal(native.value, '1999-12-08');
-  assert.deepEqual(emitted, ['input', 'change', 'input', 'change']);
-
-  text.value = '31/02/1999';
-  handlers.input();
-  assert.equal(native.value, '');
-  assert.equal(text.validationMessage, 'Data de nascimento inválida.');
-  assert.match(source, /\.tm-cad-order-nascimento \.input-group > input\.tm-cad-birth-date-picker \{[\s\S]*?flex: 0 0 34px !important;[\s\S]*?height: 29px !important;/);
-  assert.match(source, /tm-cad-birth-date-picker::-webkit-calendar-picker-indicator/);
+  handlers.keydown({ key: 'ArrowLeft' });
+  prevented = false;
+  handlers.keydown({ key: '1', preventDefault() { prevented = true; } });
+  assert.equal(prevented, false);
 });
 
 test('oculta apenas o seletor BR do celular, preservando o campo de número', () => {

@@ -73,7 +73,7 @@ test('cada cabeçalho ganha linhas distintas para data e horário', () => {
 
 test('tipografia uniforme vale também para vários procedimentos', () => {
   const style = source.slice(source.indexOf('  function tmCadInjectStyle()'), source.indexOf('  function tmCadVisibleModal()'));
-  assert.match(style, /\.tm-cad-header-card \* \{\s*font-family: inherit !important;\s*font-size: 11\.2px !important;\s*font-weight: 600 !important;/);
+  assert.match(style, /\.tm-cad-header-card \* \{\s*font-family: inherit !important;\s*font-size: 13px !important;\s*font-weight: 600 !important;/);
   assert.doesNotMatch(style, /tm-cad-multiple-headers[^\{]*\{\s*font-size: (?:15|18)px/);
   assert.match(style, /\.tm-cad-header-time-line \{\s*margin-top: 2px !important;/);
   assert.match(style, /\.tm-cad-native-icon-hidden \{\s*display: none !important;/);
