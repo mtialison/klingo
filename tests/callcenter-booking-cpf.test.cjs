@@ -158,29 +158,33 @@ test('layout oculta e-mail, move origem e desenha indicadores em todos os campos
   assert.match(source, /\.tm-cad-order-nascimento, \.tm-cad-order-cpf/);
 });
 
-test('o nono dígito não apaga uma data de nascimento já completa', () => {
+test('trava somente o quinto dígito do ano, sem impedir a correção do dia', () => {
   const handlers = {};
   const input = {
-    value: '1999-12-07', dataset: {},
+    value: '', dataset: {},
     addEventListener: (type, handler) => { handlers[type] = handler; }
   };
-  const guard = sourceFunction('tmCadLimitBirthDateDigits', 'tmCadEnableDatePastes');
+  const guard = sourceFunction('tmCadProtectBirthDate', 'tmCadEnableDatePastes');
   const field = { querySelector: () => input };
   guard(field);
   guard(field);
   let prevented = 0;
-  const preventDefault = () => { prevented += 1; };
-  handlers.keydown({ key: '9', preventDefault });
-  handlers.beforeinput({ data: '9', preventDefault });
-  assert.equal(prevented, 2);
-  for (const partialYear of ['0001-12-07', '0019-12-07', '0199-12-07']) {
-    input.value = partialYear;
-    handlers.keydown({ key: '9', preventDefault });
-    assert.equal(prevented, 2, `ano parcial ${partialYear} deve aceitar o próximo dígito`);
+  const digit = { key: '9', preventDefault: () => { prevented += 1; } };
+  for (const year of ['0001', '0019', '0199', '1999']) {
+    handlers.keydown(digit);
+    input.value = `${year}-12-07`;
+    handlers.input();
+    assert.equal(prevented, 0, `o ano ${year} ainda deve poder ser digitado`);
   }
-  input.value = '';
-  handlers.keydown({ key: '0', preventDefault });
-  assert.equal(prevented, 2);
+  handlers.keydown(digit);
+  assert.equal(prevented, 1);
+
+  handlers.pointerdown();
+  handlers.keydown(digit);
+  assert.equal(prevented, 1, 'clicar no dia permite corrigir a data completa');
+  input.value = '1999-12-08';
+  handlers.input();
+  assert.equal(input.value, '1999-12-08');
 });
 
 test('oculta apenas o seletor BR do celular, preservando o campo de número', () => {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.9
+// @version      1.10
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -3337,30 +3337,36 @@ const tmBookingModalWatch = (() => {
     }, true);
   }
 
-  function tmCadLimitBirthDateDigits(field) {
+  function tmCadProtectBirthDate(field) {
     const input = field?.querySelector('input[type="date"]');
     if (!input || input.dataset.tmBirthDateDigitGuard === '1') return;
     input.dataset.tmBirthDateDigitGuard = '1';
-    // O input date nativo preenche o ano como 0001, 0019, 0199 antes de 1999.
-    // Esses estados intermediários não são uma data terminada pelo usuário.
-    const isComplete = () => {
-      const match = /^(\d{4})-\d{2}-\d{2}$/.exec(input.value);
-      return !!match && Number(match[1]) >= 1000;
-    };
+    let yearDigits = 0;
+    const reset = () => { yearDigits = 0; };
+    input.addEventListener('pointerdown', reset, true);
+    input.addEventListener('focus', reset, true);
     input.addEventListener('keydown', (event) => {
-      if (!event.ctrlKey && !event.metaKey && !event.altKey && /^\d$/.test(event.key) && isComplete()) {
+      if (!/^\d$/.test(event.key) || event.ctrlKey || event.metaKey || event.altKey) {
+        if (/^(?:Arrow|Backspace|Delete|Tab)/.test(event.key)) reset();
+        return;
+      }
+      // O navegador representa os primeiros dígitos do ano como 0001, 0019,
+      // 0199. Só a quinta tecla na mesma sequência do ano deve ser bloqueada.
+      if (yearDigits >= 4 && /^(?:[1-9]\d{3})-\d{2}-\d{2}$/.test(input.value)) {
         event.preventDefault();
       }
     }, true);
-    input.addEventListener('beforeinput', (event) => {
-      if (/^\d$/.test(event.data || '') && isComplete()) event.preventDefault();
+    input.addEventListener('input', () => {
+      const year = /^(\d{4})-\d{2}-\d{2}$/.exec(input.value)?.[1];
+      if (year && Number(year) < 1000) yearDigits = Math.min(4, yearDigits + 1);
+      else if (yearDigits > 0 && year) yearDigits = 4;
     }, true);
   }
 
   function tmCadEnableDatePastes(modal) {
     const nascimento = tmCadFieldByLabel(modal, 'Data de Nascimento');
     tmCadEnableDatePaste(nascimento);
-    tmCadLimitBirthDateDigits(nascimento);
+    tmCadProtectBirthDate(nascimento);
     tmCadEnableDatePaste(tmCadFieldByLabel(modal, 'Validade da Carteira'));
   }
 
