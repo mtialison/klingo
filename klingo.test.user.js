@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.22
+// @version      1.23
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -4122,6 +4122,17 @@ const tmBookingModalWatch = (() => {
         width: 100% !important;
         max-width: 100% !important;
         min-width: 0 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group {
+        margin-top: 0 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group-text {
+        font-family: "Open Sans", "Helvetica Neue", sans-serif !important;
+        font-size: 13.125px !important;
+        font-weight: 400 !important;
+        color: #495057 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group > .form-control,

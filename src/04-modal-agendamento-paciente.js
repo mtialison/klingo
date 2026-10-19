@@ -151,6 +151,17 @@
         min-width: 0 !important;
       }
 
+      #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group {
+        margin-top: 0 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group-text {
+        font-family: "Open Sans", "Helvetica Neue", sans-serif !important;
+        font-size: 13.125px !important;
+        font-weight: 400 !important;
+        color: #495057 !important;
+      }
+
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group > .form-control,
       #cadastroModal.tm-paciente-layout .tm-paciente-validade .input-group > .form-control {
         flex: 1 1 auto !important;
