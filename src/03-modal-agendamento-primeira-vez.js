@@ -342,6 +342,10 @@ const tmBookingModalWatch = (() => {
         margin-bottom: 16px !important;
       }
 
+      #cadastroModal.tm-primeira-vez-layout div.mt-3.mb-5 > br {
+        display: none !important;
+      }
+
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card,
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card * {
         font-family: inherit !important;
