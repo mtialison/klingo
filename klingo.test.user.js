@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.2
+// @version      1.3
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -2807,6 +2807,33 @@ const tmBookingModalWatch = (() => {
         display: none !important;
       }
 
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-warning-host {
+        position: relative !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-required-warning {
+        position: absolute !important;
+        right: 1px;
+        z-index: 3;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        color: #dc3545;
+        background: #f8d7da;
+        border-left: 1px solid #f5c6cb;
+        border-radius: 0 3px 3px 0;
+        font-weight: 700;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-required-warning.tm-cad-warning-visible {
+        display: inline-flex;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-has-warning input {
+        padding-right: 30px !important;
+      }
+
       @media (max-width: 720px) {
         #cadastroModal.tm-primeira-vez-layout #cadTemp {
           grid-template-columns: minmax(0, 1fr) !important;
@@ -2872,6 +2899,43 @@ const tmBookingModalWatch = (() => {
     return true;
   }
 
+  function tmCadPhoneInvalid(input) {
+    const digits = String(input?.value || '').replace(/\D/g, '');
+    if (!digits || input?.validity?.valid === false) return true;
+    return digits.length < 10 || digits.length > 11;
+  }
+
+  function tmCadSetRequiredWarning(field, input, invalid) {
+    if (!field || !input) return;
+    const host = input.parentElement;
+    if (!host) return;
+    host.classList.add('tm-cad-warning-host');
+    let warning = host.querySelector(':scope > .tm-cad-required-warning');
+    if (!warning) {
+      warning = document.createElement('span');
+      warning.className = 'tm-cad-required-warning';
+      warning.textContent = '!';
+      warning.setAttribute('aria-hidden', 'true');
+      host.appendChild(warning);
+    }
+    warning.style.top = `${input.offsetTop + 1}px`;
+    warning.style.height = `${Math.max(0, input.offsetHeight - 2)}px`;
+    warning.classList.toggle('tm-cad-warning-visible', invalid);
+    field.classList.toggle('tm-cad-has-warning', invalid);
+  }
+
+  function tmCadRefreshRequiredWarnings(modal, force = false) {
+    if (!modal || !tmCadIsPrimeiraVez(modal)) return;
+    const cpfField = tmCadFieldByLabel(modal, 'CPF');
+    const phoneField = tmCadFieldByLabel(modal, 'Celular');
+    const cpfInput = cpfField?.querySelector('input');
+    const phoneInput = phoneField?.querySelector('input[type="tel"], input:not([type="hidden"])');
+    tmCadSetRequiredWarning(cpfField, cpfInput,
+      !!cpfInput && (force || cpfInput.dataset.tmCadTouched === '1') && !tmCadIsValidCpf(cpfInput.value));
+    tmCadSetRequiredWarning(phoneField, phoneInput,
+      !!phoneInput && (force || phoneInput.dataset.tmCadTouched === '1') && tmCadPhoneInvalid(phoneInput));
+  }
+
   function tmCadBookingComponent(modal) {
     const firstVisit = document.querySelector('input[placeholder="Operadora/Plano..."]') ||
       Array.from(document.querySelectorAll('a')).find((link) => tmCadNorm(link.textContent) === 'Primeira Vez');
@@ -2886,6 +2950,8 @@ const tmBookingModalWatch = (() => {
 
   function tmCadValidateCpf(modal, event) {
     if (!modal || !tmCadIsPrimeiraVez(modal)) return true;
+    modal.dataset.tmCadValidationAttempted = '1';
+    tmCadRefreshRequiredWarnings(modal, true);
     const input = tmCadFieldByLabel(modal, 'CPF')?.querySelector('input');
     const value = input?.value?.trim() || '';
     const message = !value ? 'O campo CPF é obrigatório.' :
@@ -3574,6 +3640,9 @@ const tmBookingModalWatch = (() => {
       origem.parent.insertBefore(origem.element, next);
     }
     modal.querySelectorAll('.tm-cad-origem-inline-row').forEach((row) => row.remove());
+    modal.querySelectorAll('.tm-cad-required-warning').forEach((warning) => warning.remove());
+    delete modal.dataset.tmCadValidationAttempted;
+    modal.querySelectorAll('[data-tm-cad-touched]').forEach((input) => delete input.dataset.tmCadTouched);
 
     if (cpfInput?.isConnected) {
       cpfInput.required = cpfRequired;
@@ -3672,6 +3741,7 @@ const tmBookingModalWatch = (() => {
     }
     const emailInput = email?.querySelector('input');
     if (emailInput) emailInput.required = false;
+    tmCadRefreshRequiredWarnings(modal, modal.dataset.tmCadValidationAttempted === '1');
 
     tmCadApplyHeaderLayout(modal);
     tmCadMoveObservacaoSelect(modal);
@@ -3712,6 +3782,17 @@ const tmBookingModalWatch = (() => {
       tmCadValidateCpf(modal, event);
     }
   }, true);
+
+  for (const name of ['focusout', 'input', 'change']) {
+    document.addEventListener(name, (event) => {
+      const modal = event.target?.closest?.('#cadastroModal.tm-primeira-vez-layout');
+      if (!modal || !event.target.matches('input')) return;
+      const field = event.target.closest('.tm-cad-order-cpf, .tm-cad-order-celular');
+      if (!field) return;
+      if (name === 'focusout') event.target.dataset.tmCadTouched = '1';
+      tmCadRefreshRequiredWarnings(modal, modal.dataset.tmCadValidationAttempted === '1');
+    }, true);
+  }
 
   // O observador roda na microtarefa em que o modal se torna visível, antes
   // de a fila geral (80 ms) ou o evento "shown" deixarem o layout original pintar.

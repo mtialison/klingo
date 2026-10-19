@@ -27,8 +27,9 @@ test('confirmação é bloqueada quando CPF falta ou é inválido', () => {
     value: '', focused: false,
     focus() { this.focused = true; }
   };
-  const modal = {};
+  const modal = { dataset: {} };
   const notices = [];
+  const warnings = [];
   const event = {
     prevented: false, stopped: false,
     preventDefault() { this.prevented = true; },
@@ -38,6 +39,7 @@ test('confirmação é bloqueada quando CPF falta ou é inválido', () => {
     tmCadIsPrimeiraVez: () => true,
     tmCadFieldByLabel: () => ({ querySelector: () => input }),
     tmCadIsValidCpf: isValidCpf,
+    tmCadRefreshRequiredWarnings: (_modal, force) => warnings.push(force),
     tmCadBookingComponent: () => ({ $toast: { add: (notice) => notices.push(notice) } })
   });
 
@@ -45,6 +47,7 @@ test('confirmação é bloqueada quando CPF falta ou é inválido', () => {
   assert.equal(notices[0].summary, 'Atenção');
   assert.equal(notices[0].detail, 'O campo CPF é obrigatório.');
   assert.equal(input.focused && event.prevented && event.stopped, true);
+  assert.equal(warnings[0], true);
 
   input.value = '111.111.111-11';
   assert.equal(validate(modal, event), false);
@@ -53,6 +56,16 @@ test('confirmação é bloqueada quando CPF falta ou é inválido', () => {
   input.value = '529.982.247-25';
   assert.equal(validate(modal, event), true);
   assert.equal(notices.length, 2);
+});
+
+test('indicador do celular considera ausência, formato curto e validade nativa', () => {
+  const phoneStart = source.indexOf('  function tmCadPhoneInvalid(input) {');
+  const phoneEnd = source.indexOf('  function tmCadSetRequiredWarning(', phoneStart);
+  const phoneInvalid = vm.runInNewContext(`${source.slice(phoneStart, phoneEnd)}\ntmCadPhoneInvalid`);
+  assert.equal(phoneInvalid({ value: '' }), true);
+  assert.equal(phoneInvalid({ value: '(21) 9999-999' }), true);
+  assert.equal(phoneInvalid({ value: '(21) 99999-9999' }), false);
+  assert.equal(phoneInvalid({ value: '(21) 99999-9999', validity: { valid: false } }), true);
 });
 
 test('encontra o serviço de notificações nativo no componente do Call Center', () => {
@@ -75,4 +88,5 @@ test('layout de primeira vez oculta e-mail e coloca a origem no espaço dele', (
   assert.match(source, /\.tm-cad-origem-title-hidden\s*\{\s*display: none !important;/);
   assert.match(source, /\^Confirmar\$/);
   assert.match(source, /cpfInput\.required = false/);
+  assert.match(source, /\.tm-cad-required-warning\.tm-cad-warning-visible/);
 });
