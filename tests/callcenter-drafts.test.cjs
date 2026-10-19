@@ -14,6 +14,10 @@ test('botão Em espera é atualizado em todas as páginas, não só no Call Cent
     /tmRuntime\.register\('rascunhos de agendamento do Call Center', ensureDrafts\);/);
 });
 
+test('mensagem da lista vazia preserva o texto da versão de testes atual', () => {
+  assert.match(script, /empty\.textContent = 'Nenhuma marcação em espera';/);
+});
+
 function setup() {
   const eventHandlers = {};
   const windowHandlers = {};

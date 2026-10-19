@@ -579,7 +579,7 @@
       if (!drafts.length) {
         const empty = document.createElement('div');
         empty.className = 'tm-draft-empty';
-        empty.textContent = 'Nenhuma marcação em espera nesta aba.';
+        empty.textContent = 'Nenhuma marcação em espera';
         panel.appendChild(empty);
       }
       for (const draft of drafts) {
