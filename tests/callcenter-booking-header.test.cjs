@@ -73,5 +73,6 @@ test('botão Ocupar é ancorado no canto inferior direito de cada cartão', () =
   position(item);
   assert.deepEqual(added, ['tm-cad-header-ocupar']);
   assert.match(source, /\.tm-cad-header-card \.tm-cad-header-ocupar \{\s*position: absolute !important;\s*right: 12px !important;\s*bottom: 10px !important;/);
+  assert.doesNotMatch(source, /\.tm-cad-header-card \{\s*position: relative !important;\s*padding-bottom: 40px !important;/);
   assert.match(source, /headerItems\.forEach\(\(item\) => \{[\s\S]*?tmCadPositionOcuparButton\(item\)/);
 });

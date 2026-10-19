@@ -35,6 +35,7 @@ test('celular vazio, curto ou rejeitado pela validação nativa é inválido', (
 test('identifica todos os campos obrigatórios ausentes ou malformados', () => {
   const controls = {
     Nome: { value: '', tagName: 'INPUT' },
+    'Data de Nascimento': { value: '', tagName: 'INPUT' },
     CPF: { value: '', tagName: 'INPUT' },
     Celular: { value: '', tagName: 'INPUT' },
     'Origem de Pacientes|Origem do Agendamento': { value: '', tagName: 'SELECT' },
@@ -47,10 +48,11 @@ test('identifica todos os campos obrigatórios ausentes ou malformados', () => {
     tmCadPhoneInvalid: phoneInvalid
   });
   const problems = classify({});
-  assert.deepEqual(Array.from(problems, (item) => item.key), ['nome', 'cpf', 'celular', 'origem', 'sexo']);
+  assert.deepEqual(Array.from(problems, (item) => item.key), ['nome', 'nascimento', 'cpf', 'celular', 'origem', 'sexo']);
   assert.equal(problems.every((item) => item.missing), true);
 
   controls.Nome.value = 'Alison';
+  controls['Data de Nascimento'].value = '1999-12-07';
   controls.CPF.value = '111.111.111-11';
   controls.Celular.value = '(21) 99999-9999';
   controls['Origem de Pacientes|Origem do Agendamento'].value = '1';
@@ -111,7 +113,7 @@ test('aviso é geral para campos vazios e específico somente para erro isolado 
 
 test('confirmação marca todos os campos inválidos, não apenas o CPF', () => {
   const marked = [];
-  const problems = ['nome', 'cpf', 'celular', 'origem', 'sexo'].map((key) => ({
+  const problems = ['nome', 'nascimento', 'cpf', 'celular', 'origem', 'sexo'].map((key) => ({
     field: key, control: { dataset: {} }, missing: true, malformed: false
   }));
   const refresh = sourceFunction('tmCadRefreshRequiredWarnings', 'tmCadBookingComponent', {
@@ -153,4 +155,44 @@ test('layout oculta e-mail, move origem e desenha indicadores em todos os campos
   assert.match(source, /\.tm-cad-origem-title-hidden\s*\{\s*display: none !important;/);
   assert.match(source, /\.tm-cad-required-warning\.tm-cad-warning-visible/);
   assert.match(source, /tmCadRefreshRequiredWarnings\(modal, true\)/);
+  assert.match(source, /\.tm-cad-order-nascimento, \.tm-cad-order-cpf/);
+});
+
+test('o nono dígito não apaga uma data de nascimento já completa', () => {
+  const handlers = {};
+  const input = {
+    value: '1999-12-07', dataset: {},
+    addEventListener: (type, handler) => { handlers[type] = handler; }
+  };
+  const guard = sourceFunction('tmCadLimitBirthDateDigits', 'tmCadEnableDatePastes');
+  const field = { querySelector: () => input };
+  guard(field);
+  guard(field);
+  let prevented = 0;
+  const preventDefault = () => { prevented += 1; };
+  handlers.keydown({ key: '9', preventDefault });
+  handlers.beforeinput({ data: '9', preventDefault });
+  assert.equal(prevented, 2);
+  input.value = '';
+  handlers.keydown({ key: '0', preventDefault });
+  assert.equal(prevented, 2);
+});
+
+test('oculta apenas o seletor BR do celular, preservando o campo de número', () => {
+  const classes = [];
+  const input = {};
+  const country = {
+    textContent: 'BR', contains: () => false,
+    matches: () => false, querySelector: () => ({}),
+    classList: { add: (name) => classes.push(name) }
+  };
+  const group = { children: [country, input] };
+  input.closest = () => group;
+  const field = { querySelector: () => input };
+  const hide = sourceFunction('tmCadHidePhoneCountry', 'tmCadPlaceOrigemInDados', {
+    tmCadNorm: (value) => String(value || '').trim()
+  });
+  hide(field);
+  assert.deepEqual(classes, ['tm-cad-phone-country-hidden']);
+  assert.match(source, /\.tm-cad-order-celular \.tm-cad-phone-country-hidden \{\s*display: none !important;/);
 });

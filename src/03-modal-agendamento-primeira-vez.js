@@ -139,6 +139,10 @@ const tmBookingModalWatch = (() => {
         max-width: 200px !important;
       }
 
+      #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-celular .tm-cad-phone-country-hidden {
+        display: none !important;
+      }
+
       #cadastroModal.tm-primeira-vez-layout #cadTemp .tm-cad-order-nome {
         grid-column: 1 / 3 !important;
         grid-row: 2 !important;
@@ -340,7 +344,6 @@ const tmBookingModalWatch = (() => {
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card {
         position: relative !important;
-        padding-bottom: 40px !important;
       }
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-title {
@@ -545,6 +548,7 @@ const tmBookingModalWatch = (() => {
   function tmCadRequiredProblems(modal) {
     const labels = [
       ['nome', 'Nome', 'input'],
+      ['nascimento', 'Data de Nascimento', 'input[type="date"], input'],
       ['cpf', 'CPF', 'input'],
       ['celular', 'Celular', 'input[type="tel"], input:not([type="hidden"])'],
       ['origem', 'Origem de Pacientes|Origem do Agendamento', 'select'],
@@ -672,6 +676,19 @@ const tmBookingModalWatch = (() => {
 
     field.classList.add('tm-cad-hidden-field');
     field.style.setProperty('display', 'none', 'important');
+  }
+
+  function tmCadHidePhoneCountry(field) {
+    const input = field?.querySelector('input[type="tel"], input:not([type="hidden"])');
+    const group = input?.closest('.input-group');
+    if (!group) return;
+    for (const child of group.children) {
+      if (child === input || child.contains(input)) continue;
+      if (!/^BR\b/i.test(tmCadNorm(child.textContent))) continue;
+      if (child.matches('button, select') || child.querySelector('button, select')) {
+        child.classList.add('tm-cad-phone-country-hidden');
+      }
+    }
   }
 
   function tmCadPlaceOrigemInDados(modal, origemField) {
@@ -971,8 +988,25 @@ const tmBookingModalWatch = (() => {
     }, true);
   }
 
+  function tmCadLimitBirthDateDigits(field) {
+    const input = field?.querySelector('input[type="date"]');
+    if (!input || input.dataset.tmBirthDateDigitGuard === '1') return;
+    input.dataset.tmBirthDateDigitGuard = '1';
+    const isComplete = () => /^\d{4}-\d{2}-\d{2}$/.test(input.value);
+    input.addEventListener('keydown', (event) => {
+      if (!event.ctrlKey && !event.metaKey && !event.altKey && /^\d$/.test(event.key) && isComplete()) {
+        event.preventDefault();
+      }
+    }, true);
+    input.addEventListener('beforeinput', (event) => {
+      if (/^\d$/.test(event.data || '') && isComplete()) event.preventDefault();
+    }, true);
+  }
+
   function tmCadEnableDatePastes(modal) {
-    tmCadEnableDatePaste(tmCadFieldByLabel(modal, 'Data de Nascimento'));
+    const nascimento = tmCadFieldByLabel(modal, 'Data de Nascimento');
+    tmCadEnableDatePaste(nascimento);
+    tmCadLimitBirthDateDigits(nascimento);
     tmCadEnableDatePaste(tmCadFieldByLabel(modal, 'Validade da Carteira'));
   }
 
@@ -1412,6 +1446,7 @@ const tmBookingModalWatch = (() => {
     tmCadSetField(cpf, 'tm-cad-col-4', 'tm-cad-order-cpf');
 
     tmCadSetField(celular, 'tm-cad-col-4', 'tm-cad-order-celular');
+    tmCadHidePhoneCountry(celular);
     tmCadSetField(email, 'tm-cad-col-4', 'tm-cad-order-email');
     tmCadSetField(sexo, 'tm-cad-col-4', 'tm-cad-order-sexo');
 
@@ -1480,7 +1515,7 @@ const tmBookingModalWatch = (() => {
     document.addEventListener(name, (event) => {
       const modal = event.target?.closest?.('#cadastroModal.tm-primeira-vez-layout');
       if (!modal || modal.dataset.tmCadValidationAttempted !== '1' || !event.target.matches('input, select')) return;
-      const field = event.target.closest('.tm-cad-order-nome, .tm-cad-order-cpf, .tm-cad-order-celular, .tm-cad-order-origem, .tm-cad-order-sexo');
+      const field = event.target.closest('.tm-cad-order-nome, .tm-cad-order-nascimento, .tm-cad-order-cpf, .tm-cad-order-celular, .tm-cad-order-origem, .tm-cad-order-sexo');
       if (!field) return;
       tmCadRefreshRequiredWarnings(modal, true);
     }, true);
