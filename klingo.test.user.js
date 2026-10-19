@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.23
+// @version      1.24
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -4125,7 +4125,7 @@ const tmBookingModalWatch = (() => {
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group {
-        margin-top: 0 !important;
+        margin-top: -3px !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group-text {

@@ -94,7 +94,7 @@ test('campos digitáveis do paciente usam a tipografia medida no fluxo Primeira 
 });
 
 test('nascimento alinha com Nome e o marcador de idade usa a tipografia dos campos', () => {
-  assert.match(source, /\.tm-paciente-nascimento \.input-group \{\s*margin-top: 0 !important;/);
+  assert.match(source, /\.tm-paciente-nascimento \.input-group \{\s*margin-top: -3px !important;/);
   assert.match(source, /\.tm-paciente-nascimento \.input-group-text \{\s*font-family: "Open Sans", "Helvetica Neue", sans-serif !important;\s*font-size: 13\.125px !important;\s*font-weight: 400 !important;\s*color: #495057 !important;/);
 });
 

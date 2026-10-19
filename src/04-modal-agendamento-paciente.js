@@ -152,7 +152,7 @@
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group {
-        margin-top: 0 !important;
+        margin-top: -3px !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group-text {
