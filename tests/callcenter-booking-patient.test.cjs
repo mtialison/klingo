@@ -70,3 +70,63 @@ test('origem mantém aviso e seletor na mesma linha, oculta só o título e comp
   assert.match(source, /if \(title && !title\.querySelector\('select, input'\)\)/);
   assert.match(source, /div\.mt-3\.mb-5 \{\s*height: auto !important;\s*min-height: 0 !important;/);
 });
+
+test('telefone fica oculto sem apagar o valor e e-mail ocupa o espaço livre', () => {
+  assert.match(source, /\.tm-paciente-telefone \{\s*display: none !important;/);
+  assert.match(source, /\.tm-paciente-email \{\s*grid-column: 2 \/ 5 !important;/);
+  assert.doesNotMatch(source, /telefone\.value\s*=/);
+});
+
+test('celular vazio é obrigatório independentemente do telefone preenchido', () => {
+  const controls = {
+    'Celular': { value: '', tagName: 'INPUT', validity: { valid: true } },
+    'Nome do Paciente': { value: 'Teste', tagName: 'INPUT', validity: { valid: true } }
+  };
+  const fieldByLabel = (_modal, label) => controls[label] ? {
+    querySelector() { return controls[label]; }
+  } : null;
+  const problems = sourceFunction('patientFieldProblems', 'patientSetWarning', {
+    fieldByLabel, norm: (value) => String(value || '').trim()
+  })({});
+  assert.equal(problems.find(({ key }) => key === 'celular').missing, true);
+  assert.equal(problems.some(({ key }) => key === 'telefone'), false);
+});
+
+test('sem input de celular renderizado a confirmação também é bloqueada', () => {
+  const problems = sourceFunction('patientFieldProblems', 'patientSetWarning', {
+    fieldByLabel: () => null, norm: (value) => String(value || '').trim()
+  })({});
+  assert.equal(problems.find(({ key }) => key === 'celular').missing, true);
+});
+
+test('confirmar bloqueia celular vazio e usa o balão nativo', () => {
+  const notifications = [];
+  let prevented = false;
+  let stopped = false;
+  let focused = false;
+  const cellular = { key: 'celular', missing: true, malformed: false,
+    control: { focus() { focused = true; } } };
+  const modal = { dataset: {} };
+  const validate = sourceFunction('patientValidateCellular', 'isPacienteModal', {
+    isPacienteModal: () => true,
+    patientRefreshWarnings() {},
+    patientFieldProblems: () => [cellular],
+    patientBookingComponent: () => ({ $toast: { add(value) { notifications.push(value); } } })
+  });
+  const allowed = validate(modal, {
+    preventDefault() { prevented = true; },
+    stopImmediatePropagation() { stopped = true; }
+  });
+  assert.equal(allowed, false);
+  assert.equal(prevented, true);
+  assert.equal(stopped, true);
+  assert.equal(focused, true);
+  assert.equal(modal.dataset.tmPacienteValidationAttempted, '1');
+  assert.equal(notifications[0].detail, 'O campo celular é obrigatório.');
+});
+
+test('indicadores só aparecem após confirmar e são aplicados a todos os inválidos', () => {
+  assert.match(source, /modal\.dataset\.tmPacienteValidationAttempted !== '1'\) return;/);
+  assert.match(source, /for \(const \{ control, missing, malformed \} of patientFieldProblems\(modal\)\) \{\s*patientSetWarning\(control, missing \|\| malformed\);/);
+  assert.match(source, /warning\.classList\.toggle\('tm-paciente-warning-visible', invalid\)/);
+});

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.16
+// @version      1.17
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -4076,8 +4076,7 @@ const tmBookingModalWatch = (() => {
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-telefone {
-        grid-column: 4 !important;
-        grid-row: 2 !important;
+        display: none !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group,
@@ -4107,8 +4106,35 @@ const tmBookingModalWatch = (() => {
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-email {
-        grid-column: 2 / 4 !important;
+        grid-column: 2 / 5 !important;
         grid-row: 2 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-warning-host {
+        position: relative !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-required-warning {
+        position: absolute !important;
+        z-index: 3;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        color: #dc3545;
+        background: #f8d7da;
+        border-right: 1px solid #f5c6cb;
+        border-radius: 3px 0 0 3px;
+        font-weight: 700;
+        pointer-events: none;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-required-warning.tm-paciente-warning-visible {
+        display: inline-flex;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-warning-control {
+        padding-left: 30px !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-sexo {
@@ -4385,6 +4411,88 @@ const tmBookingModalWatch = (() => {
     }
 
     return null;
+  }
+
+  function patientFieldProblems(modal) {
+    const definitions = [
+      ['nome', 'Nome do Paciente', 'input:not([type="hidden"])', true],
+      ['nascimento', 'Data de Nascimento', 'input:not([type="hidden"])', true],
+      ['sexo', 'Sexo', 'select', true],
+      ['celular', 'Celular', 'input:not([type="hidden"])', true],
+      ['email', 'e-mail', 'input:not([type="hidden"])', false],
+      ['carteira', 'No. da Carteira do Plano', 'input:not([type="hidden"])', false],
+      ['validade', 'Validade da Carteira', 'input:not([type="hidden"])', false],
+      ['origem', 'Origem de Pacientes|Origem do Agendamento', 'select', true],
+      ['cpf', 'CPF', 'input:not([type="hidden"])', false]
+    ];
+    return definitions.map(([key, label, selector, requiredByFlow]) => {
+      const field = fieldByLabel(modal, label);
+      const control = field?.querySelector(selector) || null;
+      const value = norm(control?.value);
+      const selectedText = norm(control?.selectedOptions?.[0]?.textContent);
+      const missing = (requiredByFlow || control?.required) &&
+        (!control || !value || (control.tagName === 'SELECT' && /^Selecione/i.test(selectedText)));
+      const digits = key === 'celular' ? value.replace(/\D/g, '') : '';
+      const malformed = !!control && !!value && (control.validity?.valid === false ||
+        (key === 'celular' && (digits.length < 10 || digits.length > 11 || /^(\d)\1+$/.test(digits))));
+      return { key, field, control, missing, malformed };
+    });
+  }
+
+  function patientSetWarning(control, invalid) {
+    if (!control?.parentElement) return;
+    const host = control.parentElement;
+    host.classList.add('tm-paciente-warning-host');
+    let warning = host.querySelector(':scope > .tm-paciente-required-warning');
+    if (!warning) {
+      warning = document.createElement('span');
+      warning.className = 'tm-paciente-required-warning';
+      warning.textContent = '!';
+      warning.setAttribute('aria-hidden', 'true');
+      host.appendChild(warning);
+    }
+    warning.style.top = `${control.offsetTop + 1}px`;
+    warning.style.left = `${control.offsetLeft + 1}px`;
+    warning.style.height = `${Math.max(0, control.offsetHeight - 2)}px`;
+    warning.classList.toggle('tm-paciente-warning-visible', invalid);
+    control.classList.toggle('tm-paciente-warning-control', invalid);
+  }
+
+  function patientRefreshWarnings(modal) {
+    if (!modal?.classList.contains('tm-paciente-layout') ||
+        modal.dataset.tmPacienteValidationAttempted !== '1') return;
+    for (const { control, missing, malformed } of patientFieldProblems(modal)) {
+      patientSetWarning(control, missing || malformed);
+    }
+  }
+
+  function patientBookingComponent(modal) {
+    const patientLink = Array.from(document.querySelectorAll('a'))
+      .find((link) => norm(link.textContent) === 'Paciente');
+    for (const start of [modal, patientLink]) {
+      for (let element = start; element; element = element.parentElement) {
+        const vue = element.__vue__;
+        if (vue?.$route?.path === '/call-center' && typeof vue.$toast?.add === 'function') return vue;
+      }
+    }
+    return null;
+  }
+
+  function patientValidateCellular(modal, event) {
+    if (!modal || !isPacienteModal(modal)) return true;
+    modal.dataset.tmPacienteValidationAttempted = '1';
+    patientRefreshWarnings(modal);
+    const celular = patientFieldProblems(modal).find(({ key }) => key === 'celular');
+    if (!celular || (!celular.missing && !celular.malformed)) return true;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const detail = celular.missing ? 'O campo celular é obrigatório.' : 'Informe um celular válido.';
+    const component = patientBookingComponent(modal);
+    component?.$toast?.add({ severity: 'error', summary: 'Atenção', detail, life: 5000 });
+    if (!component) console.warn('[TM] Balão do Klingo indisponível para validar o celular.');
+    celular.control?.focus();
+    return false;
   }
 
   function isPacienteModal(modal) {
@@ -4900,6 +5008,7 @@ const tmBookingModalWatch = (() => {
     enableDatePaste(nascimento);
     protectBirthDate(nascimento);
     enableDatePaste(validade);
+    patientRefreshWarnings(modal);
   }
 
   function clearPacienteLayout(modal) {
@@ -4907,8 +5016,11 @@ const tmBookingModalWatch = (() => {
     const baseline = modalBaselines.get(modal);
     if (!baseline) return;
 
-    modal.querySelectorAll('.tm-paciente-header-emoji, .tm-paciente-header-procedure-emoji, .tm-paciente-header-convenio-injetado, textarea.tm-paciente-observacao-textarea')
+    modal.querySelectorAll('.tm-paciente-header-emoji, .tm-paciente-header-procedure-emoji, .tm-paciente-header-convenio-injetado, textarea.tm-paciente-observacao-textarea, .tm-paciente-required-warning')
       .forEach((node) => node.remove());
+    modal.querySelectorAll('.tm-paciente-warning-host').forEach((node) => node.classList.remove('tm-paciente-warning-host'));
+    modal.querySelectorAll('.tm-paciente-warning-control').forEach((node) => node.classList.remove('tm-paciente-warning-control'));
+    delete modal.dataset.tmPacienteValidationAttempted;
 
     const { origem } = baseline;
     if (origem?.element.isConnected && origem.parent.isConnected) {
@@ -4934,6 +5046,32 @@ const tmBookingModalWatch = (() => {
       clearPacienteLayout(event.target);
     }
   }, true);
+
+  document.addEventListener('click', (event) => {
+    if (!window.location.hash.startsWith('#/call-center')) return;
+    const button = event.target?.closest?.('button');
+    const modal = button?.closest?.('#cadastroModal.tm-paciente-layout');
+    if (modal && /^Confirmar$/i.test(norm(button.textContent))) {
+      patientValidateCellular(modal, event);
+    }
+  }, true);
+
+  document.addEventListener('submit', (event) => {
+    if (!window.location.hash.startsWith('#/call-center')) return;
+    const modal = event.target?.closest?.('#cadastroModal.tm-paciente-layout');
+    if (modal && !/^Reservar$/i.test(norm(event.submitter?.textContent))) {
+      patientValidateCellular(modal, event);
+    }
+  }, true);
+
+  for (const name of ['input', 'change']) {
+    document.addEventListener(name, (event) => {
+      const modal = event.target?.closest?.('#cadastroModal.tm-paciente-layout');
+      if (modal?.dataset.tmPacienteValidationAttempted === '1' && event.target.matches('input, select')) {
+        patientRefreshWarnings(modal);
+      }
+    }, true);
+  }
 
   // Mesmo tratamento antecipado do cadastro de primeira vez, limitado ao
   // formulário de paciente já cadastrado ("Nome do Paciente").
