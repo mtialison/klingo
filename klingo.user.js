@@ -907,7 +907,7 @@ function setDateCalculatorOpen(isOpen) {
       indicator.className = 'tm-script-version-indicator';
     }
 
-    const expected = `v${getDisplayVersion()}`;
+    const expected = String(getDisplayVersion());
     if (indicator.textContent !== expected) {
       indicator.textContent = expected;
     }
