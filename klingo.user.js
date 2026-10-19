@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/
-// @version      26.42
+// @version      26.43
 // @description  Ajustes de interface, cadastro, chat, recepção e autorizações do Klingo
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
@@ -2680,13 +2680,9 @@ const tmBookingModalWatch = (() => {
       }
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-title,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-row,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-row small,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data small,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data span {
-        font-weight: 400 !important;
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card * {
+        font-size: 11.2px !important;
+        line-height: 1.35 !important;
       }
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-title {
@@ -2734,37 +2730,30 @@ const tmBookingModalWatch = (() => {
         margin-top: 0 !important;
       }
 
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data small,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data span {
-        font-size: 18.75px !important;
-        line-height: 1.35 !important;
-        font-weight: 400 !important;
-        text-transform: uppercase !important;
-      }
-
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data small {
-        display: inline-flex !important;
-        align-items: center !important;
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-date-line,
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-time-line {
+        display: block !important;
+        width: 100% !important;
         margin-left: 0 !important;
-        font-weight: 400 !important;
       }
 
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data .fa-calendar-alt {
-        width: 1.25em !important;
-        min-width: 1.25em !important;
-        max-width: 1.25em !important;
-        text-align: center !important;
-        margin-right: 6px !important;
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-time-line {
+        margin-top: 2px !important;
       }
 
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-data small.mx-2 {
-        margin-left: 8px !important;
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-native-icon-hidden {
+        display: none !important;
+      }
+
+      #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-emoji {
+        display: inline-block !important;
+        width: 1.5em !important;
+        margin-right: 4px !important;
+        vertical-align: baseline !important;
       }
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card .tm-cad-header-sala {
-        font-size: 18.75px !important;
-        line-height: 1.35 !important;
+        font-size: 11.2px !important;
       }
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-card blockquote {
@@ -2777,22 +2766,6 @@ const tmBookingModalWatch = (() => {
 
       #cadastroModal.tm-primeira-vez-layout .tm-cad-header-convenio-injetado {
         display: block !important;
-      }
-
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card .tm-cad-header-title,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card .tm-cad-header-title * {
-        font-size: 18px !important;
-        line-height: 1.3 !important;
-      }
-
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card .tm-cad-header-row,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card .tm-cad-header-row *,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card .tm-cad-header-data,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card .tm-cad-header-data *,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card blockquote,
-      #cadastroModal.tm-primeira-vez-layout .tm-cad-multiple-headers .tm-cad-header-card blockquote * {
-        font-size: 15px !important;
-        line-height: 1.3 !important;
       }
 
 
@@ -3445,17 +3418,41 @@ const tmBookingModalWatch = (() => {
     calendarSmall.textContent = '';
 
     if (icon) {
-      icon.style.setProperty('width', '1.25em', 'important');
-      icon.style.setProperty('min-width', '1.25em', 'important');
-      icon.style.setProperty('max-width', '1.25em', 'important');
-      icon.style.setProperty('text-align', 'center', 'important');
-      icon.style.setProperty('margin-right', '6px', 'important');
       calendarSmall.appendChild(icon);
     }
 
     calendarSmall.appendChild(document.createTextNode(`${day} de ${monthName} | ${weekday}`.toUpperCase()));
 
     dateBlock.dataset.tmHeaderDateNormalized = '1';
+  }
+
+  function tmCadEmojifyHeaderIcon(container, selector, emoji) {
+    const icon = container?.querySelector(selector);
+    if (!icon) return;
+    icon.classList.add('tm-cad-native-icon-hidden');
+    if (icon.previousElementSibling?.classList.contains('tm-cad-header-emoji')) return;
+
+    const replacement = document.createElement('span');
+    replacement.className = 'tm-cad-header-emoji';
+    replacement.textContent = emoji;
+    replacement.setAttribute('aria-hidden', 'true');
+    icon.before(replacement);
+  }
+
+  function tmCadDecorateHeader(profissional, convenio, unidade, dateBlock) {
+    tmCadEmojifyHeaderIcon(profissional, '.fa-user-md', '🩺');
+    tmCadEmojifyHeaderIcon(convenio, '.fa-credit-card', '💳');
+    tmCadEmojifyHeaderIcon(unidade, '.fa-building', '🏥');
+
+    const dateSmall = Array.from(dateBlock.querySelectorAll('small'))
+      .find((small) => !!small.querySelector('.fa-calendar-alt'));
+    const timeSmall = Array.from(dateBlock.querySelectorAll('small'))
+      .find((small) => small !== dateSmall && /\d{1,2}:\d{2}/.test(small.textContent || ''));
+
+    dateSmall?.classList.add('tm-cad-header-date-line');
+    timeSmall?.classList.add('tm-cad-header-time-line');
+    tmCadEmojifyHeaderIcon(dateSmall, '.fa-calendar-alt', '📅');
+    tmCadEmojifyHeaderIcon(timeSmall, 'i', '🕒');
   }
 
   function tmCadGetExternalConvenioForHeaderList(listGroup) {
@@ -3569,6 +3566,7 @@ const tmBookingModalWatch = (() => {
         });
 
         tmCadNormalizeHeaderDate(dateBlock);
+        tmCadDecorateHeader(profissional, convenio, unidade, dateBlock);
       });
     });
   }
@@ -3652,7 +3650,7 @@ const tmBookingModalWatch = (() => {
     const baseline = modalBaselines.get(modal);
     if (!baseline) return;
 
-    modal.querySelectorAll('.tm-cad-header-convenio-injetado, textarea.tm-cad-observacao-textarea')
+    modal.querySelectorAll('.tm-cad-header-emoji, .tm-cad-header-convenio-injetado, textarea.tm-cad-observacao-textarea')
       .forEach((node) => node.remove());
 
     const { origem, cpfInput, cpfRequired, cpfAriaRequired, emailInput, emailRequired } = baseline;
