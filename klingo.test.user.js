@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.1
+// @version      1.2
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -2872,26 +2872,32 @@ const tmBookingModalWatch = (() => {
     return true;
   }
 
+  function tmCadBookingComponent(modal) {
+    const firstVisit = document.querySelector('input[placeholder="Operadora/Plano..."]') ||
+      Array.from(document.querySelectorAll('a')).find((link) => tmCadNorm(link.textContent) === 'Primeira Vez');
+    for (const start of [modal, firstVisit]) {
+      for (let element = start; element; element = element.parentElement) {
+        const vue = element.__vue__;
+        if (vue?.$route?.path === '/call-center' && typeof vue.$toast?.add === 'function') return vue;
+      }
+    }
+    return null;
+  }
+
   function tmCadValidateCpf(modal, event) {
     if (!modal || !tmCadIsPrimeiraVez(modal)) return true;
     const input = tmCadFieldByLabel(modal, 'CPF')?.querySelector('input');
     const value = input?.value?.trim() || '';
     const message = !value ? 'O campo CPF é obrigatório.' :
       !tmCadIsValidCpf(value) ? 'Informe um CPF válido.' : '';
-    if (!message) {
-      input?.setCustomValidity('');
-      return true;
-    }
+    if (!message) return true;
 
     event?.preventDefault();
     event?.stopImmediatePropagation();
-    if (input) {
-      input.setCustomValidity(message);
-      input.focus();
-      input.reportValidity();
-    } else {
-      window.alert(message);
-    }
+    const component = tmCadBookingComponent(modal);
+    component?.$toast?.add({ severity: 'error', summary: 'Atenção', detail: message, life: 5000 });
+    if (!component) console.warn('[TM] Balão do Klingo indisponível para validação do CPF.');
+    input?.focus();
     return false;
   }
 
@@ -3659,12 +3665,10 @@ const tmBookingModalWatch = (() => {
     tmCadHideField(email);
     const cpfInput = cpf?.querySelector('input');
     if (cpfInput) {
-      cpfInput.required = true;
+      // A obrigatoriedade é verificada antes de confirmar; o HTML5 não deve
+      // substituir o aviso padrão do Klingo pelo balão do navegador.
+      cpfInput.required = false;
       cpfInput.setAttribute('aria-required', 'true');
-      if (!cpfInput.dataset.tmCadCpfGuard) {
-        cpfInput.dataset.tmCadCpfGuard = '1';
-        cpfInput.addEventListener('input', () => cpfInput.setCustomValidity(''));
-      }
     }
     const emailInput = email?.querySelector('input');
     if (emailInput) emailInput.required = false;

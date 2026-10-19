@@ -24,12 +24,11 @@ test('CPF do agendamento exige dígitos verificadores válidos e rejeita sequên
 
 test('confirmação é bloqueada quando CPF falta ou é inválido', () => {
   const input = {
-    value: '', message: '', focused: false, reported: false,
-    setCustomValidity(message) { this.message = message; },
-    focus() { this.focused = true; },
-    reportValidity() { this.reported = true; }
+    value: '', focused: false,
+    focus() { this.focused = true; }
   };
   const modal = {};
+  const notices = [];
   const event = {
     prevented: false, stopped: false,
     preventDefault() { this.prevented = true; },
@@ -38,20 +37,35 @@ test('confirmação é bloqueada quando CPF falta ou é inválido', () => {
   const validate = vm.runInNewContext(`${source.slice(end, validateEnd)}\ntmCadValidateCpf`, {
     tmCadIsPrimeiraVez: () => true,
     tmCadFieldByLabel: () => ({ querySelector: () => input }),
-    tmCadIsValidCpf: isValidCpf
+    tmCadIsValidCpf: isValidCpf,
+    tmCadBookingComponent: () => ({ $toast: { add: (notice) => notices.push(notice) } })
   });
 
   assert.equal(validate(modal, event), false);
-  assert.equal(input.message, 'O campo CPF é obrigatório.');
-  assert.equal(input.focused && input.reported && event.prevented && event.stopped, true);
+  assert.equal(notices[0].summary, 'Atenção');
+  assert.equal(notices[0].detail, 'O campo CPF é obrigatório.');
+  assert.equal(input.focused && event.prevented && event.stopped, true);
 
   input.value = '111.111.111-11';
   assert.equal(validate(modal, event), false);
-  assert.equal(input.message, 'Informe um CPF válido.');
+  assert.equal(notices[1].detail, 'Informe um CPF válido.');
 
   input.value = '529.982.247-25';
   assert.equal(validate(modal, event), true);
-  assert.equal(input.message, '');
+  assert.equal(notices.length, 2);
+});
+
+test('encontra o serviço de notificações nativo no componente do Call Center', () => {
+  const componentStart = source.indexOf('  function tmCadBookingComponent(modal) {');
+  assert.ok(componentStart > start);
+  const findComponent = vm.runInNewContext(`${source.slice(componentStart, end)}\ntmCadBookingComponent`, {
+    document: { querySelector: () => null, querySelectorAll: () => [] },
+    tmCadNorm: (value) => String(value || '').trim()
+  });
+  const vue = { $route: { path: '/call-center' }, $toast: { add() {} } };
+  const modal = { parentElement: { __vue__: vue, parentElement: null } };
+  assert.equal(findComponent(modal), vue);
+  assert.doesNotMatch(source.slice(end, validateEnd), /reportValidity|window\.alert/);
 });
 
 test('layout de primeira vez oculta e-mail e coloca a origem no espaço dele', () => {
@@ -60,4 +74,5 @@ test('layout de primeira vez oculta e-mail e coloca a origem no espaço dele', (
   assert.match(source, /\.tm-cad-order-origem\s*\{\s*grid-column: 2 \/ 4 !important;\s*grid-row: 3 !important;/);
   assert.match(source, /\.tm-cad-origem-title-hidden\s*\{\s*display: none !important;/);
   assert.match(source, /\^Confirmar\$/);
+  assert.match(source, /cpfInput\.required = false/);
 });
