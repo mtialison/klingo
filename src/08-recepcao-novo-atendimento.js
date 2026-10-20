@@ -150,15 +150,19 @@
           max-width: 50% !important;
         }
 
-        #${MODAL_ID}.tm-recepcao-primeira-vez .tm-recepcao-dados-row > .col:not(.tm-recepcao-hidden-field),
+        #${MODAL_ID}.tm-recepcao-primeira-vez .tm-recepcao-dados-row > .col:not(.tm-recepcao-hidden-field) {
+          flex: 0 0 25% !important;
+          max-width: 25% !important;
+        }
+
         #${MODAL_ID}.tm-recepcao-primeira-vez .tm-recepcao-contato-row > .col:not(.tm-recepcao-hidden-field) {
           flex: 0 0 33.333333% !important;
           max-width: 33.333333% !important;
         }
 
         #${MODAL_ID}.tm-recepcao-primeira-vez .tm-recepcao-dados-row > .tm-recepcao-cpf-col {
-          flex: 0 0 33.333333% !important;
-          max-width: 33.333333% !important;
+          flex: 0 0 25% !important;
+          max-width: 25% !important;
         }
 
       }
@@ -237,10 +241,10 @@
     placeAfter(detailsRow, name, null);
     placeAfter(detailsRow, birth, name);
     placeAfter(detailsRow, cpf, birth);
+    placeAfter(detailsRow, sex, cpf);
     placeAfter(contactRow, email, null);
     placeAfter(contactRow, cellular, email);
     if (origin) placeAfter(contactRow, origin, cellular);
-    placeAfter(contactRow, sex, origin || cellular);
     setClass(detailsRow, 'tm-recepcao-dados-row', true);
     setClass(contactRow, 'tm-recepcao-contato-row', true);
   }

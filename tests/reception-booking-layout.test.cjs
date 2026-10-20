@@ -117,8 +117,8 @@ test('Primeira Vez organiza as duas linhas sem recriar nem limpar campos', () =>
   } };
   const arrange = vm.runInContext('arrangeFirstTimeReceptionFields', context);
   arrange(modal);
-  assert.deepEqual(details.children, [name, birth, cpf]);
-  assert.deepEqual(contact.children, [email, cellular, origin, sex]);
+  assert.deepEqual(details.children, [name, birth, cpf, sex]);
+  assert.deepEqual(contact.children, [email, cellular, origin]);
   assert.deepEqual(original.children, []);
   assert.equal(details.classList.contains('tm-recepcao-dados-row'), true);
   assert.equal(contact.classList.contains('tm-recepcao-contato-row'), true);
@@ -126,5 +126,6 @@ test('Primeira Vez organiza as duas linhas sem recriar nem limpar campos', () =>
   const moves = details.moves + contact.moves;
   arrange(modal);
   assert.equal(details.moves + contact.moves, moves);
+  assert.match(source, /\.tm-recepcao-dados-row > \.col:not\(\.tm-recepcao-hidden-field\) \{\s*flex: 0 0 25% !important;/);
   assert.match(source, /\.tm-recepcao-contato-row > \.col:not\(\.tm-recepcao-hidden-field\) \{\s*flex: 0 0 33\.333333% !important;/);
 });
