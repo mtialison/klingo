@@ -135,7 +135,21 @@
         display: none !important;
       }
 
+      #${MODAL_ID} .tm-recepcao-origem-titulo-oculto {
+        display: none !important;
+      }
+
       @media (min-width: 768px) {
+        #${MODAL_ID} .form-row > .tm-recepcao-origem-col {
+          flex: 0 0 25% !important;
+          max-width: 25% !important;
+        }
+
+        #${MODAL_ID} .form-row > .tm-recepcao-observacao-col {
+          flex: 0 0 50% !important;
+          max-width: 50% !important;
+        }
+
         #${MODAL_ID}.tm-recepcao-primeira-vez .tm-recepcao-dados-row > .col.col-md-3:not(.tm-recepcao-hidden-field) {
           flex: 0 0 33.333333% !important;
           max-width: 33.333333% !important;
@@ -146,10 +160,14 @@
           max-width: 33.333333% !important;
         }
 
-        #${MODAL_ID}.tm-recepcao-primeira-vez .form-row > .tm-recepcao-observacao-col {
-          flex: 0 0 50% !important;
-          max-width: 50% !important;
-        }
+      }
+
+      #${MODAL_ID} .tm-recepcao-origem-col select,
+      #${MODAL_ID} .tm-recepcao-origem-col .input-group,
+      #${MODAL_ID} .tm-recepcao-observacao-col input,
+      #${MODAL_ID} .tm-recepcao-observacao-col textarea {
+        width: 100% !important;
+        max-width: 100% !important;
       }
     `;
     document.head.appendChild(style);
@@ -159,6 +177,26 @@
     const label = Array.from(modal.querySelectorAll('small.form-text.text-muted'))
       .find((small) => small.closest('.modal') === modal && norm(small.textContent) === labelText);
     return label?.closest('.col') || null;
+  }
+
+  function arrangeReceptionBookingFields(modal) {
+    const email = fieldByLabel(modal, 'e-mail');
+    const cellular = fieldByLabel(modal, 'Celular');
+    const origin = fieldByLabel(modal, 'Origem do Agendamento');
+    const contactRow = cellular?.parentElement;
+    if (origin && contactRow?.classList.contains('form-row') && contactRow.contains(email) &&
+        (origin.parentElement !== contactRow || origin.previousElementSibling !== cellular)) {
+      contactRow.insertBefore(origin, cellular.nextSibling);
+    }
+    if (origin) setClass(origin, 'tm-recepcao-origem-col', true);
+
+    for (const small of modal.querySelectorAll('.border-bottom small')) {
+      if (norm(small.textContent) !== 'Origem do Agendamento') continue;
+      const title = small.closest('.border-bottom');
+      if (title && !title.querySelector('input, select, textarea')) {
+        setClass(title, 'tm-recepcao-origem-titulo-oculto', true);
+      }
+    }
   }
 
   function requiredReceptionField(modal, labelText) {
@@ -403,9 +441,15 @@
     applyExtraDefault(modal);
     ensureOriginField(modal);
     guardReceptionBooking(modal);
+    arrangeReceptionBookingFields(modal);
 
     const social = fieldByLabel(modal, 'Nome Social');
     const phone = fieldByLabel(modal, 'Telefone');
+    const phoneInput = phone?.querySelector('input');
+    if (phoneInput) {
+      phoneInput.required = false;
+      phoneInput.removeAttribute('aria-required');
+    }
     const cpf = fieldByLabel(modal, 'CPF');
     optionalReceptionCpf(modal);
     requiredReceptionField(modal, 'e-mail');
@@ -424,7 +468,7 @@
 
     if (!firstTime) {
       modal.querySelectorAll('.tm-recepcao-hidden-field').forEach((field) =>
-        setClass(field, 'tm-recepcao-hidden-field', false));
+        setClass(field, 'tm-recepcao-hidden-field', field === phone));
       modal.querySelectorAll('.tm-recepcao-dados-row').forEach((row) =>
         setClass(row, 'tm-recepcao-dados-row', false));
       return;
