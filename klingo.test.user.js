@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.12
+// @version      1.13
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -9887,7 +9887,24 @@ const tmConfirmationCalendarAdapter = (() => {
     return JSON.parse(JSON.stringify(parms));
   }
 
-  function summarize(data, date, context) {
+  function bookableUnits(page) {
+    const byDate = new Map();
+    for (const slot of Array.isArray(page.horarios) ? page.horarios : []) {
+      if (slot?.status !== 'livre' || slot.bloqueado || slot.restricao) continue;
+      const date = String(slot.data || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+      const unitId = slot.id_unidade_operacao ?? slot.unidade_operacao?.id_unidade_operacao;
+      if (unitId == null) {
+        byDate.set(date, null); // sem unidade, não atribuir sinalizadores por suposição
+      } else if (byDate.get(date) !== null) {
+        if (!byDate.has(date)) byDate.set(date, new Set());
+        byDate.get(date).add(String(unitId));
+      }
+    }
+    return byDate;
+  }
+
+  function summarize(data, date, context, availableUnits) {
     if (!Array.isArray(data?.agendas) || data.paginate ||
         (data.parms?.data && data.parms.data.slice(0, 10) !== date)) throw new Error('Resposta incompleta');
     const doctors = new Set(context.medicos.map(String)), seen = new Set(), groups = new Map(), units = new Set();
@@ -9898,7 +9915,8 @@ const tmConfirmationCalendarAdapter = (() => {
           (!doctors.has(String(row.medico?.id_pessoa)) && !doctors.has(String(mark?.id_medico)))) continue;
       const unit = mark?.unidade_operacao || row.unidade_operacao;
       const unitId = mark?.id_unidade_operacao ?? row.id_unidade_operacao ?? unit?.id_unidade_operacao;
-      if (unitId != null) units.add(String(unitId));
+      if (unitId == null || !availableUnits.has(String(unitId))) continue;
+      units.add(String(unitId));
       if (!mark) continue;
       const flag = mark.sinalizador_atendimento;
       if (!flag) {
@@ -9908,7 +9926,6 @@ const tmConfirmationCalendarAdapter = (() => {
       if (!mark.id_marcacao || !flag.id_sinalizador_atendimento || !flag.st_icon) throw new Error('Sinalizador incompleto');
       if (seen.has(String(mark.id_marcacao))) continue;
       seen.add(String(mark.id_marcacao));
-      if (unitId == null) throw new Error('Unidade não identificada');
       const id = String(unitId), flagId = String(flag.id_sinalizador_atendimento);
       if (!groups.has(id)) groups.set(id, { id, name: unit?.st_sigla || unit?.st_nome || unit?.search || 'Unidade ' + id, flags: new Map() });
       const group = groups.get(id);
@@ -9967,7 +9984,7 @@ const tmConfirmationCalendarAdapter = (() => {
     });
   }
 
-  function paint(items, contextKey) {
+  function paint(items, contextKey, availableByDate) {
     if (!document.getElementById(STYLE)) {
       const style = document.createElement('style'); style.id = STYLE;
       style.textContent = `.${CLASS}{font:inherit;font-size:12px;line-height:1.5;text-align:center;max-width:100%;cursor:default}
@@ -9982,12 +9999,22 @@ const tmConfirmationCalendarAdapter = (() => {
       let host = box.querySelector('.' + CLASS);
       if (!host) { host = document.createElement('div'); host.className = CLASS; box.appendChild(host); hosts.add(host); }
       const entry = cache.get(contextKey + '|' + date);
-      const signature = JSON.stringify(entry ? [entry.value, entry.error, entry.time] : ['loading']);
+      const available = availableByDate.get(date);
+      const signature = JSON.stringify([contextKey, available?.size || 0,
+        entry ? [entry.value, entry.error, entry.time] : 'loading']);
       if (host.dataset.signature === signature) continue;
       host.dataset.signature = signature;
       host.replaceChildren();
       host.setAttribute('aria-live', 'polite');
-      host.setAttribute('aria-busy', String(!entry));
+      host.setAttribute('aria-busy', String(!!available?.size && !entry));
+      if (!available?.size) {
+        const status = document.createElement('span');
+        status.className = 'tm-day-flags-pending';
+        status.textContent = '?';
+        status.title = 'Não foi possível identificar a unidade da vaga disponível.';
+        status.setAttribute('aria-label', status.title); host.appendChild(status);
+        continue;
+      }
       if (!entry || entry.error) {
         const status = document.createElement('span');
         status.className = 'tm-day-flags-pending';
@@ -9998,11 +10025,9 @@ const tmConfirmationCalendarAdapter = (() => {
       }
       for (const group of entry.value.groups) {
         const line = document.createElement('div'); line.className = 'tm-day-flags-line';
-        if (entry.value.multipleUnits) {
-          const label = document.createElement('span'); label.className = 'tm-day-flags-unit';
-          label.textContent = group.name.match(/^\(([^)]+)\)/)?.[1] || group.name;
-          line.appendChild(label);
-        }
+        const label = document.createElement('span'); label.className = 'tm-day-flags-unit';
+        label.textContent = group.name.match(/^\(([^)]+)\)/)?.[1] || group.name;
+        line.appendChild(label);
         for (const flag of group.flags) {
           const item = document.createElement('span'); item.className = 'tm-day-flag text-' + flag.color;
           item.title = `${group.name}: ${flag.label} — ${flag.count}`;
@@ -10017,9 +10042,10 @@ const tmConfirmationCalendarAdapter = (() => {
     for (const host of hosts) if (!host.isConnected) hosts.delete(host);
   }
 
-  async function run(page, context, key, items) {
+  async function run(page, context, key, items, availableByDate) {
     if (running) return;
     const pending = items.filter(({ date }) => {
+      if (!availableByDate.get(date)?.size) return false;
       const entry = cache.get(key + '|' + date);
       return !entry || Date.now() - entry.time >= (entry.error ? RETRY : TTL);
     });
@@ -10044,7 +10070,7 @@ const tmConfirmationCalendarAdapter = (() => {
             try {
               const result = response.data?.['flags' + n];
               if (result?.status !== 200) throw new Error('Consulta recusada');
-              entry = { value: summarize(result.data, date, context), time: Date.now() };
+              entry = { value: summarize(result.data, date, context, availableByDate.get(date)), time: Date.now() };
             } catch (_) { entry = { error: true, time: Date.now() }; }
             cache.delete(key + '|' + date); cache.set(key + '|' + date, entry);
           });
@@ -10053,7 +10079,7 @@ const tmConfirmationCalendarAdapter = (() => {
           batch.forEach(({ date }) => cache.set(key + '|' + date, { error: true, time: Date.now() }));
         } finally { cancel = null; }
         while (cache.size > LIMIT) cache.delete(cache.keys().next().value);
-        if (ticket === generation) paint(items, key);
+        if (ticket === generation) paint(items, key, availableByDate);
       }
     } finally {
       running = false;
@@ -10077,11 +10103,13 @@ const tmConfirmationCalendarAdapter = (() => {
       hosts.forEach((h) => h.remove()); hosts.clear();
       return;
     }
-    const key = JSON.stringify(context);
+    const availableByDate = bookableUnits(page);
+    const key = JSON.stringify([context, items.map(({ date }) =>
+      [date, availableByDate.get(date) ? [...availableByDate.get(date)].sort() : null])]);
     const workKey = key + '|' + items.map((item) => item.date).join(',');
     if (activeKey !== workKey) { stop(); activeKey = workKey; }
-    paint(items, key);
-    run(page, context, key, items);
+    paint(items, key, availableByDate);
+    run(page, context, key, items, availableByDate);
   }
   document.addEventListener('visibilitychange', sync);
   window.addEventListener('hashchange', sync);

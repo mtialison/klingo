@@ -11,7 +11,8 @@ const flag = (id = 7) => ({ id_sinalizador_atendimento: id, st_icon: id === 7 ? 
   st_cor: 'primary', st_sinalizador_atendimento: id === 7 ? 'Estacionamento' : 'Cadeirante' });
 const row = (id, unit = 5, doctor = 10, signal = flag()) => ({ data: date, status: 'ocupado',
   medico: { id_pessoa: doctor }, marcacao: { id_marcacao: id, id_medico: doctor,
-    id_unidade_operacao: unit, unidade_operacao: { st_nome: unit === 5 ? '(BANGU) - CLINICA' : '(COPA) - CLINICA' },
+    id_unidade_operacao: unit, unidade_operacao: { st_nome: unit === 5 ? '(BANGU) - CLINICA' :
+      unit === 6 ? '(BARRA) - CLINICA' : '(COPACABANA) - CLINICA' },
     id_sinalizador_atendimento: signal?.id_sinalizador_atendimento, sinalizador_atendimento: signal,
     arquivos: [{ filename: 'nao-contar.pdf' }], nome_paciente: 'NUNCA CONSERVAR' } });
 
@@ -33,7 +34,8 @@ function setup() {
     $refs: { listaPac: { listaproc: true, cc: false, infusao: false } },
     medicos: [{ id_pessoa: 10 }, { id_pessoa: 11 }], medicosSelecionados: [true, true],
     procedimentos: [{ selected: true, procedimento: { id_procedimento: 20 }, plano: { id_plano: 30 } }],
-    listaPacientes() {}, axios: client, exibicao: { [date]: {} } };
+    listaPacientes() {}, axios: client, exibicao: { [date]: {} },
+    horarios: [{ data: date, status: 'livre', id_unidade_operacao: 5 }] };
   const box = new Element();
   const querySelector = box.querySelector.bind(box);
   box.querySelector = (s) => s === 'h4 a.card-link' ? { textContent: '30/11' } : querySelector(s);
@@ -43,7 +45,7 @@ function setup() {
   const window = { location: { hash: '#/call-center' }, addEventListener() {} };
   const context = vm.createContext({ document, window, console, Date,
     tmRuntime: { register(_name, job) { sync = job; }, schedule() { scheduled++; } } });
-  vm.runInContext(script.slice(start, end) + '\nthis.api = { queryContext, summarize, bindings, sync, stop, cache, paint };', context);
+  vm.runInContext(script.slice(start, end) + '\nthis.api = { queryContext, bookableUnits, summarize, bindings, sync, stop, cache, paint };', context);
   return { ...context.api, page, document, window, box, requests, sync: () => sync(),
     respond(fn) { respond = fn; }, scheduled: () => scheduled };
 }
@@ -77,7 +79,8 @@ test('vários procedimentos mantêm consulta nativa sem restringir a um procedim
 test('conta somente sinalizadores, deduplica marcação e separa unidades/profissionais', () => {
   const f = setup();
   const summary = f.summarize({ agendas: [row(1), row(1), row(2), row(3, 6, 11), row(4, 5, 10, flag(4)),
-    row(5, 5, 999), row(6, 5, 10, null), { ...row(7), status: 'passado' }] }, date, f.queryContext(f.page));
+    row(5, 5, 999), row(6, 5, 10, null), { ...row(7), status: 'passado' }] },
+  date, f.queryContext(f.page), new Set(['5', '6']));
   assert.equal(summary.multipleUnits, true);
   assert.equal(summary.groups.length, 2);
   assert.equal(summary.groups[0].flags.find((f) => f.id === '7').count, 2);
@@ -89,7 +92,8 @@ test('conta somente sinalizadores, deduplica marcação e separa unidades/profis
 
 test('rotula unidade mesmo se apenas uma das unidades possui sinalizadores', () => {
   const f = setup();
-  const summary = f.summarize({ agendas: [row(1), row(2, 6, 11, null)] }, date, f.queryContext(f.page));
+  const summary = f.summarize({ agendas: [row(1), row(2, 6, 11, null)] },
+    date, f.queryContext(f.page), new Set(['5', '6']));
   assert.equal(summary.multipleUnits, true); assert.equal(summary.groups.length, 1);
 });
 
@@ -97,7 +101,7 @@ test('falha/paginação/sinalizador incompleto não viram ausência de sinalizad
   const f = setup(), q = f.queryContext(f.page);
   for (const data of [{ agendas: [], paginate: true }, {}, { agendas: [{ ...row(1), data: '2026-12-01' }] },
     { agendas: [{ ...row(1), marcacao: { ...row(1).marcacao, sinalizador_atendimento: null } }] }]) {
-    assert.throws(() => f.summarize(data, date, q));
+    assert.throws(() => f.summarize(data, date, q, new Set(['5', '6'])));
   }
 });
 
@@ -108,11 +112,50 @@ test('busca começa sem modal, chamadas repetidas usam cache, ícones não têm 
   assert.equal(f.box.children[0].attributes['aria-busy'], 'true');
   f.sync(); await settle(); f.sync(); await settle();
   assert.equal(f.requests.length, 1);
-  const host = f.box.children[0], line = host.children[0], item = line.children[0];
+  const host = f.box.children[0], line = host.children[0], item = line.children[1];
   assert.equal(host.attributes['aria-busy'], 'false');
+  assert.equal(line.children[0].textContent, 'BANGU');
   assert.equal(item.children[0].className, 'fa-solid fa-car');
   assert.equal(item.children[1].textContent, '1');
   assert.equal(item.title, '(BANGU) - CLINICA: Estacionamento — 1');
+});
+
+test('11/11 mostra somente sinalizadores da unidade com vaga livre', async () => {
+  const f = setup();
+  f.page.horarios = [
+    { data: date, status: 'ocupado', id_unidade_operacao: 5 },
+    { data: date, status: 'livre', id_unidade_operacao: 6 },
+    { data: date, status: 'livre', id_unidade_operacao: 5, bloqueado: true }
+  ];
+  f.respond(async () => ({ data: { flags0: { status: 200, data: {
+    agendas: [row(1, 5), row(2, 6), row(3, 7)]
+  } } } }));
+  assert.deepEqual([...f.bookableUnits(f.page).get(date)], ['6']);
+  f.sync(); await settle();
+  const host = f.box.children[0];
+  assert.equal(host.children.length, 1);
+  assert.equal(host.children[0].children[0].textContent, 'BARRA');
+  assert.equal(host.children[0].children[1].title, '(BARRA) - CLINICA: Estacionamento — 1');
+  assert.equal(f.cache.values().next().value.value.groups.length, 1);
+});
+
+test('sem unidade identificada na vaga livre não atribui ícones de outra unidade', async () => {
+  const f = setup();
+  f.page.horarios = [{ data: date, status: 'livre' }];
+  f.sync(); await settle();
+  assert.equal(f.requests.length, 0);
+  assert.equal(f.box.children[0].children[0].textContent, '?');
+});
+
+test('troca da unidade disponível invalida o resumo anterior da mesma data', async () => {
+  const f = setup();
+  f.sync(); await settle();
+  assert.equal(f.box.children[0].children[0].children[0].textContent, 'BANGU');
+  f.page.horarios = [{ data: date, status: 'livre', id_unidade_operacao: 6 }];
+  f.respond(async () => ({ data: { flags0: { status: 200, data: { agendas: [row(1), row(2, 6)] } } } }));
+  f.sync(); await settle();
+  assert.equal(f.requests.length, 2);
+  assert.equal(f.box.children[0].children[0].children[0].textContent, 'BARRA');
 });
 
 test('mudança de contexto descarta resposta antiga e troca de conta limpa cache', async () => {
