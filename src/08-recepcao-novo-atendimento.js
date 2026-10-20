@@ -162,12 +162,27 @@
 
       }
 
-      #${MODAL_ID} .tm-recepcao-origem-col select,
       #${MODAL_ID} .tm-recepcao-origem-col .input-group,
       #${MODAL_ID} .tm-recepcao-observacao-col input,
       #${MODAL_ID} .tm-recepcao-observacao-col textarea {
         width: 100% !important;
         max-width: 100% !important;
+      }
+
+      #${MODAL_ID} .tm-recepcao-origem-col .input-group {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+      }
+
+      #${MODAL_ID} .tm-recepcao-origem-col .input-group > select.form-control {
+        flex: 1 1 auto !important;
+        width: 0 !important;
+        min-width: 0 !important;
+      }
+
+      #${MODAL_ID} .tm-recepcao-origem-col .input-group > :not(select) {
+        flex: 0 0 auto !important;
       }
     `;
     document.head.appendChild(style);

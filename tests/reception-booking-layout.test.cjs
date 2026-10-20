@@ -62,3 +62,10 @@ test('Recepção oculta telefone também para paciente cadastrado e amplia obser
   assert.match(source, /\.form-row > \.tm-recepcao-origem-col \{\s*flex: 0 0 25% !important;\s*max-width: 25% !important;/);
   assert.match(source, /\.form-row > \.tm-recepcao-observacao-col \{\s*flex: 0 0 50% !important;\s*max-width: 50% !important;/);
 });
+
+test('Recepção mantém indicador de inválido e seletor de origem na mesma linha', () => {
+  assert.match(source, /\.tm-recepcao-origem-col \.input-group \{\s*display: flex !important;\s*flex-wrap: nowrap !important;/);
+  assert.match(source, /\.tm-recepcao-origem-col \.input-group > select\.form-control \{\s*flex: 1 1 auto !important;\s*width: 0 !important;\s*min-width: 0 !important;/);
+  assert.match(source, /\.tm-recepcao-origem-col \.input-group > :not\(select\) \{\s*flex: 0 0 auto !important;/);
+  assert.doesNotMatch(source, /\.tm-recepcao-origem-col select,\s*#\$\{MODAL_ID\} \.tm-recepcao-origem-col \.input-group/);
+});
