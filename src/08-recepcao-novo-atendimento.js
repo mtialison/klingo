@@ -150,7 +150,8 @@
           max-width: 50% !important;
         }
 
-        #${MODAL_ID}.tm-recepcao-primeira-vez .tm-recepcao-dados-row > .col.col-md-3:not(.tm-recepcao-hidden-field) {
+        #${MODAL_ID}.tm-recepcao-primeira-vez .tm-recepcao-dados-row > .col:not(.tm-recepcao-hidden-field),
+        #${MODAL_ID}.tm-recepcao-primeira-vez .tm-recepcao-contato-row > .col:not(.tm-recepcao-hidden-field) {
           flex: 0 0 33.333333% !important;
           max-width: 33.333333% !important;
         }
@@ -212,6 +213,36 @@
         setClass(title, 'tm-recepcao-origem-titulo-oculto', true);
       }
     }
+  }
+
+  function arrangeFirstTimeReceptionFields(modal) {
+    const name = fieldByLabel(modal, 'Nome');
+    const birth = fieldByLabel(modal, 'Data de Nascimento');
+    const cpf = fieldByLabel(modal, 'CPF');
+    const email = fieldByLabel(modal, 'e-mail');
+    const cellular = fieldByLabel(modal, 'Celular');
+    const sex = fieldByLabel(modal, 'Sexo');
+    const origin = fieldByLabel(modal, 'Origem do Agendamento');
+    const detailsRow = birth?.parentElement;
+    const contactRow = email?.parentElement;
+    if (![name, birth, cpf, email, cellular, sex].every(Boolean) ||
+        !detailsRow?.classList.contains('form-row') ||
+        !contactRow?.classList.contains('form-row') || detailsRow === contactRow) return;
+
+    const placeAfter = (row, field, previous) => {
+      if (field.parentElement !== row || field.previousElementSibling !== previous) {
+        row.insertBefore(field, previous ? previous.nextElementSibling : row.firstElementChild);
+      }
+    };
+    placeAfter(detailsRow, name, null);
+    placeAfter(detailsRow, birth, name);
+    placeAfter(detailsRow, cpf, birth);
+    placeAfter(contactRow, email, null);
+    placeAfter(contactRow, cellular, email);
+    if (origin) placeAfter(contactRow, origin, cellular);
+    placeAfter(contactRow, sex, origin || cellular);
+    setClass(detailsRow, 'tm-recepcao-dados-row', true);
+    setClass(contactRow, 'tm-recepcao-contato-row', true);
   }
 
   function requiredReceptionField(modal, labelText) {
@@ -487,6 +518,8 @@
         setClass(field, 'tm-recepcao-hidden-field', field === phone));
       modal.querySelectorAll('.tm-recepcao-dados-row').forEach((row) =>
         setClass(row, 'tm-recepcao-dados-row', false));
+      modal.querySelectorAll('.tm-recepcao-contato-row').forEach((row) =>
+        setClass(row, 'tm-recepcao-contato-row', false));
       return;
     }
 
@@ -497,6 +530,7 @@
         setClass(field.parentElement, 'tm-recepcao-dados-row', true);
       }
     }
+    arrangeFirstTimeReceptionFields(modal);
   }
 
   function observeReceptionMutations() {

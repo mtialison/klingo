@@ -69,3 +69,62 @@ test('Recepção mantém indicador de inválido e seletor de origem na mesma lin
   assert.match(source, /\.tm-recepcao-origem-col \.input-group > :not\(select\) \{\s*flex: 0 0 auto !important;/);
   assert.doesNotMatch(source, /\.tm-recepcao-origem-col select,\s*#\$\{MODAL_ID\} \.tm-recepcao-origem-col \.input-group/);
 });
+
+test('Primeira Vez organiza as duas linhas sem recriar nem limpar campos', () => {
+  const start = source.indexOf('  function setClass(element');
+  const end = source.indexOf('  function requiredReceptionField(', start);
+  const context = vm.createContext({});
+  vm.runInContext(source.slice(start, end), context);
+
+  const classes = () => {
+    const values = new Set(['form-row']);
+    return { contains: (name) => values.has(name), toggle(name, active) {
+      if (active) values.add(name); else values.delete(name);
+    } };
+  };
+  const row = (children) => {
+    const result = { children, classList: classes(), moves: 0,
+      get firstElementChild() { return this.children[0] || null; },
+      insertBefore(field, next) {
+        if (field.parentElement) {
+          field.parentElement.children = field.parentElement.children.filter((item) => item !== field);
+        }
+        this.children.splice(next ? this.children.indexOf(next) : this.children.length, 0, field);
+        field.parentElement = this;
+        this.moves++;
+      }
+    };
+    children.forEach((field) => { field.parentElement = result; });
+    return result;
+  };
+  const field = () => ({ value: 'preservado', get previousElementSibling() {
+    const siblings = this.parentElement?.children || [];
+    return siblings[siblings.indexOf(this) - 1] || null;
+  }, get nextElementSibling() {
+    const siblings = this.parentElement?.children || [];
+    return siblings[siblings.indexOf(this) + 1] || null;
+  } });
+  const [sex, birth, cellular, email, name, cpf, origin] = Array.from({ length: 7 }, field);
+  const details = row([sex, birth, cellular]);
+  const contact = row([email, name, cpf]);
+  const original = row([origin]);
+  const fields = { Nome: name, 'Data de Nascimento': birth, CPF: cpf,
+    'e-mail': email, Celular: cellular, Sexo: sex, 'Origem do Agendamento': origin };
+  const modal = { querySelectorAll(selector) {
+    if (selector !== 'small.form-text.text-muted') return [];
+    return Object.entries(fields).map(([textContent, node]) => ({ textContent,
+      closest(target) { return target === '.modal' ? modal : node; } }));
+  } };
+  const arrange = vm.runInContext('arrangeFirstTimeReceptionFields', context);
+  arrange(modal);
+  assert.deepEqual(details.children, [name, birth, cpf]);
+  assert.deepEqual(contact.children, [email, cellular, origin, sex]);
+  assert.deepEqual(original.children, []);
+  assert.equal(details.classList.contains('tm-recepcao-dados-row'), true);
+  assert.equal(contact.classList.contains('tm-recepcao-contato-row'), true);
+  assert.ok(Object.values(fields).every((node) => node.value === 'preservado'));
+  const moves = details.moves + contact.moves;
+  arrange(modal);
+  assert.equal(details.moves + contact.moves, moves);
+  assert.match(source, /\.tm-recepcao-contato-row > \.col:not\(\.tm-recepcao-hidden-field\) \{\s*flex: 0 0 33\.333333% !important;/);
+});
