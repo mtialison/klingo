@@ -12,7 +12,9 @@ const functions = script.slice(begin, end);
 function fixture() {
   const toasts = [];
   let calls = 0;
-  const cpf = { value: '', focus() { this.focused = true; }, setAttribute() {} };
+  const cpf = { value: '', required: true, focus() { this.focused = true; },
+    removeAttribute(name) { this.removedAttribute = name; },
+    setCustomValidity(value) { this.customValidity = value; } };
   const email = { value: '', focus() { this.focused = true; }, setAttribute() {} };
   const modal = {
     isConnected: true,
@@ -43,27 +45,28 @@ function fixture() {
   };
 }
 
-test('CPF e e-mail vazios bloqueiam conclusão também pela ação direta do componente', () => {
+test('CPF vazio não bloqueia a Recepção, mas e-mail continua obrigatório', () => {
   const f = fixture();
   f.guard(f.modal);
   assert.equal(f.component.marcar(), undefined);
   assert.equal(f.calls(), 0);
-  assert.equal(f.toasts.length, 2);
-  assert.equal(f.cpf.focused, true);
-  assert.equal(f.cpf.required, true);
+  assert.equal(f.toasts.length, 1);
+  assert.equal(f.toasts[0].detail, 'O campo e-mail é obrigatório.');
+  assert.equal(f.cpf.focused, undefined);
+  assert.equal(f.cpf.required, false);
+  assert.equal(f.cpf.removedAttribute, 'aria-required');
   assert.equal(f.email.required, true);
 
-  f.cpf.value = '12345678901';
   f.email.value = 'paciente@example.com';
   f.guard(f.modal);
   assert.equal(f.component.marcar(), 'salvo');
   assert.equal(f.calls(), 1);
 });
 
-test('validação falha de modo seguro se um campo ainda não foi renderizado', () => {
+test('validação falha de modo seguro se o e-mail ainda não foi renderizado', () => {
   const f = fixture();
   f.modal.querySelectorAll = () => [];
   assert.equal(f.validate(f.modal), false);
-  assert.equal(f.toasts.length, 2);
+  assert.equal(f.toasts.length, 1);
   assert.equal(f.calls(), 0);
 });

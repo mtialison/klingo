@@ -163,10 +163,8 @@
 
   function requiredReceptionField(modal, labelText) {
     const column = fieldByLabel(modal, labelText);
-    const fallback = labelText === 'CPF'
-      ? 'input[name*="cpf" i], input[id*="cpf" i]'
-      : 'input[type="email"], input[name*="email" i], input[id*="email" i]';
-    const input = column?.querySelector('input') || modal.querySelector(fallback);
+    const input = column?.querySelector('input') ||
+      modal.querySelector('input[type="email"], input[name*="email" i], input[id*="email" i]');
     if (input) {
       input.required = true;
       input.setAttribute('aria-required', 'true');
@@ -174,9 +172,18 @@
     return input || null;
   }
 
+  function optionalReceptionCpf(modal) {
+    const input = fieldByLabel(modal, 'CPF')?.querySelector('input') ||
+      modal.querySelector('input[name*="cpf" i], input[id*="cpf" i]');
+    if (!input) return;
+    input.required = false;
+    input.removeAttribute('aria-required');
+    input.setCustomValidity?.('');
+  }
+
   function validateRequiredReceptionFields(modal, event) {
+    optionalReceptionCpf(modal);
     const fields = [
-      { input: requiredReceptionField(modal, 'CPF'), name: 'CPF' },
       { input: requiredReceptionField(modal, 'e-mail'), name: 'e-mail' }
     ];
     const missing = fields.filter(({ input }) => !input || !norm(input.value));
@@ -400,7 +407,7 @@
     const social = fieldByLabel(modal, 'Nome Social');
     const phone = fieldByLabel(modal, 'Telefone');
     const cpf = fieldByLabel(modal, 'CPF');
-    requiredReceptionField(modal, 'CPF');
+    optionalReceptionCpf(modal);
     requiredReceptionField(modal, 'e-mail');
     const observationLabel = Array.from(modal.querySelectorAll('small, label'))
       .find((element) => element.closest('.modal') === modal &&
