@@ -445,6 +445,7 @@
 
     const social = fieldByLabel(modal, 'Nome Social');
     const phone = fieldByLabel(modal, 'Telefone');
+    if (phone) setClass(phone, 'tm-recepcao-hidden-field', true);
     const phoneInput = phone?.querySelector('input');
     if (phoneInput) {
       phoneInput.required = false;
@@ -474,7 +475,7 @@
       return;
     }
 
-    for (const field of [phone, social]) {
+    for (const field of [social]) {
       if (!field) continue;
       setClass(field, 'tm-recepcao-hidden-field', true);
       if (field.parentElement?.classList.contains('form-row')) {

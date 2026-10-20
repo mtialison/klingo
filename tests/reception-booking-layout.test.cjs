@@ -56,6 +56,7 @@ test('Recepção coloca origem após celular e oculta apenas o título azul', ()
 });
 
 test('Recepção oculta telefone também para paciente cadastrado e amplia observação', () => {
+  assert.match(source, /const phone = fieldByLabel\(modal, 'Telefone'\);\s*if \(phone\) setClass\(phone, 'tm-recepcao-hidden-field', true\);/);
   assert.match(source, /setClass\(field, 'tm-recepcao-hidden-field', field === phone\)/);
   assert.match(source, /phoneInput\.required = false;/);
   assert.match(source, /\.form-row > \.tm-recepcao-origem-col \{\s*flex: 0 0 25% !important;\s*max-width: 25% !important;/);

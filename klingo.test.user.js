@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.8
+// @version      1.9
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -6508,6 +6508,7 @@ const tmBookingModalWatch = (() => {
 
     const social = fieldByLabel(modal, 'Nome Social');
     const phone = fieldByLabel(modal, 'Telefone');
+    if (phone) setClass(phone, 'tm-recepcao-hidden-field', true);
     const phoneInput = phone?.querySelector('input');
     if (phoneInput) {
       phoneInput.required = false;
@@ -6537,7 +6538,7 @@ const tmBookingModalWatch = (() => {
       return;
     }
 
-    for (const field of [phone, social]) {
+    for (const field of [social]) {
       if (!field) continue;
       setClass(field, 'tm-recepcao-hidden-field', true);
       if (field.parentElement?.classList.contains('form-row')) {
