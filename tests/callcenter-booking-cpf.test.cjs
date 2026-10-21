@@ -117,7 +117,7 @@ test('vincula somente uma ficha com CPF completo e id de pessoa válido', () => 
   const exact = sourceFunction('tmCadExactCpfRecords', 'tmCadSelectExactCpf', { tmCadCpfDigits: cpfDigits });
   const cpf = '52998224725';
   const records = [
-    { id_pessoa: 12, st_cpf: '529.982.247-25' },
+    { id_pessoa: 12, cadastro: { st_cpf: '529.982.247-25' } },
     { id_pessoa: 13, st_cpf: '123.456.789-09' },
     { id_pessoa: -1, st_cpf: cpf }
   ];
@@ -146,13 +146,13 @@ test('consulta CPF sem aguardar sexo, nascimento ou celular e seleciona só o re
     identificar_paciente(record) { selected.push(record.id_pessoa); },
     $util: { loadItem(_component, request) {
       params = request;
-      return Promise.resolve({ pacientes: [
+      return Promise.resolve([
         { id_pessoa: 31, st_cpf: '12345678909' },
-        { id_pessoa: 42, st_cpf: cpf }
-      ] });
+        { id_pessoa: 42, cadastro: { st_cpf: cpf } }
+      ]);
     } }
   };
-  const modal = { isConnected: true, querySelector: () => ({ __vue__: component }) };
+  const modal = { isConnected: true, querySelector: () => ({ parentElement: { __vue__: component } }) };
   const context = {
     cpfLookups: new WeakMap(),
     tmCadFieldByLabel: () => ({ querySelector: () => input }),
@@ -169,8 +169,8 @@ test('consulta CPF sem aguardar sexo, nascimento ou celular e seleciona só o re
   const state = lookup(modal);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(params.service, 'pacientes');
-  assert.equal(params.func, 'checar_existencia');
-  assert.equal(params.parms.st_cpf, cpf);
+  assert.equal(params.func, 'index');
+  assert.equal(params.parms.search, cpf);
   assert.deepEqual(selected, [42]);
   assert.equal(state.done, true);
   assert.equal(state.selectedCpf, cpf);

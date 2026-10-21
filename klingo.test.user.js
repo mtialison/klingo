@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.14
+// @version      1.15
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -2979,7 +2979,7 @@ const tmBookingModalWatch = (() => {
   }
 
   function tmCadCadastroComponent(modal) {
-    const component = modal?.querySelector('#cadTemp')?.__vue__;
+    const component = modal?.querySelector('#cadTemp')?.parentElement?.__vue__;
     return component?.value && typeof component.$util?.loadItem === 'function' &&
       typeof component.identificar_paciente === 'function' ? component : null;
   }
@@ -2996,7 +2996,7 @@ const tmBookingModalWatch = (() => {
 
   function tmCadExactCpfRecords(records, cpf) {
     return Array.isArray(records) ? records.filter((record) =>
-      tmCadCpfDigits(record?.st_cpf || record?.pessoa?.st_cpf) === cpf &&
+      tmCadCpfDigits(record?.st_cpf || record?.cadastro?.st_cpf || record?.pessoa?.st_cpf) === cpf &&
       Number(record?.id_pessoa) > 0) : [];
   }
 
@@ -3022,15 +3022,11 @@ const tmBookingModalWatch = (() => {
 
     let state = cpfLookups.get(component);
     if (!state) {
-      state = { cpf: '', mode: '', pending: false, done: false, selectedCpf: '', matches: 0, generation: 0 };
+      state = { cpf: '', pending: false, done: false, selectedCpf: '', matches: 0, generation: 0 };
       cpfLookups.set(component, state);
     }
-    const phone = tmCadCpfDigits(component.value.st_celular || component.value.st_telefone);
-    const mode = component.value.ch_sexo && component.value.dt_nascimento &&
-      (phone.length === 10 || phone.length === 11) ? 'full' : 'cpf';
-    if (state.cpf !== cpf || state.mode !== mode) {
+    if (state.cpf !== cpf) {
       state.cpf = cpf;
-      state.mode = mode;
       state.pending = false;
       state.done = false;
       state.selectedCpf = '';
@@ -3042,19 +3038,16 @@ const tmBookingModalWatch = (() => {
 
     state.pending = true;
     const generation = state.generation;
-    // O watcher nativo exige sexo + nascimento + contato. Consultamos pelo CPF
-    // completo usando o mesmo serviço que alimenta "Possíveis Cadastros".
+    // A pesquisa nativa de pacientes aceita CPF isolado; checar_existencia
+    // exige os demais dados e falha quando recebe apenas o CPF.
     Promise.resolve(component.$util.loadItem(component, {
-      service: 'pacientes', func: 'checar_existencia',
-      parms: mode === 'full' ? { ...component.value, st_cpf: cpf, temps: true } :
-        { st_cpf: cpf, temps: false }
+      service: 'pacientes', func: 'index', parms: { search: cpf }
     })).then((result) => {
       if (state.generation !== generation || !modal.isConnected || !tmCadIsCpfLookupTarget(modal) ||
           tmCadCpfDigits(input.value) !== cpf) return;
-      const matches = tmCadExactCpfRecords(result?.pacientes, cpf);
+      const matches = tmCadExactCpfRecords(result, cpf);
       state.done = true;
       state.matches = matches.length;
-      if (matches.length) component.lista = matches;
       tmCadSelectExactCpf(modal, component, cpf, matches);
     }).catch(() => {
       if (state.generation === generation) state.done = false;
@@ -3073,7 +3066,7 @@ const tmBookingModalWatch = (() => {
     event?.stopImmediatePropagation();
     (tmCadCadastroComponent(modal)?.$toast || tmCadBookingComponent(modal)?.$toast)?.add({
       severity: 'warn', summary: 'Atenção',
-      detail: state?.matches > 1 ? 'Há mais de uma ficha com este CPF. Selecione a correta.' :
+      detail: state?.matches > 1 ? 'Há mais de uma ficha com este CPF. Confira os demais dados e selecione a correta.' :
         state?.selectedCpf ? 'Aguarde a ficha existente carregar.' :
           'Aguarde a conferência do CPF antes de confirmar.', life: 5000
     });
