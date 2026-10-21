@@ -79,6 +79,7 @@ test('ficha existente mostra Nome, Nascimento e CPF como leitura, antes do conta
 test('identificação da ficha usa tamanho e tipografia dos campos nativos da Recepção', () => {
   assert.match(source, /\.tm-recepcao-existing-identity-row \.form-control,[\s\S]*?font-size: \.875rem !important/);
   assert.match(source, /\.tm-recepcao-existing-identity-row \.form-control,[\s\S]*?height: calc\(1\.5em \+ \.5rem \+ 2px\) !important/);
+  assert.match(source, /\.tm-recepcao-perfil-append button \{[\s\S]*?font-size: \.875rem !important;[\s\S]*?height: calc\(1\.5em \+ \.5rem \+ 2px\) !important/);
 });
 
 test('abrir histórico chama o perfil sem executar o clique nativo que fecha o agendamento', () => {

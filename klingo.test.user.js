@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.36
+// @version      1.37
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -6759,6 +6759,8 @@ const tmBookingModalWatch = (() => {
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
+        font-size: .875rem !important;
+        line-height: 1.5 !important;
         height: calc(1.5em + .5rem + 2px) !important;
         min-width: 36px !important;
         padding: 0 !important;
