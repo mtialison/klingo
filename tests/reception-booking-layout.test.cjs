@@ -8,7 +8,7 @@ const source = fs.readFileSync(path.join(__dirname, '..', 'src', '08-recepcao-no
 
 test('Recepção coloca origem após celular e oculta apenas o título azul', () => {
   const start = source.indexOf('  function setClass(element');
-  const end = source.indexOf('  function requiredReceptionField(', start);
+  const end = source.indexOf('  function requiredReceptionCpf(', start);
   const context = vm.createContext({});
   vm.runInContext(source.slice(start, end), context);
 
@@ -72,7 +72,7 @@ test('Recepção mantém indicador de inválido e seletor de origem na mesma lin
 
 test('Primeira Vez organiza as duas linhas sem recriar nem limpar campos', () => {
   const start = source.indexOf('  function setClass(element');
-  const end = source.indexOf('  function requiredReceptionField(', start);
+  const end = source.indexOf('  function requiredReceptionCpf(', start);
   const context = vm.createContext({});
   vm.runInContext(source.slice(start, end), context);
 

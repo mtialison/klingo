@@ -15,7 +15,9 @@ function fixture() {
   const cpf = { value: '', required: false, focus() { this.focused = true; },
     setAttribute(name, value) { this.attributes ??= {}; this.attributes[name] = value; },
     setCustomValidity(value) { this.customValidity = value; } };
-  const email = { value: '', focus() { this.focused = true; }, setAttribute() {} };
+  const email = { value: '', required: true, focus() { this.focused = true; },
+    removeAttribute(name) { this.removedAttribute = name; },
+    setCustomValidity(value) { this.customValidity = value; } };
   const modal = {
     isConnected: true,
     classList: { contains: () => true },
@@ -45,23 +47,19 @@ function fixture() {
   };
 }
 
-test('CPF e e-mail vazios bloqueiam a conclusão na Recepção', () => {
+test('CPF vazio bloqueia a conclusão, mas e-mail vazio é permitido na Recepção', () => {
   const f = fixture();
   f.guard(f.modal);
   assert.equal(f.component.marcar(), undefined);
   assert.equal(f.calls(), 0);
-  assert.equal(f.toasts.length, 2);
+  assert.equal(f.toasts.length, 1);
   assert.equal(f.toasts[0].detail, 'O campo CPF é obrigatório.');
-  assert.equal(f.toasts[1].detail, 'O campo e-mail é obrigatório.');
   assert.equal(f.cpf.focused, true);
   assert.equal(f.cpf.required, true);
   assert.equal(f.cpf.attributes['aria-required'], 'true');
-  assert.equal(f.email.required, true);
+  assert.equal(f.email.required, false);
+  assert.equal(f.email.removedAttribute, 'aria-required');
 
-  f.email.value = 'paciente@example.com';
-  f.guard(f.modal);
-  assert.equal(f.component.marcar(), undefined);
-  assert.equal(f.calls(), 0);
   f.cpf.value = '084.864.457-36';
   assert.equal(f.component.marcar(), 'salvo');
   assert.equal(f.calls(), 1);
@@ -73,15 +71,18 @@ test('ficha existente sem campo CPF visível não bloqueia a Recepção', () => 
     { textContent: 'e-mail', closest: target => target === '.modal' ? f.modal :
       { querySelector: () => f.email } }
   ] : [];
-  f.email.value = 'paciente@example.com';
   f.guard(f.modal);
   assert.equal(f.component.marcar(), 'salvo');
+  assert.equal(f.email.required, false);
 });
 
-test('validação falha de modo seguro se o e-mail ainda não foi renderizado', () => {
+test('e-mail ainda não renderizado não bloqueia o agendamento', () => {
   const f = fixture();
-  f.modal.querySelectorAll = () => [];
-  assert.equal(f.validate(f.modal), false);
-  assert.equal(f.toasts.length, 1);
-  assert.equal(f.calls(), 0);
+  f.modal.querySelectorAll = selector => selector === 'small.form-text.text-muted' ? [
+    { textContent: 'CPF', closest: target => target === '.modal' ? f.modal :
+      { querySelector: () => f.cpf } }
+  ] : [];
+  f.cpf.value = '084.864.457-36';
+  assert.equal(f.validate(f.modal), true);
+  assert.equal(f.toasts.length, 0);
 });

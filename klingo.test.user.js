@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.31
+// @version      1.32
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -6813,10 +6813,8 @@ const tmBookingModalWatch = (() => {
     setClass(contactRow, 'tm-recepcao-contato-row', true);
   }
 
-  function requiredReceptionField(modal, labelText) {
-    const column = fieldByLabel(modal, labelText);
-    const input = column?.querySelector('input') ||
-      (labelText === 'e-mail' ? modal.querySelector('input[type="email"], input[name*="email" i], input[id*="email" i]') : null);
+  function requiredReceptionCpf(modal) {
+    const input = fieldByLabel(modal, 'CPF')?.querySelector('input');
     if (input) {
       input.required = true;
       input.setAttribute('aria-required', 'true');
@@ -6824,13 +6822,19 @@ const tmBookingModalWatch = (() => {
     return input || null;
   }
 
+  function optionalReceptionEmail(modal) {
+    const input = fieldByLabel(modal, 'e-mail')?.querySelector('input') ||
+      modal.querySelector('input[type="email"], input[name*="email" i], input[id*="email" i]');
+    if (!input) return;
+    input.required = false;
+    input.removeAttribute('aria-required');
+    if (!norm(input.value)) input.setCustomValidity?.('');
+  }
+
   function validateRequiredReceptionFields(modal, event) {
-    const cpf = requiredReceptionField(modal, 'CPF');
-    const fields = [
-      ...(cpf ? [{ input: cpf, name: 'CPF' }] : []),
-      { input: requiredReceptionField(modal, 'e-mail'), name: 'e-mail' }
-    ];
-    const missing = fields.filter(({ input }) => !input || !norm(input.value));
+    optionalReceptionEmail(modal);
+    const cpf = requiredReceptionCpf(modal);
+    const missing = cpf && !norm(cpf.value) ? [{ input: cpf, name: 'CPF' }] : [];
     if (!missing.length) return true;
 
     event?.preventDefault();
@@ -7058,8 +7062,8 @@ const tmBookingModalWatch = (() => {
       phoneInput.removeAttribute('aria-required');
     }
     const cpf = fieldByLabel(modal, 'CPF');
-    requiredReceptionField(modal, 'CPF');
-    requiredReceptionField(modal, 'e-mail');
+    requiredReceptionCpf(modal);
+    optionalReceptionEmail(modal);
     const observationLabel = Array.from(modal.querySelectorAll('small, label'))
       .find((element) => element.closest('.modal') === modal &&
         norm(element.textContent) === 'Observação');
