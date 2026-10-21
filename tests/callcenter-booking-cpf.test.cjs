@@ -135,6 +135,26 @@ test('a busca cobre cadastro temporário da recepção e edição, sem exigir CP
   assert.equal(target({ id: 'novoAtendimento2Modal', querySelector: () => null }), false);
 });
 
+test('ao trocar para a ficha existente preserva celular informado somente se destino estiver vazio', () => {
+  const modal = {};
+  const pendingCpfTransfers = new WeakMap([[modal, { cellular: '(21) 98888-7777' }]]);
+  const input = { value: '' };
+  const restore = sourceFunction('tmCadRestorePendingFields', 'tmCadLookupCpf', {
+    pendingCpfTransfers,
+    tmCadIsPrimeiraVez: () => false,
+    tmCadFieldByLabel: () => ({ querySelector: () => input }),
+    tmCadSetInputValue: (el, value) => { el.value = value; }
+  });
+  restore(modal);
+  assert.equal(input.value, '(21) 98888-7777');
+  assert.equal(pendingCpfTransfers.has(modal), false);
+
+  input.value = '(21) 97777-6666';
+  pendingCpfTransfers.set(modal, { cellular: '(21) 98888-7777' });
+  restore(modal);
+  assert.equal(input.value, '(21) 97777-6666');
+});
+
 test('consulta CPF sem aguardar sexo, nascimento ou celular e seleciona só o resultado exato', async () => {
   const cpf = '52998224725';
   const input = { value: '529.982.247-25' };

@@ -33,6 +33,7 @@ const tmBookingModalWatch = (() => {
   const modalBaselines = new WeakMap();
   const cpfLookups = new WeakMap();
   const otherCpfObservers = new WeakMap();
+  const pendingCpfTransfers = new WeakMap();
 
   function tmCadNorm(value) {
     return String(value || '').replace(/\s+/g, ' ').trim();
@@ -657,8 +658,21 @@ const tmBookingModalWatch = (() => {
     const state = cpfLookups.get(component);
     if (state?.selectedCpf === cpf) return true;
     if (state) state.selectedCpf = cpf;
+    if (modal.id === 'cadastroModal') {
+      const cellular = tmCadFieldByLabel(modal, 'Celular')?.querySelector('input')?.value;
+      if (cellular) pendingCpfTransfers.set(modal, { cellular });
+    }
     component.identificar_paciente(matches[0]);
     return true;
+  }
+
+  function tmCadRestorePendingFields(modal) {
+    const pending = pendingCpfTransfers.get(modal);
+    if (!pending || tmCadIsPrimeiraVez(modal)) return;
+    const cellular = tmCadFieldByLabel(modal, 'Celular')?.querySelector('input');
+    if (!cellular) return;
+    if (!cellular.value) tmCadSetInputValue(cellular, pending.cellular);
+    pendingCpfTransfers.delete(modal);
   }
 
   function tmCadLookupCpf(modal) {
@@ -1573,6 +1587,7 @@ const tmBookingModalWatch = (() => {
 
     if (!tmCadIsPrimeiraVez(modal)) {
       tmCadClearPrimeiraVezLayout(modal);
+      tmCadRestorePendingFields(modal);
       return;
     }
 
@@ -1719,6 +1734,7 @@ const tmBookingModalWatch = (() => {
 
   document.addEventListener('hidden.bs.modal', (event) => {
     otherCpfObservers.get(event.target)?.disconnect();
+    pendingCpfTransfers.delete(event.target);
     const state = cpfLookups.get(tmCadCadastroComponent(event.target));
     if (state) {
       state.generation += 1;
