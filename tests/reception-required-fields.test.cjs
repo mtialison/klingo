@@ -18,12 +18,18 @@ function fixture() {
   const email = { value: '', required: true, focus() { this.focused = true; },
     removeAttribute(name) { this.removedAttribute = name; },
     setCustomValidity(value) { this.customValidity = value; } };
+  const filled = ['Nome', 'Data de Nascimento', 'Sexo', 'Celular', 'Origem do Agendamento']
+    .map((name) => ({ textContent: name, closest: target => target === '.modal' ? modal :
+      { querySelector: () => ({ value: 'preenchido', tagName: name === 'Sexo' || name === 'Origem do Agendamento' ? 'SELECT' : 'INPUT',
+        selectedOptions: [{ textContent: 'Opção' }] }) } }));
   const modal = {
     isConnected: true,
     classList: { contains: () => true },
     querySelectorAll(selector) { return selector === 'small.form-text.text-muted' ? [
       { textContent: 'CPF', closest: (target) => target === '.modal' ? modal : { querySelector: () => cpf } },
-      { textContent: 'e-mail', closest: (target) => target === '.modal' ? modal : { querySelector: () => email } }
+      { textContent: 'e-mail', closest: (target) => target === '.modal' ? modal : { querySelector: () => email } },
+      { textContent: 'Nome Social', closest: (target) => target === '.modal' ? modal : {} },
+      ...filled
     ] : []; },
     querySelector() { return null; }
   };
@@ -121,6 +127,34 @@ test('ficha existente sem campo CPF visível não bloqueia a Recepção', () => 
   f.guard(f.modal);
   assert.equal(f.component.marcar(), 'salvo');
   assert.equal(f.email.required, false);
+});
+
+test('ficha existente sinaliza Celular e Origem vazios ao concluir', () => {
+  const f = fixture();
+  const classes = () => { const values = new Set(); return {
+    add: name => values.add(name), remove: name => values.delete(name),
+    contains: name => values.has(name) }; };
+  const controls = new Map();
+  const labels = ['Celular', 'Origem do Agendamento'].map((name) => {
+    const host = { classList: classes(), warning: null,
+      querySelector() { return this.warning; }, appendChild(warning) { this.warning = warning; } };
+    const control = { value: '', tagName: name === 'Celular' ? 'INPUT' : 'SELECT',
+      selectedOptions: [{ textContent: 'Selecione...' }], parentElement: host,
+      classList: classes(), offsetTop: 0, offsetLeft: 0, offsetHeight: 29, focus() {} };
+    controls.set(name, control);
+    return { textContent: name, closest: target => target === '.modal' ? f.modal :
+      { querySelector: () => control } };
+  });
+  f.modal.querySelectorAll = selector => selector === 'small.form-text.text-muted' ? labels : [];
+  f.context.document.createElement = () => ({ className: '', textContent: '', style: {},
+    setAttribute() {}, remove() { this.removed = true; } });
+
+  assert.equal(f.validate(f.modal), false);
+  assert.equal(f.toasts[0].detail, 'Verificar preenchimento dos campos obrigatórios.');
+  for (const control of controls.values()) {
+    assert.equal(control.parentElement.warning.textContent, '!');
+    assert.equal(control.classList.contains('tm-recepcao-warning-control'), true);
+  }
 });
 
 test('e-mail ainda não renderizado não bloqueia o agendamento', () => {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.37
+// @version      1.38
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -7170,7 +7170,7 @@ const tmBookingModalWatch = (() => {
     const fields = firstTime ? [
       ['Nome', 'input'], ['Data de Nascimento', 'input'], ['CPF', 'input'],
       ['Sexo', 'select'], ['Celular', 'input'], ['Origem do Agendamento', 'select']
-    ] : [['CPF', 'input']];
+    ] : [['Celular', 'input'], ['Origem do Agendamento', 'select']];
     return fields.map(([name, selector]) => {
       const field = fieldByLabel(modal, name);
       const control = field?.querySelector(selector) || null;

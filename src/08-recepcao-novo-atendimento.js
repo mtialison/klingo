@@ -606,7 +606,7 @@
     const fields = firstTime ? [
       ['Nome', 'input'], ['Data de Nascimento', 'input'], ['CPF', 'input'],
       ['Sexo', 'select'], ['Celular', 'input'], ['Origem do Agendamento', 'select']
-    ] : [['CPF', 'input']];
+    ] : [['Celular', 'input'], ['Origem do Agendamento', 'select']];
     return fields.map(([name, selector]) => {
       const field = fieldByLabel(modal, name);
       const control = field?.querySelector(selector) || null;
