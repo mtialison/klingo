@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.32
+// @version      1.33
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -6585,6 +6585,8 @@ const tmBookingModalWatch = (() => {
   let originInjectedComponent = null;
   const guardedBookings = new WeakSet();
   const bookingModals = new WeakMap();
+  const validationAttempted = new WeakSet();
+  const lastValidationToast = new WeakMap();
 
   function setClass(element, className, active) {
     if (element.classList.contains(className) !== active) {
@@ -6702,6 +6704,16 @@ const tmBookingModalWatch = (() => {
       #${MODAL_ID} .tm-recepcao-origem-titulo-oculto {
         display: none !important;
       }
+
+      #${MODAL_ID} .tm-recepcao-warning-host { position: relative !important; }
+      #${MODAL_ID} .tm-recepcao-required-warning {
+        position: absolute !important; z-index: 3; display: inline-flex;
+        align-items: center; justify-content: center; width: 24px;
+        color: #dc3545; background: #f8d7da; border-right: 1px solid #f5c6cb;
+        border-radius: 3px 0 0 3px; font-weight: 700;
+        pointer-events: none;
+      }
+      #${MODAL_ID} .tm-recepcao-warning-control { padding-left: 30px !important; }
 
       @media (min-width: 768px) {
         #${MODAL_ID} .form-row > .tm-recepcao-origem-col {
@@ -6831,29 +6843,91 @@ const tmBookingModalWatch = (() => {
     if (!norm(input.value)) input.setCustomValidity?.('');
   }
 
+  function receptionRequiredControls(modal) {
+    const firstTime = !!fieldByLabel(modal, 'Nome Social');
+    const fields = firstTime ? [
+      ['Nome', 'input'], ['Data de Nascimento', 'input'], ['CPF', 'input'],
+      ['Sexo', 'select'], ['Celular', 'input'], ['Origem do Agendamento', 'select']
+    ] : [['CPF', 'input']];
+    return fields.map(([name, selector]) => {
+      const field = fieldByLabel(modal, name);
+      const control = field?.querySelector(selector) || null;
+      const value = norm(control?.value);
+      const selectedText = norm(control?.selectedOptions?.[0]?.textContent);
+      const missing = !control || !value ||
+        (control.tagName === 'SELECT' && /^Selecione/i.test(selectedText));
+      return { name, field, control, missing };
+    }).filter((item) => firstTime || item.control);
+  }
+
+  function setReceptionWarning(field, control, invalid) {
+    if (!field || !control) return;
+    const host = control.parentElement;
+    if (!host) return;
+    host.classList.add('tm-recepcao-warning-host');
+    let warning = host.querySelector(':scope > .tm-recepcao-required-warning');
+    if (!invalid) {
+      warning?.remove();
+      control.classList.remove('tm-recepcao-warning-control');
+      return;
+    }
+    if (!warning) {
+      warning = document.createElement('span');
+      warning.className = 'tm-recepcao-required-warning';
+      warning.textContent = '!';
+      warning.setAttribute('aria-hidden', 'true');
+      host.appendChild(warning);
+    }
+    const position = { top: `${control.offsetTop + 1}px`, left: `${control.offsetLeft + 1}px`,
+      height: `${Math.max(0, control.offsetHeight - 2)}px` };
+    for (const [key, value] of Object.entries(position)) {
+      if (warning.style[key] !== value) warning.style[key] = value;
+    }
+    control.classList.add('tm-recepcao-warning-control');
+  }
+
+  function refreshReceptionWarnings(modal) {
+    if (!validationAttempted.has(modal)) return;
+    for (const { field, control, missing } of receptionRequiredControls(modal)) {
+      setReceptionWarning(field, control, missing);
+    }
+  }
+
+  function clearReceptionWarnings(modal) {
+    validationAttempted.delete(modal);
+    lastValidationToast.delete(modal);
+    modal.querySelectorAll('.tm-recepcao-required-warning').forEach((warning) => warning.remove());
+    modal.querySelectorAll('.tm-recepcao-warning-control').forEach((control) =>
+      control.classList.remove('tm-recepcao-warning-control'));
+  }
+
   function validateRequiredReceptionFields(modal, event) {
     optionalReceptionEmail(modal);
-    const cpf = requiredReceptionCpf(modal);
-    const missing = cpf && !norm(cpf.value) ? [{ input: cpf, name: 'CPF' }] : [];
+    requiredReceptionCpf(modal);
+    validationAttempted.add(modal);
+    const missing = receptionRequiredControls(modal).filter((item) => item.missing);
+    refreshReceptionWarnings(modal);
     if (!missing.length) return true;
 
     event?.preventDefault();
     event?.stopImmediatePropagation();
 
     const component = receptionBookingComponent(modal);
-    for (const { name } of missing) {
-      component?.$toast?.add?.({ severity: 'error', summary: 'Atenção',
-        detail: `O campo ${name} é obrigatório.`, life: 5000 });
+    const message = missing.length === 1 ? `O campo ${missing[0].name} é obrigatório.` :
+      'Verificar preenchimento dos campos obrigatórios.';
+    if (Date.now() - (lastValidationToast.get(modal) || 0) > 1000) {
+      component?.$toast?.add?.({ severity: 'error', summary: 'Atenção', detail: message, life: 5000 });
+      lastValidationToast.set(modal, Date.now());
     }
-    const first = missing.find(({ input }) => input)?.input;
+    const first = missing.find(({ control }) => control)?.control;
     first?.focus();
     if (!component?.$toast?.add) {
       if (first?.setCustomValidity) {
-        first.setCustomValidity(`O campo ${missing[0].name} é obrigatório.`);
+        first.setCustomValidity(message);
         first.reportValidity();
         first.addEventListener('input', () => first.setCustomValidity(''), { once: true });
       } else {
-        window.alert(`O campo ${missing[0].name} é obrigatório.`);
+        window.alert(message);
       }
     }
     return false;
@@ -7030,6 +7104,8 @@ const tmBookingModalWatch = (() => {
   function applyReceptionLayout() {
     const modal = observedModal;
     if (!modal?.isConnected) return;
+    if (!modal.classList.contains('show') && getComputedStyle(modal).display === 'none' &&
+        validationAttempted.has(modal)) clearReceptionWarnings(modal);
 
     const mainRow = modal.querySelector('.modal-body > div > .form-row.justify-content-center');
     // A coluna vazia não deve reservar espaço enquanto os primeiros campos são preenchidos.
@@ -7064,6 +7140,7 @@ const tmBookingModalWatch = (() => {
     const cpf = fieldByLabel(modal, 'CPF');
     requiredReceptionCpf(modal);
     optionalReceptionEmail(modal);
+    refreshReceptionWarnings(modal);
     const observationLabel = Array.from(modal.querySelectorAll('small, label'))
       .find((element) => element.closest('.modal') === modal &&
         norm(element.textContent) === 'Observação');
@@ -7170,6 +7247,8 @@ const tmBookingModalWatch = (() => {
   for (const eventName of ['input', 'change']) {
     document.addEventListener(eventName, (event) => {
       if (observationStopped) return;
+      const modal = event.target?.closest?.(`#${MODAL_ID}`);
+      if (modal) refreshReceptionWarnings(modal);
       if (event.target?.matches?.('input#ref-data[type="date"]')) {
         applyReceptionLayout();
       }
