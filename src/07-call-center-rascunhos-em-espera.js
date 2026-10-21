@@ -160,7 +160,8 @@
       procedureIndex: Number.isInteger(source.index) ? source.index : fallbackIndex,
       doctorId: Number(source.medico?.id_pessoa || source.id_medico) || null,
       procedureId: Number(source.procedimento?.id_procedimento) || null,
-      unitId: Number(source.id_unidade_operacao) || null
+      unitId: Number(source.id_unidade_operacao || source.unidade_operacao?.id_unidade_operacao ||
+        source.unidade?.id_unidade_operacao) || null
     };
   }
 
@@ -327,10 +328,27 @@
       (!preferred.agendaId || Number(slot.id_agenda) === preferred.agendaId) &&
       (!preferred.doctorId || Number(slot.medico?.id_pessoa || slot.id_medico) === preferred.doctorId) &&
       (!preferred.procedureId || Number(slot.procedimento?.id_procedimento) === preferred.procedureId) &&
-      (!preferred.unitId || Number(slot.id_unidade_operacao) === preferred.unitId));
+      (!preferred.unitId || Number(slot.id_unidade_operacao ||
+        slot.unidade_operacao?.id_unidade_operacao || slot.unidade?.id_unidade_operacao) === preferred.unitId));
   }
 
-  async function restoreDate(vue, preference) {
+  function restoreSlotUnit(target, saved, currentSlot) {
+    if (!target || !saved?.unidade || !currentSlot) return;
+    const savedUnit = Number(saved.id_unidade_operacao || saved.unidade_operacao?.id_unidade_operacao ||
+      saved.unidade?.id_unidade_operacao);
+    const currentUnit = Number(currentSlot.id_unidade_operacao ||
+      currentSlot.unidade_operacao?.id_unidade_operacao || currentSlot.unidade?.id_unidade_operacao);
+    const targetUnit = Number(target.id_unidade_operacao || target.unidade_operacao?.id_unidade_operacao ||
+      target.unidade?.id_unidade_operacao);
+    if (savedUnit && currentUnit && savedUnit !== currentUnit) return;
+    if (savedUnit && targetUnit && savedUnit !== targetUnit) return;
+    if (saved.id_local && currentSlot.id_local &&
+        Number(saved.id_local) !== Number(currentSlot.id_local)) return;
+    if (saved.id_local && target.id_local && Number(saved.id_local) !== Number(target.id_local)) return;
+    if (target.unidade == null || target.unidade === '') target.unidade = clone(saved.unidade);
+  }
+
+  async function restoreDate(vue, preference, savedProcedures = []) {
     if (typeof vue.buscarHorarios !== 'function') return '';
     const preferences = Array.isArray(preference) ? preference : preference ? [preference] : [];
     const preferred = preferences[0];
@@ -371,11 +389,16 @@
         `${missing.length} vagas não estão mais disponíveis (${when}). Escolha outros horários na lista.`;
       return { unavailable: true, message };
     }
-    for (const slot of slots) {
+    for (const [index, slot] of slots.entries()) {
       if (component() !== vue) throw new Error('A página mudou durante a reserva das vagas.');
+      const procedureIndex = preferences[index].procedureIndex ?? index;
+      const savedProcedure = savedProcedures[procedureIndex];
+      restoreSlotUnit(slot, savedProcedure, slot);
       await vue.selecionar_horario(slot);
       await new Promise((resolve) => vue.$nextTick(resolve));
+      restoreSlotUnit(vue.procedimentos?.[procedureIndex], savedProcedure, slot);
     }
+    vue.$forceUpdate?.();
     for (let attempt = 0; attempt < 120; attempt++) {
       if (document.querySelector('#cadastroModal.show')) {
         return '';
@@ -426,7 +449,9 @@
       open = false;
       notice = '';
       try {
-        const status = await restoreDate(vue, draft.preferredSlots?.length ? draft.preferredSlots : draft.preferred);
+        const status = await restoreDate(vue,
+          draft.preferredSlots?.length ? draft.preferredSlots : draft.preferred,
+          draft.snapshot.procedimentos);
         if (status?.unavailable) notifyUnavailable(vue, status.message);
         else if (status) notify(status);
       } catch (error) {

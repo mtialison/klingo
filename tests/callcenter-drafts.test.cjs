@@ -93,6 +93,21 @@ test('resumo deixa vazios os itens ainda não selecionados', () => {
   assert.equal(summary.operator, '');
 });
 
+test('não reaproveita unidade salva quando a vaga corresponde a outra sala ou unidade', () => {
+  const context = setup();
+  const result = vm.runInContext(`(() => {
+    const saved = { id_unidade_operacao: 500, id_local: 204,
+      unidade: '(BANGU) - CLINICA DO SONO' };
+    const otherRoom = { id_unidade_operacao: 500, id_local: 205 };
+    const otherUnit = { id_unidade_operacao: 600 };
+    restoreSlotUnit(otherRoom, saved, otherRoom);
+    restoreSlotUnit(otherUnit, saved, otherUnit);
+    return { room: otherRoom.unidade, unit: otherUnit.unidade };
+  })()`, context);
+  assert.equal(result.room, undefined);
+  assert.equal(result.unit, undefined);
+});
+
 test('rascunho agrupa cada procedimento com seu profissional e horário', () => {
   const context = setup();
   const groups = vm.runInContext(`draftProcedureGroups({ dados: {}, procedimentos: [
@@ -202,7 +217,9 @@ test('retomada confere a vaga e abre só o cadastro com os dados preservados', a
   vue.procedimentos.push({
     procedimento: { id_procedimento: 200, search: 'Consulta' },
     data: '2026-10-20', hora: '16:30', id_agenda: 300, index: 0,
-    medico: { id_pessoa: 400 }, id_unidade_operacao: 500, selected: true
+    medico: { id_pessoa: 400 }, id_unidade_operacao: 500,
+    unidade: '(BANGU) - CLINICA DO SONO',
+    id_local: 204, local_nome: '204 - CONSULTORIO 1', selected: true
   });
   context.vue = vue;
   vm.runInContext('component = () => vue;', context);
@@ -216,16 +233,28 @@ test('retomada confere a vaga e abre só o cadastro com os dados preservados', a
     vue.horarios = [{
       data: '2026-10-20', hora: '16:30', status: 'livre', id_agenda: 300, index: 0,
       medico: { id_pessoa: 400 }, procedimento: { id_procedimento: 200 },
-      id_unidade_operacao: 500
+      id_unidade_operacao: 500, id_local: 204, local_nome: '204 - CONSULTORIO 1'
     }];
     vue.datas = ['2026-10-20'];
     vue.buscando = false;
   };
   vue.listaPacientes = () => { openedDayAgenda = true; };
-  vue.selecionar_horario = slot => { selectedSlot = slot; modalOpen = true; };
+  vue.selecionar_horario = slot => {
+    selectedSlot = slot;
+    vue.procedimentos[0] = { procedimento: { id_procedimento: 200 },
+      data: slot.data, hora: slot.hora, id_agenda: slot.id_agenda,
+      id_unidade_operacao: slot.id_unidade_operacao, id_local: slot.id_local,
+      local_nome: slot.local_nome, unidade: null };
+    modalOpen = true;
+  };
   await vm.runInContext('resume(1)', context);
   assert.equal(openedDayAgenda, false);
   assert.equal(selectedSlot.id_agenda, 300);
+  assert.equal(selectedSlot.unidade, '(BANGU) - CLINICA DO SONO');
+  assert.equal(selectedSlot.local_nome, '204 - CONSULTORIO 1');
+  assert.equal(vue.procedimentos[0].id_local, 204);
+  assert.equal(vue.procedimentos[0].local_nome, '204 - CONSULTORIO 1');
+  assert.equal(vue.procedimentos[0].unidade, '(BANGU) - CLINICA DO SONO');
   assert.equal(vue.cadastro_temporario.st_nome, 'Paciente de teste');
   assert.equal(vm.runInContext('drafts.length', context), 0);
   assert.equal(layoutPasses, 1);
@@ -237,9 +266,11 @@ test('retomada seleciona as vagas de todos os procedimentos antes de abrir o cad
   vue.dados.plano = { id_plano: 100, search: 'Particular' };
   vue.procedimentos.push(
     { procedimento: { id_procedimento: 200, search: 'ECG' }, medico: { id_pessoa: 400 },
-      data: '2026-10-20', hora: '08:00', id_agenda: 300, selected: true },
+      data: '2026-10-20', hora: '08:00', id_agenda: 300, id_unidade_operacao: 5,
+      unidade: 'BANGU', selected: true },
     { procedimento: { id_procedimento: 201, search: 'Consulta' }, medico: { id_pessoa: 401 },
-      data: '2026-10-21', hora: '12:00', id_agenda: 301, selected: true }
+      data: '2026-10-21', hora: '12:00', id_agenda: 301, id_unidade_operacao: 6,
+      unidade: 'COPACABANA', selected: true }
   );
   context.vue = vue;
   vm.runInContext('component = () => vue;', context);
@@ -253,19 +284,24 @@ test('retomada seleciona as vagas de todos os procedimentos antes de abrir o cad
   vue.buscarHorarios = () => {
     vue.horarios = [
       { data: '2026-10-20', hora: '08:00', status: 'livre', id_agenda: 300,
-        index: 0, medico: { id_pessoa: 400 }, procedimento: { id_procedimento: 200 } },
+        index: 0, id_unidade_operacao: 5, medico: { id_pessoa: 400 },
+        procedimento: { id_procedimento: 200 } },
       { data: '2026-10-21', hora: '12:00', status: 'livre', id_agenda: 301,
-        index: 1, medico: { id_pessoa: 401 }, procedimento: { id_procedimento: 201 } }
+        index: 1, id_unidade_operacao: 6, medico: { id_pessoa: 401 },
+        procedimento: { id_procedimento: 201 } }
     ];
     vue.buscando = false;
   };
   vue.selecionar_horario = slot => {
     assert.equal(modalOpen, false);
     selected.push(slot.index);
+    vue.procedimentos[slot.index].unidade = null;
     if (selected.length === 2) modalOpen = true;
   };
   await vm.runInContext('resume(1)', context);
   assert.deepEqual(selected, [0, 1]);
+  assert.equal(vue.procedimentos[0].unidade, 'BANGU');
+  assert.equal(vue.procedimentos[1].unidade, 'COPACABANA');
   assert.equal(modalOpen, true);
   assert.equal(vm.runInContext('drafts.length', context), 0);
   assert.equal(vm.runInContext('notice', context), '');
