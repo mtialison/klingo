@@ -169,13 +169,16 @@ test('botão Perfil replica o ícone nativo e só aparece com ficha vinculada', 
     appendChild(node) { children.push(node); }
   };
   const createElement = () => ({
-    children: [], className: '', appendChild(node) { this.children.push(node); },
-    setAttribute(name, value) { this[name] = value; }
+    children: [], className: '', listeners: {}, appendChild(node) { this.children.push(node); },
+    setAttribute(name, value) { this[name] = value; },
+    addEventListener(name, handler) { this.listeners[name] = handler; }
   });
   const patient = { id_pessoa: 42 };
+  const opened = [];
   const show = sourceFunction('patientProfileButton', 'patientOpenProfile', {
     document: { createElement },
-    patientBookingComponent: () => ({ dados: { paciente: patient }, $root: { perfil() {} } })
+    patientBookingComponent: () => ({ dados: { paciente: patient }, $root: { perfil() {} } }),
+    patientOpenProfile(modal, nameField) { opened.push([modal, nameField]); }
   });
   const field = { querySelector: () => group };
   show({}, field);
@@ -183,24 +186,43 @@ test('botão Perfil replica o ícone nativo e só aparece com ficha vinculada', 
   assert.equal(children.length, 1);
   assert.equal(children[0].children[0].children[0].className, 'fas fa-id-badge');
   assert.equal(children[0].children[0]['aria-label'], 'Abrir perfil do paciente');
+  const click = children[0].children[0].listeners.click;
+  assert.equal(typeof click, 'function');
+  click({ preventDefault() {}, stopPropagation() {} });
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0][1], field);
 });
 
-test('botão Perfil chama a função nativa com a ficha certa sem concluir agendamento', () => {
+test('botão Perfil usa a ação nativa do componente de Nome', () => {
   const calls = [];
   const patient = { id_pessoa: 42 };
-  const jquery = (selector) => ({ modal: (action) => calls.push([selector, action]) });
-  jquery.fn = { modal() {} };
   const open = sourceFunction('patientOpenProfile', 'applyPacienteLayout', {
     patientBookingComponent: () => ({
       dados: { paciente: patient }, $root: { perfil(record) { calls.push(['perfil', record]); } }
     }),
-    window: { jQuery: jquery }
+    window: {}
   });
-  assert.equal(open({}), true);
-  assert.deepEqual(calls, [['.modal', 'hide'], ['perfil', patient]]);
+  const native = { dados: { paciente: patient }, perfil() { calls.push(['nativo']); } };
+  const field = { querySelector: () => ({ __vue__: { $parent: native } }) };
+  assert.equal(open({}, field), true);
+  assert.deepEqual(calls, [['nativo']]);
   patient.id_pessoa = 0;
-  assert.equal(open({}), false);
-  assert.equal(calls.length, 2);
+  assert.equal(open({}, field), false);
+  assert.equal(calls.length, 1);
+});
+
+test('Perfil abre mesmo sem jQuery global quando não há método no campo', () => {
+  const calls = [];
+  const patient = { id_pessoa: 42 };
+  const open = sourceFunction('patientOpenProfile', 'applyPacienteLayout', {
+    patientBookingComponent: () => ({
+      dados: { paciente: patient }, $root: { perfil(record) { calls.push(record); } }
+    }),
+    window: {}
+  });
+  assert.equal(open({}, { querySelector: () => null }), true);
+  assert.deepEqual(calls, [patient]);
+  assert.match(source, /display: inline-flex !important;\s*align-items: center !important;\s*justify-content: center !important;/);
 });
 
 test('campos digitáveis do paciente usam a tipografia medida no fluxo Primeira Vez', () => {

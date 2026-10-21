@@ -123,9 +123,18 @@
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-perfil-append button {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
         height: 100% !important;
-        padding: 3px 10px !important;
-        line-height: 1.2 !important;
+        min-width: 36px !important;
+        padding: 0 !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-perfil-append button i {
+        display: block !important;
+        margin: 0 !important;
+        line-height: 1 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento {
@@ -1146,17 +1155,27 @@
     icon.className = 'fas fa-id-badge';
     icon.setAttribute('aria-hidden', 'true');
     button.appendChild(icon);
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      patientOpenProfile(modal, nameField);
+    });
     append.appendChild(button);
     inputGroup.appendChild(append);
   }
 
-  function patientOpenProfile(modal) {
+  function patientOpenProfile(modal, nameField) {
     const component = patientBookingComponent(modal);
     const patient = component?.dados?.paciente;
+    if (!(Number(patient?.id_pessoa) > 0)) return false;
+    const native = nameField?.querySelector('.form-group')?.__vue__?.$parent;
+    if (typeof native?.perfil === 'function' && Number(native?.dados?.paciente?.id_pessoa) === Number(patient.id_pessoa)) {
+      native.perfil();
+      return true;
+    }
+    if (typeof component?.$root?.perfil !== 'function') return false;
     const jq = window.jQuery || window.$;
-    if (!(Number(patient?.id_pessoa) > 0) || typeof component?.$root?.perfil !== 'function' ||
-        typeof jq?.fn?.modal !== 'function') return false;
-    jq('.modal').modal('hide');
+    if (typeof jq?.fn?.modal === 'function') jq('.modal').modal('hide');
     component.$root.perfil(patient);
     return true;
   }
@@ -1315,13 +1334,6 @@
   }, true);
 
   document.addEventListener('click', (event) => {
-    const profileButton = event.target?.closest?.('#cadastroModal.tm-paciente-layout .tm-paciente-perfil-button');
-    if (profileButton) {
-      event.preventDefault();
-      event.stopPropagation();
-      patientOpenProfile(profileButton.closest('#cadastroModal'));
-      return;
-    }
     if (!window.location.hash.startsWith('#/call-center')) return;
     const button = event.target?.closest?.('button');
     const modal = button?.closest?.('#cadastroModal.tm-paciente-layout');
