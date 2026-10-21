@@ -1585,6 +1585,18 @@ const tmBookingModalWatch = (() => {
     }
     modal.querySelectorAll('.tm-cad-origem-inline-row').forEach((row) => row.remove());
     modal.querySelectorAll('.tm-cad-required-warning').forEach((warning) => warning.remove());
+    // Na troca para uma ficha existente, o Klingo pode destacar a linha de
+    // origem antes desta limpeza. O aviso inserido por nós fica fora do modal.
+    origem?.element?.querySelectorAll('.tm-cad-required-warning').forEach((warning) => warning.remove());
+    if (origem?.element && !origem.element.isConnected) {
+      for (const { element, attributes } of baseline.attributes) {
+        if (element !== origem.element && !origem.element.contains(element)) continue;
+        for (const [name, value] of attributes) {
+          if (value === null) element.removeAttribute(name);
+          else element.setAttribute(name, value);
+        }
+      }
+    }
     delete modal.dataset.tmCadValidationAttempted;
 
     if (cpfInput?.isConnected) {

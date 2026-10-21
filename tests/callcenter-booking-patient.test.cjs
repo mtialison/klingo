@@ -90,7 +90,10 @@ test('paciente organiza nome e nascimento, depois celular, origem e sexo, sem al
 
 test('troca automática recupera a origem nativa desconectada do Vue', () => {
   const ownerRow = { isConnected: true, appendChild(field) { field.isConnected = true; } };
-  const field = { isConnected: false };
+  let staleWarningRemoved = false;
+  const field = { isConnected: false, querySelectorAll(selector) {
+    return selector === '.tm-cad-required-warning' ? [{ remove() { staleWarningRemoved = true; } }] : [];
+  } };
   const component = {
     label: 'Origem do Agendamento',
     $el: { closest: () => field },
@@ -104,6 +107,7 @@ test('troca automática recupera a origem nativa desconectada do Vue', () => {
   });
   assert.equal(recover({}), field);
   assert.equal(field.isConnected, true);
+  assert.equal(staleWarningRemoved, true);
 });
 
 test('CPF cadastrado aparece uma só vez, somente para leitura, na primeira linha', () => {

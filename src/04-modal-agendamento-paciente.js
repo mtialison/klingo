@@ -571,8 +571,14 @@
   }
 
   function patientNativeOrigem(modal) {
+    const discardFirstVisitWarning = (field) => {
+      field?.querySelectorAll('.tm-cad-required-warning').forEach((warning) => warning.remove());
+      field?.querySelectorAll('.tm-cad-warning-host').forEach((host) => host.classList.remove('tm-cad-warning-host'));
+      field?.querySelectorAll('.tm-cad-warning-control').forEach((control) => control.classList.remove('tm-cad-warning-control'));
+      return field;
+    };
     const visible = fieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
-    if (visible) return visible;
+    if (visible) return discardFirstVisitWarning(visible);
 
     // A Primeira Vez da versão anterior podia deixar o componente Vue ligado
     // a uma linha removida. Recupere somente o campo nativo, sem recriá-lo.
@@ -586,7 +592,7 @@
         if (field && ownerRow?.isConnected && !field.isConnected) {
           ownerRow.appendChild(field);
         }
-        return field?.isConnected ? field : null;
+        return field?.isConnected ? discardFirstVisitWarning(field) : null;
       }
       pending.push(...(component?.$children || []));
     }

@@ -165,6 +165,8 @@ test('troca de ficha limpa o layout anterior antes de montar Paciente', () => {
   assert.match(source, /\.tm-cad-header-procedure-emoji/);
   assert.match(source, /fallback\?\.appendChild\(origem\.element\)/);
   assert.match(patientSource, /if \(modal\.classList\.contains\('tm-primeira-vez-layout'\)\) return;/);
+  assert.match(source, /origem\?\.element\?\.querySelectorAll\('\.tm-cad-required-warning'\)\.forEach\(\(warning\) => warning\.remove\(\)\)/);
+  assert.match(source, /if \(origem\?\.element && !origem\.element\.isConnected\) \{/);
 });
 
 test('consulta CPF sem aguardar sexo, nascimento ou celular e seleciona só o resultado exato', async () => {

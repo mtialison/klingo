@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.21
+// @version      1.22
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -3936,6 +3936,18 @@ const tmBookingModalWatch = (() => {
     }
     modal.querySelectorAll('.tm-cad-origem-inline-row').forEach((row) => row.remove());
     modal.querySelectorAll('.tm-cad-required-warning').forEach((warning) => warning.remove());
+    // Na troca para uma ficha existente, o Klingo pode destacar a linha de
+    // origem antes desta limpeza. O aviso inserido por nós fica fora do modal.
+    origem?.element?.querySelectorAll('.tm-cad-required-warning').forEach((warning) => warning.remove());
+    if (origem?.element && !origem.element.isConnected) {
+      for (const { element, attributes } of baseline.attributes) {
+        if (element !== origem.element && !origem.element.contains(element)) continue;
+        for (const [name, value] of attributes) {
+          if (value === null) element.removeAttribute(name);
+          else element.setAttribute(name, value);
+        }
+      }
+    }
     delete modal.dataset.tmCadValidationAttempted;
 
     if (cpfInput?.isConnected) {
@@ -4736,8 +4748,14 @@ const tmBookingModalWatch = (() => {
   }
 
   function patientNativeOrigem(modal) {
+    const discardFirstVisitWarning = (field) => {
+      field?.querySelectorAll('.tm-cad-required-warning').forEach((warning) => warning.remove());
+      field?.querySelectorAll('.tm-cad-warning-host').forEach((host) => host.classList.remove('tm-cad-warning-host'));
+      field?.querySelectorAll('.tm-cad-warning-control').forEach((control) => control.classList.remove('tm-cad-warning-control'));
+      return field;
+    };
     const visible = fieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
-    if (visible) return visible;
+    if (visible) return discardFirstVisitWarning(visible);
 
     // A Primeira Vez da versão anterior podia deixar o componente Vue ligado
     // a uma linha removida. Recupere somente o campo nativo, sem recriá-lo.
@@ -4751,7 +4769,7 @@ const tmBookingModalWatch = (() => {
         if (field && ownerRow?.isConnected && !field.isConnected) {
           ownerRow.appendChild(field);
         }
-        return field?.isConnected ? field : null;
+        return field?.isConnected ? discardFirstVisitWarning(field) : null;
       }
       pending.push(...(component?.$children || []));
     }
