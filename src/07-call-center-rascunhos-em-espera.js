@@ -129,6 +129,27 @@
       }).filter(Boolean).slice(0, 3);
   }
 
+  function draftProcedureGroups(snapshot, slots = []) {
+    const data = snapshot.dados || {};
+    const procedures = snapshot.procedimentos?.length ? snapshot.procedimentos :
+      (data.procedimento ? [data] : []);
+    const display = (value) => typeof value === 'string' ? value.trim() :
+      ['search', 'st_nome_exibicao', 'st_nome', 'nome', 'nm_pessoa', 'descricao', 'st_descricao']
+        .map((key) => value?.[key]).find((text) => typeof text === 'string' && text.trim())?.trim() || '';
+    return procedures.map((item, index) => {
+      const slot = slots.find((entry) => entry.procedureIndex === index) ||
+        (procedures.length === 1 ? slots[0] : null);
+      const date = displayDate(item.data || slot?.date);
+      const time = item.hora || slot?.time;
+      return {
+        procedure: display(item.procedimento),
+        professional: display(item.medico || item.profissional ||
+          (procedures.length === 1 ? data.medico || data.profissional : null)),
+        dateTime: [date, time].filter(Boolean).join(' • ')
+      };
+    });
+  }
+
   function slotPreference(source, fallbackIndex = null) {
     const date = String(source?.data || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !source?.hora) return null;
@@ -234,7 +255,8 @@
     saving = true;
     const description = label(captured.snapshot);
     drafts.unshift({ id: nextId++, user: owner, created: Date.now(), ...captured,
-      ...description, times: selectedTimes(captured.snapshot) });
+      ...description, times: selectedTimes(captured.snapshot),
+      groups: draftProcedureGroups(captured.snapshot, captured.preferredSlots) });
     open = true;
     notice = '';
     render();
@@ -458,6 +480,10 @@
         padding: 11px 0; cursor: pointer; }
       #${DOCK_ID} .tm-draft-item:first-of-type { border-top: 0; }
       #${DOCK_ID} .tm-draft-name { display: block; color: #273444; }
+      #${DOCK_ID} .tm-draft-operator { display: block; color: #273444;
+        margin-bottom: 7px; overflow-wrap: anywhere; }
+      #${DOCK_ID} .tm-draft-procedure-group + .tm-draft-procedure-group {
+        border-top: 1px solid #d9dee5; margin-top: 6px; padding-top: 6px; }
       #${DOCK_ID} .tm-draft-line { min-height: 1.45em; color: #526171;
         line-height: 1.45; overflow-wrap: anywhere; }
       #${DOCK_ID} .tm-draft-date { padding-right: 36px; }
@@ -594,9 +620,21 @@
           element.textContent = text;
           return element;
         };
-        const date = line(draft.times.length ? draft.times.join(' · ') :
-          displayDate(draft.preferred?.date));
-        date.classList.add('tm-draft-date');
+        const operator = document.createElement('strong');
+        operator.className = 'tm-draft-operator';
+        operator.textContent = draft.operator || '—';
+        const groups = draft.groups?.length ? draft.groups : [{
+          procedure: draft.procedure, professional: draft.professional,
+          dateTime: draft.times?.join(' · ') || displayDate(draft.preferred?.date)
+        }];
+        const groupElements = groups.map((group) => {
+          const element = document.createElement('div');
+          element.className = 'tm-draft-procedure-group';
+          const date = line(group.dateTime || '—');
+          date.classList.add('tm-draft-date');
+          element.append(line(group.procedure || '—'), line(group.professional || '—'), date);
+          return element;
+        });
         const resumeButton = document.createElement('button');
         resumeButton.type = 'button';
         resumeButton.className = 'tm-draft-resume-hitbox';
@@ -616,8 +654,7 @@
         trash.className = 'far fa-trash-alt';
         trash.setAttribute('aria-hidden', 'true');
         discard.appendChild(trash);
-        item.append(name, line(draft.procedure), line(draft.professional),
-          line(draft.operator), date, resumeButton, discard);
+        item.append(name, operator, ...groupElements, resumeButton, discard);
         panel.appendChild(item);
       }
       if (notice) {

@@ -21,7 +21,13 @@ test('mensagem da lista vazia preserva o texto da versão de testes atual', () =
 function setup() {
   const eventHandlers = {};
   const windowHandlers = {};
+  // As vagas de teste são de 20/10/2026; fixe o relógio para não expirarem.
+  class TestDate extends Date {
+    constructor(...args) { super(...(args.length ? args : ['2026-10-19T12:00:00'])); }
+    static now() { return new Date('2026-10-19T12:00:00').getTime(); }
+  }
   const context = vm.createContext({
+    Date: TestDate,
     window: { location: { hash: '#/call-center' }, setTimeout,
       addEventListener(type, handler) { windowHandlers[type] = handler; },
       removeEventListener(type, handler) {
@@ -85,6 +91,20 @@ test('resumo deixa vazios os itens ainda não selecionados', () => {
   assert.equal(summary.procedure, '');
   assert.equal(summary.professional, '');
   assert.equal(summary.operator, '');
+});
+
+test('rascunho agrupa cada procedimento com seu profissional e horário', () => {
+  const context = setup();
+  const groups = vm.runInContext(`draftProcedureGroups({ dados: {}, procedimentos: [
+    { procedimento: { search: 'ECG' }, medico: { st_nome_exibicao: 'Profissional A' },
+      data: '2026-10-21', hora: '08:00' },
+    { procedimento: { search: 'CONSULTA' }, medico: { st_nome_exibicao: 'Profissional B' },
+      data: '2026-10-27', hora: '17:02' }
+  ] })`, context);
+  assert.deepEqual(Array.from(groups, group => ({ ...group })), [
+    { procedure: 'ECG', professional: 'Profissional A', dateTime: '21/10/2026 • 08:00' },
+    { procedure: 'CONSULTA', professional: 'Profissional B', dateTime: '27/10/2026 • 17:02' }
+  ]);
 });
 
 test('abrir a calculadora fecha o menu Em espera', () => {
@@ -455,7 +475,11 @@ test('card inteiro retoma e a lixeira separada descarta sem retomar', () => {
     checkOwner = () => true; ensureModalSave = () => {}; ensureStyle = () => {};
     resume = id => { resumed = id; }; open = true;
     drafts.push({ id: 7, patient: 'Paciente teste', procedure: 'Consulta',
-      professional: 'Médica', operator: 'Particular', times: ['20/10/2026 • 17:15'] });`, context);
+      professional: 'Médica', operator: 'Particular', times: ['20/10/2026 • 17:15'],
+      groups: [
+        { procedure: 'ECG', professional: 'Profissional A', dateTime: '21/10/2026 • 08:00' },
+        { procedure: 'Consulta', professional: 'Profissional B', dateTime: '27/10/2026 • 17:02' }
+      ] });`, context);
   context.resumed = 0;
   assert.equal(vm.runInContext('headerUserId()', context), '20');
   assert.equal(vm.runInContext('!!document.querySelector("nav.navbar ul.navbar-nav.ml-auto")', context), true);
@@ -472,7 +496,14 @@ test('card inteiro retoma e a lixeira separada descarta sem retomar', () => {
   assert.equal(buttons[0].title, undefined);
   assert.equal(buttons[1].className, 'tm-draft-discard');
   assert.equal(buttons[1].children[0].className, 'far fa-trash-alt');
-  assert.equal(item.children[4].classList.values[0], 'tm-draft-date');
+  assert.equal(item.children[0].tag, 'strong');
+  assert.equal(item.children[1].tag, 'strong');
+  assert.equal(item.children[2].className, 'tm-draft-procedure-group');
+  assert.equal(item.children[2].children[2].classList.values[0], 'tm-draft-date');
+  assert.equal(item.children[2].children[1].textContent, 'Profissional A');
+  assert.equal(item.children[3].children[0].textContent, 'Consulta');
+  assert.equal(item.children[3].children[1].textContent, 'Profissional B');
+  assert.equal(item.children[3].children[2].textContent, '27/10/2026 • 17:02');
 
   dock.click({ target: { closest: () => buttons[0] } });
   assert.equal(context.resumed, 7);
