@@ -10,11 +10,21 @@ const date = '2026-11-30';
 const flag = (id = 7) => ({ id_sinalizador_atendimento: id, st_icon: id === 7 ? 'fa-solid fa-car' : 'fas fa-wheelchair',
   st_cor: 'primary', st_sinalizador_atendimento: id === 7 ? 'Estacionamento' : 'Cadeirante' });
 const row = (id, unit = 5, doctor = 10, signal = flag()) => ({ data: date, status: 'ocupado',
-  medico: { id_pessoa: doctor }, marcacao: { id_marcacao: id, id_medico: doctor,
+  medico: { id_pessoa: doctor }, id_agenda: doctor * 100,
+  marcacao: { id_marcacao: id, id_medico: doctor,
     id_unidade_operacao: unit, unidade_operacao: { st_nome: unit === 5 ? '(BANGU) - CLINICA' :
       unit === 6 ? '(BARRA) - CLINICA' : '(COPACABANA) - CLINICA' },
     id_sinalizador_atendimento: signal?.id_sinalizador_atendimento, sinalizador_atendimento: signal,
     arquivos: [{ filename: 'nao-contar.pdf' }], nome_paciente: 'NUNCA CONSERVAR' } });
+const available = (...slots) => {
+  const result = new Map();
+  for (const [unit, doctor, agenda = doctor * 100] of slots) {
+    if (!result.has(String(unit))) result.set(String(unit), { doctors: new Set(), agendas: new Set() });
+    result.get(String(unit)).doctors.add(String(doctor));
+    result.get(String(unit)).agendas.add(String(agenda));
+  }
+  return result;
+};
 
 function setup() {
   class Element {
@@ -35,7 +45,8 @@ function setup() {
     medicos: [{ id_pessoa: 10 }, { id_pessoa: 11 }], medicosSelecionados: [true, true],
     procedimentos: [{ selected: true, procedimento: { id_procedimento: 20 }, plano: { id_plano: 30 } }],
     listaPacientes() {}, axios: client, exibicao: { [date]: {} },
-    horarios: [{ data: date, status: 'livre', id_unidade_operacao: 5 }] };
+    horarios: [{ data: date, status: 'livre', id_unidade_operacao: 5,
+      medico: { id_pessoa: 10 }, id_agenda: 1000 }] };
   const box = new Element();
   const querySelector = box.querySelector.bind(box);
   box.querySelector = (s) => s === 'h4 a.card-link' ? { textContent: '30/11' } : querySelector(s);
@@ -80,7 +91,7 @@ test('conta somente sinalizadores, deduplica marcação e separa unidades/profis
   const f = setup();
   const summary = f.summarize({ agendas: [row(1), row(1), row(2), row(3, 6, 11), row(4, 5, 10, flag(4)),
     row(5, 5, 999), row(6, 5, 10, null), { ...row(7), status: 'passado' }] },
-  date, f.queryContext(f.page), new Set(['5', '6']));
+  date, f.queryContext(f.page), available([5, 10], [6, 11]));
   assert.equal(summary.multipleUnits, true);
   assert.equal(summary.groups.length, 2);
   assert.equal(summary.groups[0].flags.find((f) => f.id === '7').count, 2);
@@ -93,7 +104,7 @@ test('conta somente sinalizadores, deduplica marcação e separa unidades/profis
 test('rotula unidade mesmo se apenas uma das unidades possui sinalizadores', () => {
   const f = setup();
   const summary = f.summarize({ agendas: [row(1), row(2, 6, 11, null)] },
-    date, f.queryContext(f.page), new Set(['5', '6']));
+    date, f.queryContext(f.page), available([5, 10], [6, 11]));
   assert.equal(summary.multipleUnits, true); assert.equal(summary.groups.length, 1);
 });
 
@@ -101,7 +112,7 @@ test('falha/paginação/sinalizador incompleto não viram ausência de sinalizad
   const f = setup(), q = f.queryContext(f.page);
   for (const data of [{ agendas: [], paginate: true }, {}, { agendas: [{ ...row(1), data: '2026-12-01' }] },
     { agendas: [{ ...row(1), marcacao: { ...row(1).marcacao, sinalizador_atendimento: null } }] }]) {
-    assert.throws(() => f.summarize(data, date, q, new Set(['5', '6'])));
+    assert.throws(() => f.summarize(data, date, q, available([5, 10], [6, 11])));
   }
 });
 
@@ -123,20 +134,67 @@ test('busca começa sem modal, chamadas repetidas usam cache, ícones não têm 
 test('11/11 mostra somente sinalizadores da unidade com vaga livre', async () => {
   const f = setup();
   f.page.horarios = [
-    { data: date, status: 'ocupado', id_unidade_operacao: 5 },
-    { data: date, status: 'livre', id_unidade_operacao: 6 },
-    { data: date, status: 'livre', id_unidade_operacao: 5, bloqueado: true }
+    { data: date, status: 'ocupado', id_unidade_operacao: 5, medico: { id_pessoa: 10 } },
+    { data: date, status: 'livre', id_unidade_operacao: 6, medico: { id_pessoa: 11 }, id_agenda: 1100 },
+    { data: date, status: 'livre', id_unidade_operacao: 5, medico: { id_pessoa: 10 }, bloqueado: true }
   ];
   f.respond(async () => ({ data: { flags0: { status: 200, data: {
-    agendas: [row(1, 5), row(2, 6), row(3, 7)]
+    agendas: [row(1, 5), row(2, 6, 11), row(3, 7)]
   } } } }));
-  assert.deepEqual([...f.bookableUnits(f.page).get(date)], ['6']);
+  assert.deepEqual([...f.bookableUnits(f.page).get(date).keys()], ['6']);
   f.sync(); await settle();
   const host = f.box.children[0];
   assert.equal(host.children.length, 1);
   assert.equal(host.children[0].children[0].textContent, 'BARRA');
   assert.equal(host.children[0].children[1].title, '(BARRA) - CLINICA: Estacionamento — 1');
   assert.equal(f.cache.values().next().value.value.groups.length, 1);
+});
+
+test('29/10 não conta a agenda lotada de outro profissional na mesma unidade', async () => {
+  const f = setup();
+  f.page.horarios = [{ data: date, status: 'livre', id_unidade_operacao: 5,
+    medico: { id_pessoa: 10 }, id_agenda: 1000 }]; // Biologix
+  f.respond(async () => ({ data: { flags0: { status: 200, data: {
+    agendas: [row(1, 5, 10), row(2, 5, 11)] // Técnico Bangu Noite, lotado
+  } } } }));
+  f.sync(); await settle();
+  const summary = f.cache.values().next().value.value;
+  assert.equal(summary.groups.length, 1);
+  assert.equal(summary.groups[0].flags[0].count, 1);
+  assert.equal(f.box.children[0].children[0].children[1].title,
+    '(BANGU) - CLINICA: Estacionamento — 1');
+});
+
+test('não mostra ícones quando só a agenda lotada possui sinalizadores', async () => {
+  const f = setup();
+  f.respond(async () => ({ data: { flags0: { status: 200, data: {
+    agendas: [row(2, 5, 11)]
+  } } } }));
+  f.sync(); await settle();
+  assert.equal(f.cache.values().next().value.value.groups.length, 0);
+  assert.equal(f.box.children[0].children.length, 0);
+});
+
+test('agenda específica prevalece quando o mesmo profissional tem outra agenda lotada', () => {
+  const f = setup();
+  const occupied = { ...row(2, 5, 10), id_agenda: 1001 };
+  const summary = f.summarize({ agendas: [row(1, 5, 10), occupied] },
+    date, f.queryContext(f.page), available([5, 10, 1000]));
+  assert.equal(summary.groups[0].flags[0].count, 1);
+});
+
+test('mudança de agenda livre invalida o cache mesmo dentro da mesma unidade', async () => {
+  const f = setup();
+  f.sync(); await settle();
+  f.page.horarios = [{ data: date, status: 'livre', id_unidade_operacao: 5,
+    medico: { id_pessoa: 11 }, id_agenda: 1100 }];
+  f.respond(async () => ({ data: { flags0: { status: 200, data: {
+    agendas: [row(1, 5, 10), row(2, 5, 11)]
+  } } } }));
+  f.sync(); await settle();
+  assert.equal(f.requests.length, 2);
+  assert.equal(f.box.children[0].children[0].children[1].title,
+    '(BANGU) - CLINICA: Estacionamento — 1');
 });
 
 test('sem unidade identificada na vaga livre não atribui ícones de outra unidade', async () => {
@@ -151,8 +209,9 @@ test('troca da unidade disponível invalida o resumo anterior da mesma data', as
   const f = setup();
   f.sync(); await settle();
   assert.equal(f.box.children[0].children[0].children[0].textContent, 'BANGU');
-  f.page.horarios = [{ data: date, status: 'livre', id_unidade_operacao: 6 }];
-  f.respond(async () => ({ data: { flags0: { status: 200, data: { agendas: [row(1), row(2, 6)] } } } }));
+  f.page.horarios = [{ data: date, status: 'livre', id_unidade_operacao: 6,
+    medico: { id_pessoa: 11 }, id_agenda: 1100 }];
+  f.respond(async () => ({ data: { flags0: { status: 200, data: { agendas: [row(1), row(2, 6, 11)] } } } }));
   f.sync(); await settle();
   assert.equal(f.requests.length, 2);
   assert.equal(f.box.children[0].children[0].children[0].textContent, 'BARRA');

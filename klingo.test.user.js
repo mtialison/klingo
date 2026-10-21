@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.29
+// @version      1.30
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -10398,11 +10398,22 @@ const tmConfirmationCalendarAdapter = (() => {
       if (unitId == null) {
         byDate.set(date, null); // sem unidade, não atribuir sinalizadores por suposição
       } else if (byDate.get(date) !== null) {
-        if (!byDate.has(date)) byDate.set(date, new Set());
-        byDate.get(date).add(String(unitId));
+        const doctorId = slot.medico?.id_pessoa ?? slot.id_medico;
+        const agendaId = slot.id_agenda ?? slot.agenda?.id_agenda;
+        if (doctorId == null && agendaId == null) continue;
+        if (!byDate.has(date)) byDate.set(date, new Map());
+        const units = byDate.get(date), id = String(unitId);
+        if (!units.has(id)) units.set(id, { doctors: new Set(), agendas: new Set() });
+        if (doctorId != null) units.get(id).doctors.add(String(doctorId));
+        if (agendaId != null) units.get(id).agendas.add(String(agendaId));
       }
     }
     return byDate;
+  }
+
+  function availableKey(units) {
+    return units ? [...units].map(([unit, ids]) => [unit,
+      [...ids.doctors].sort(), [...ids.agendas].sort()]).sort((a, b) => a[0].localeCompare(b[0])) : null;
   }
 
   function summarize(data, date, context, availableUnits) {
@@ -10416,7 +10427,13 @@ const tmConfirmationCalendarAdapter = (() => {
           (!doctors.has(String(row.medico?.id_pessoa)) && !doctors.has(String(mark?.id_medico)))) continue;
       const unit = mark?.unidade_operacao || row.unidade_operacao;
       const unitId = mark?.id_unidade_operacao ?? row.id_unidade_operacao ?? unit?.id_unidade_operacao;
-      if (unitId == null || !availableUnits.has(String(unitId))) continue;
+      const available = unitId == null ? null : availableUnits.get(String(unitId));
+      if (!available) continue;
+      const agendaId = mark?.id_agenda ?? row.id_agenda ?? row.agenda?.id_agenda;
+      const doctorId = mark?.id_medico ?? row.medico?.id_pessoa;
+      if (agendaId != null && available.agendas.size) {
+        if (!available.agendas.has(String(agendaId))) continue;
+      } else if (doctorId == null || !available.doctors.has(String(doctorId))) continue;
       units.add(String(unitId));
       if (!mark) continue;
       const flag = mark.sinalizador_atendimento;
@@ -10501,7 +10518,7 @@ const tmConfirmationCalendarAdapter = (() => {
       if (!host) { host = document.createElement('div'); host.className = CLASS; box.appendChild(host); hosts.add(host); }
       const entry = cache.get(contextKey + '|' + date);
       const available = availableByDate.get(date);
-      const signature = JSON.stringify([contextKey, available?.size || 0,
+      const signature = JSON.stringify([contextKey, availableKey(available),
         entry ? [entry.value, entry.error, entry.time] : 'loading']);
       if (host.dataset.signature === signature) continue;
       host.dataset.signature = signature;
@@ -10606,7 +10623,7 @@ const tmConfirmationCalendarAdapter = (() => {
     }
     const availableByDate = bookableUnits(page);
     const key = JSON.stringify([context, items.map(({ date }) =>
-      [date, availableByDate.get(date) ? [...availableByDate.get(date)].sort() : null])]);
+      [date, availableKey(availableByDate.get(date))])]);
     const workKey = key + '|' + items.map((item) => item.date).join(',');
     if (activeKey !== workKey) { stop(); activeKey = workKey; }
     paint(items, key, availableByDate);
