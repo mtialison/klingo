@@ -78,7 +78,8 @@ test('aviso é geral para campos vazios e específico somente para erro isolado 
     tmCadIsPrimeiraVez: () => true,
     tmCadRequiredProblems: () => problems,
     tmCadRefreshRequiredWarnings: (_modal, force) => warnings.push(force),
-    tmCadBookingComponent: () => ({ $toast: { add: (notice) => notices.push(notice) } })
+    tmCadBookingComponent: () => ({ $toast: { add: (notice) => notices.push(notice) } }),
+    tmCadGuardCpfLookup: () => true
   });
   const modal = { dataset: {} };
   const event = {
@@ -109,6 +110,59 @@ test('aviso é geral para campos vazios e específico somente para erro isolado 
   problems = fields([['cpf', false, false]]);
   assert.equal(validate(modal, event), true);
   assert.equal(notices.length, 4);
+});
+
+test('vincula somente uma ficha com CPF completo e id de pessoa válido', () => {
+  const cpfDigits = sourceFunction('tmCadCpfDigits', 'tmCadExactCpfRecords');
+  const exact = sourceFunction('tmCadExactCpfRecords', 'tmCadSelectExactCpf', { tmCadCpfDigits: cpfDigits });
+  const cpf = '52998224725';
+  const records = [
+    { id_pessoa: 12, st_cpf: '529.982.247-25' },
+    { id_pessoa: 13, st_cpf: '123.456.789-09' },
+    { id_pessoa: -1, st_cpf: cpf }
+  ];
+  assert.deepEqual(exact(records, cpf).map((item) => item.id_pessoa), [12]);
+  assert.deepEqual(exact(records, '52998224724'), []);
+});
+
+test('consulta CPF sem aguardar sexo, nascimento ou celular e seleciona só o resultado exato', async () => {
+  const cpf = '52998224725';
+  const input = { value: '529.982.247-25' };
+  const selected = [];
+  let params;
+  const component = {
+    value: { st_cpf: cpf },
+    lista: [],
+    identificar_paciente(record) { selected.push(record.id_pessoa); },
+    $util: { loadItem(_component, request) {
+      params = request;
+      return Promise.resolve({ pacientes: [
+        { id_pessoa: 31, st_cpf: '12345678909' },
+        { id_pessoa: 42, st_cpf: cpf }
+      ] });
+    } }
+  };
+  const modal = { isConnected: true, querySelector: () => ({ __vue__: component }) };
+  const context = {
+    cpfLookups: new WeakMap(),
+    tmCadFieldByLabel: () => ({ querySelector: () => input }),
+    tmCadIsPrimeiraVez: () => true,
+    tmCadIsValidCpf: isValidCpf,
+    tmCadCpfDigits: sourceFunction('tmCadCpfDigits', 'tmCadExactCpfRecords'),
+    Promise
+  };
+  context.tmCadExactCpfRecords = sourceFunction('tmCadExactCpfRecords', 'tmCadSelectExactCpf', context);
+  context.tmCadCadastroComponent = sourceFunction('tmCadCadastroComponent', 'tmCadCpfDigits', context);
+  context.tmCadSelectExactCpf = sourceFunction('tmCadSelectExactCpf', 'tmCadLookupCpf', context);
+  const lookup = sourceFunction('tmCadLookupCpf', 'tmCadGuardCpfLookup', context);
+  const state = lookup(modal);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(params.service, 'pacientes');
+  assert.equal(params.func, 'checar_existencia');
+  assert.equal(params.parms.st_cpf, cpf);
+  assert.deepEqual(selected, [42]);
+  assert.equal(state.done, true);
+  assert.equal(state.selectedCpf, cpf);
 });
 
 test('confirmação marca todos os campos inválidos, não apenas o CPF', () => {

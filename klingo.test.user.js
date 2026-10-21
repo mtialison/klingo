@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.13
+// @version      1.14
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -2382,6 +2382,7 @@ const tmBookingModalWatch = (() => {
 
   const TM_CADASTRO_LAYOUT_ID = 'tm-cadastro-primeira-vez-layout-22-4';
   const modalBaselines = new WeakMap();
+  const cpfLookups = new WeakMap();
 
   function tmCadNorm(value) {
     return String(value || '').replace(/\s+/g, ' ').trim();
@@ -2976,6 +2977,101 @@ const tmBookingModalWatch = (() => {
     return null;
   }
 
+  function tmCadCadastroComponent(modal) {
+    const component = modal?.querySelector('#cadTemp')?.__vue__;
+    return component?.value && typeof component.$util?.loadItem === 'function' &&
+      typeof component.identificar_paciente === 'function' ? component : null;
+  }
+
+  function tmCadCpfDigits(value) {
+    return String(value || '').replace(/\D/g, '');
+  }
+
+  function tmCadExactCpfRecords(records, cpf) {
+    return Array.isArray(records) ? records.filter((record) =>
+      tmCadCpfDigits(record?.st_cpf || record?.pessoa?.st_cpf) === cpf &&
+      Number(record?.id_pessoa) > 0) : [];
+  }
+
+  function tmCadSelectExactCpf(modal, component, cpf, records) {
+    if (!modal?.isConnected || !tmCadIsPrimeiraVez(modal) ||
+        tmCadCpfDigits(tmCadFieldByLabel(modal, 'CPF')?.querySelector('input')?.value) !== cpf) return false;
+    const matches = tmCadExactCpfRecords(records, cpf);
+    if (matches.length !== 1) return false;
+    const state = cpfLookups.get(component);
+    if (state?.selectedCpf === cpf) return true;
+    if (state) state.selectedCpf = cpf;
+    component.identificar_paciente(matches[0]);
+    return true;
+  }
+
+  function tmCadLookupCpf(modal) {
+    const input = tmCadFieldByLabel(modal, 'CPF')?.querySelector('input');
+    const cpf = tmCadCpfDigits(input?.value);
+    if (!tmCadIsValidCpf(cpf)) return null;
+    const component = tmCadCadastroComponent(modal);
+    if (!component) return null;
+
+    let state = cpfLookups.get(component);
+    if (!state) {
+      state = { cpf: '', mode: '', pending: false, done: false, selectedCpf: '', matches: 0, generation: 0 };
+      cpfLookups.set(component, state);
+    }
+    const phone = tmCadCpfDigits(component.value.st_celular || component.value.st_telefone);
+    const mode = component.value.ch_sexo && component.value.dt_nascimento &&
+      (phone.length === 10 || phone.length === 11) ? 'full' : 'cpf';
+    if (state.cpf !== cpf || state.mode !== mode) {
+      state.cpf = cpf;
+      state.mode = mode;
+      state.pending = false;
+      state.done = false;
+      state.selectedCpf = '';
+      state.matches = 0;
+      state.generation += 1;
+    }
+    if (tmCadSelectExactCpf(modal, component, cpf, component.lista)) return state;
+    if (state.pending || state.done || state.selectedCpf === cpf) return state;
+
+    state.pending = true;
+    const generation = state.generation;
+    // O watcher nativo exige sexo + nascimento + contato. Consultamos pelo CPF
+    // completo usando o mesmo serviço que alimenta "Possíveis Cadastros".
+    Promise.resolve(component.$util.loadItem(component, {
+      service: 'pacientes', func: 'checar_existencia',
+      parms: mode === 'full' ? { ...component.value, st_cpf: cpf, temps: true } :
+        { st_cpf: cpf, temps: false }
+    })).then((result) => {
+      if (state.generation !== generation || !modal.isConnected || !tmCadIsPrimeiraVez(modal) ||
+          tmCadCpfDigits(input.value) !== cpf) return;
+      const matches = tmCadExactCpfRecords(result?.pacientes, cpf);
+      state.done = true;
+      state.matches = matches.length;
+      if (matches.length) component.lista = matches;
+      tmCadSelectExactCpf(modal, component, cpf, matches);
+    }).catch(() => {
+      if (state.generation === generation) state.done = false;
+    }).finally(() => {
+      if (state.generation === generation) state.pending = false;
+    });
+    return state;
+  }
+
+  function tmCadGuardCpfLookup(modal, event) {
+    const input = tmCadFieldByLabel(modal, 'CPF')?.querySelector('input');
+    if (!tmCadIsValidCpf(input?.value)) return true;
+    const state = tmCadLookupCpf(modal);
+    if (state?.done && state.matches === 0 && !state.selectedCpf) return true;
+    event?.preventDefault();
+    event?.stopImmediatePropagation();
+    tmCadBookingComponent(modal)?.$toast?.add({
+      severity: 'warn', summary: 'Atenção',
+      detail: state?.matches > 1 ? 'Há mais de uma ficha com este CPF. Selecione a correta.' :
+        state?.selectedCpf ? 'Aguarde a ficha existente carregar.' :
+          'Aguarde a conferência do CPF antes de confirmar.', life: 5000
+    });
+    return false;
+  }
+
   function tmCadValidateRequiredFields(modal, event) {
     if (!modal || !tmCadIsPrimeiraVez(modal)) return true;
     modal.dataset.tmCadValidationAttempted = '1';
@@ -2983,7 +3079,7 @@ const tmBookingModalWatch = (() => {
     const problems = tmCadRequiredProblems(modal);
     const missing = problems.filter((item) => item.missing);
     const malformed = problems.filter((item) => item.malformed);
-    if (!missing.length && !malformed.length) return true;
+    if (!missing.length && !malformed.length) return tmCadGuardCpfLookup(modal, event);
 
     const message = missing.length || malformed.length !== 1 ? 'Verificar preenchimento dos campos.' :
       malformed[0].key === 'cpf' ? 'Informe um CPF válido.' :
@@ -3897,6 +3993,7 @@ const tmBookingModalWatch = (() => {
     const emailInput = email?.querySelector('input');
     if (emailInput) emailInput.required = false;
     tmCadRefreshRequiredWarnings(modal, modal.dataset.tmCadValidationAttempted === '1');
+    tmCadLookupCpf(modal);
 
     tmCadApplyHeaderLayout(modal);
     tmCadMoveObservacaoSelect(modal);
@@ -3947,6 +4044,12 @@ const tmBookingModalWatch = (() => {
       tmCadRefreshRequiredWarnings(modal, true);
     }, true);
   }
+
+  for (const name of ['input', 'change']) document.addEventListener(name, (event) => {
+    const modal = event.target?.closest?.('#cadastroModal.tm-primeira-vez-layout');
+    if (!modal || !modal.querySelector('#cadTemp')?.contains(event.target)) return;
+    window.setTimeout(() => tmCadLookupCpf(modal), 0);
+  }, true);
 
   // O observador roda na microtarefa em que o modal se torna visível, antes
   // de a fila geral (80 ms) ou o evento "shown" deixarem o layout original pintar.
