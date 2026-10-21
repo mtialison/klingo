@@ -70,6 +70,9 @@ test('ficha existente mostra Nome, Nascimento e CPF como leitura, antes do conta
     assert.equal(field.querySelector('input').readOnly, true);
     assert.equal(field.querySelector('input')['aria-readonly'], 'true');
   }
+  const profile = fields[0].querySelector('.tm-recepcao-perfil-button');
+  assert.equal(profile.title, 'Abrir perfil do paciente');
+  assert.equal(profile.querySelector('i').className, 'fa-solid fa-id-badge');
   assert.match(fields[1].querySelector('.tm-recepcao-identity-age').textContent, /^\d+a$/);
 });
 
@@ -82,8 +85,8 @@ test('abrir histórico chama o perfil sem executar o clique nativo que fecha o a
   const patient = { id_pessoa: 42 };
   const calls = [];
   const modal = {};
-  const button = { title: 'Histórico do paciente.', closest: () => modal,
-    querySelector: () => ({}) };
+  const button = { title: 'Abrir perfil do paciente', closest: () => modal,
+    classList: { contains: value => value === 'tm-recepcao-perfil-button' } };
   const event = { target: { closest: () => button },
     preventDefault: () => calls.push('preventDefault'),
     stopImmediatePropagation: () => calls.push('stopImmediatePropagation') };
@@ -93,6 +96,23 @@ test('abrir histórico chama o perfil sem executar o clique nativo que fecha o a
   vm.runInContext(section('openReceptionPatientProfile', 'alignReceptionBirth'), context);
   assert.equal(vm.runInContext('openReceptionPatientProfile', context)(modal, event), true);
   assert.deepEqual(calls, ['preventDefault', 'stopImmediatePropagation', patient]);
+});
+
+test('ficha vinculada oculta somente o cartão duplicado e a busca nativa do paciente', () => {
+  const classes = () => { const selected = new Set(); return { selected,
+    contains: value => selected.has(value), toggle: (value, active) => active ? selected.add(value) : selected.delete(value) }; };
+  const nativeRow = { classList: classes() }, card = { classList: classes(), querySelector: () => ({}) };
+  const button = { closest: () => nativeRow };
+  const modal = { querySelector: () => button, querySelectorAll: () => [card] };
+  const context = vm.createContext({ setClass: (element, name, active) => element.classList.toggle(name, active) });
+  vm.runInContext(section('hideRedundantReceptionPatientControls', 'alignReceptionBirth'), context);
+  const hide = vm.runInContext('hideRedundantReceptionPatientControls', context);
+  hide(modal, true);
+  assert.equal(nativeRow.classList.contains('tm-recepcao-hidden-native-patient-row'), true);
+  assert.equal(card.classList.contains('tm-recepcao-hidden-patient-card'), true);
+  hide(modal, false);
+  assert.equal(nativeRow.classList.contains('tm-recepcao-hidden-native-patient-row'), false);
+  assert.equal(card.classList.contains('tm-recepcao-hidden-patient-card'), false);
 });
 
 test('origem nativa removida pela troca de ficha é recolocada após o celular', () => {

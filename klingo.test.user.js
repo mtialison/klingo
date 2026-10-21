@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.35
+// @version      1.36
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -6751,6 +6751,23 @@ const tmBookingModalWatch = (() => {
         padding: .25rem .5rem !important;
         box-sizing: border-box !important;
       }
+      #${MODAL_ID} .tm-recepcao-hidden-patient-card,
+      #${MODAL_ID} .tm-recepcao-hidden-native-patient-row {
+        display: none !important;
+      }
+      #${MODAL_ID} .tm-recepcao-perfil-append button {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        height: calc(1.5em + .5rem + 2px) !important;
+        min-width: 36px !important;
+        padding: 0 !important;
+      }
+      #${MODAL_ID} .tm-recepcao-perfil-append button i {
+        display: block !important;
+        margin: 0 !important;
+        line-height: 1 !important;
+      }
 
       @media (max-width: 767px) {
         #${MODAL_ID} .tm-recepcao-existing-identity-row > .col {
@@ -6953,6 +6970,21 @@ const tmBookingModalWatch = (() => {
     input.readOnly = true;
     input.setAttribute('aria-readonly', 'true');
     group.appendChild(input);
+    if (key === 'name') {
+      const append = document.createElement('div');
+      append.className = 'input-group-append tm-recepcao-perfil-append';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-outline-primary tm-recepcao-perfil-button';
+      button.title = 'Abrir perfil do paciente';
+      button.setAttribute('aria-label', 'Abrir perfil do paciente');
+      const icon = document.createElement('i');
+      icon.className = 'fa-solid fa-id-badge';
+      icon.setAttribute('aria-hidden', 'true');
+      button.appendChild(icon);
+      append.appendChild(button);
+      group.appendChild(append);
+    }
     if (key === 'birth') {
       const append = document.createElement('div');
       append.className = 'input-group-append';
@@ -7009,7 +7041,8 @@ const tmBookingModalWatch = (() => {
   function openReceptionPatientProfile(modal, event) {
     const button = event.target?.closest?.('button');
     if (!button || button.closest(`#${MODAL_ID}`) !== modal ||
-        norm(button.title) !== 'Histórico do paciente.' || !button.querySelector('.fa-id-badge')) return false;
+        !(button.classList?.contains('tm-recepcao-perfil-button') ||
+          (norm(button.title) === 'Histórico do paciente.' && button.querySelector('.fa-id-badge')))) return false;
     const component = receptionBookingComponent(modal);
     const patient = component?.dados?.paciente;
     if (!(Number(patient?.id_pessoa) > 0) || typeof component?.$root?.perfil !== 'function') return false;
@@ -7020,6 +7053,17 @@ const tmBookingModalWatch = (() => {
     // A ação raiz do Klingo apenas abre o perfil; não é necessário fechar o agendamento.
     component.$root.perfil(patient);
     return true;
+  }
+
+  function hideRedundantReceptionPatientControls(modal, existingPatient) {
+    const nativeButton = modal.querySelector('button[title="Histórico do paciente."]');
+    const nativeRow = nativeButton?.closest('.row.d-flex.justify-content-center.mb-2.w3-animate-opacity');
+    if (nativeRow) setClass(nativeRow, 'tm-recepcao-hidden-native-patient-row', existingPatient);
+    modal.querySelectorAll('.alert.alert-light.alert-dismissible.border').forEach((card) => {
+      if (card.querySelector('a.card-link')) {
+        setClass(card, 'tm-recepcao-hidden-patient-card', existingPatient);
+      }
+    });
   }
 
   function alignReceptionBirth(modal) {
@@ -7437,6 +7481,8 @@ const tmBookingModalWatch = (() => {
     if (observation) setClass(observation, 'tm-recepcao-observacao-col', true);
     const firstTime = !!social;
     setClass(modal, 'tm-recepcao-primeira-vez', firstTime);
+    hideRedundantReceptionPatientControls(modal,
+      !firstTime && Number(receptionBookingComponent(modal)?.dados?.paciente?.id_pessoa) > 0);
 
     if (!firstTime) {
       if (modal.classList.contains('show') || getComputedStyle(modal).display !== 'none') {
