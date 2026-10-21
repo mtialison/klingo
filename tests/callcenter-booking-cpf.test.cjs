@@ -125,6 +125,16 @@ test('vincula somente uma ficha com CPF completo e id de pessoa válido', () => 
   assert.deepEqual(exact(records, '52998224724'), []);
 });
 
+test('a busca cobre cadastro temporário da recepção e edição, sem exigir CPF vazio', () => {
+  const target = sourceFunction('tmCadIsCpfLookupTarget', 'tmCadCpfDigits', {
+    tmCadIsPrimeiraVez: (modal) => modal.id === 'cadastroModal'
+  });
+  assert.equal(target({ id: 'cadastroModal' }), true);
+  assert.equal(target({ id: 'novoAtendimento2Modal', querySelector: () => ({}) }), true);
+  assert.equal(target({ id: 'editarMarcacaoModal', querySelector: () => ({}) }), true);
+  assert.equal(target({ id: 'novoAtendimento2Modal', querySelector: () => null }), false);
+});
+
 test('consulta CPF sem aguardar sexo, nascimento ou celular e seleciona só o resultado exato', async () => {
   const cpf = '52998224725';
   const input = { value: '529.982.247-25' };
@@ -147,6 +157,7 @@ test('consulta CPF sem aguardar sexo, nascimento ou celular e seleciona só o re
     cpfLookups: new WeakMap(),
     tmCadFieldByLabel: () => ({ querySelector: () => input }),
     tmCadIsPrimeiraVez: () => true,
+    tmCadIsCpfLookupTarget: () => true,
     tmCadIsValidCpf: isValidCpf,
     tmCadCpfDigits: sourceFunction('tmCadCpfDigits', 'tmCadExactCpfRecords'),
     Promise

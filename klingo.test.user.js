@@ -2383,6 +2383,7 @@ const tmBookingModalWatch = (() => {
   const TM_CADASTRO_LAYOUT_ID = 'tm-cadastro-primeira-vez-layout-22-4';
   const modalBaselines = new WeakMap();
   const cpfLookups = new WeakMap();
+  const otherCpfObservers = new WeakMap();
 
   function tmCadNorm(value) {
     return String(value || '').replace(/\s+/g, ' ').trim();
@@ -2983,6 +2984,12 @@ const tmBookingModalWatch = (() => {
       typeof component.identificar_paciente === 'function' ? component : null;
   }
 
+  function tmCadIsCpfLookupTarget(modal) {
+    return tmCadIsPrimeiraVez(modal) ||
+      (['novoAtendimento2Modal', 'editarMarcacaoModal'].includes(modal?.id) &&
+        !!modal.querySelector('#cadTemp'));
+  }
+
   function tmCadCpfDigits(value) {
     return String(value || '').replace(/\D/g, '');
   }
@@ -2994,7 +3001,7 @@ const tmBookingModalWatch = (() => {
   }
 
   function tmCadSelectExactCpf(modal, component, cpf, records) {
-    if (!modal?.isConnected || !tmCadIsPrimeiraVez(modal) ||
+    if (!modal?.isConnected || !tmCadIsCpfLookupTarget(modal) ||
         tmCadCpfDigits(tmCadFieldByLabel(modal, 'CPF')?.querySelector('input')?.value) !== cpf) return false;
     const matches = tmCadExactCpfRecords(records, cpf);
     if (matches.length !== 1) return false;
@@ -3006,6 +3013,7 @@ const tmBookingModalWatch = (() => {
   }
 
   function tmCadLookupCpf(modal) {
+    if (!tmCadIsCpfLookupTarget(modal)) return null;
     const input = tmCadFieldByLabel(modal, 'CPF')?.querySelector('input');
     const cpf = tmCadCpfDigits(input?.value);
     if (!tmCadIsValidCpf(cpf)) return null;
@@ -3041,7 +3049,7 @@ const tmBookingModalWatch = (() => {
       parms: mode === 'full' ? { ...component.value, st_cpf: cpf, temps: true } :
         { st_cpf: cpf, temps: false }
     })).then((result) => {
-      if (state.generation !== generation || !modal.isConnected || !tmCadIsPrimeiraVez(modal) ||
+      if (state.generation !== generation || !modal.isConnected || !tmCadIsCpfLookupTarget(modal) ||
           tmCadCpfDigits(input.value) !== cpf) return;
       const matches = tmCadExactCpfRecords(result?.pacientes, cpf);
       state.done = true;
@@ -3063,7 +3071,7 @@ const tmBookingModalWatch = (() => {
     if (state?.done && state.matches === 0 && !state.selectedCpf) return true;
     event?.preventDefault();
     event?.stopImmediatePropagation();
-    tmCadBookingComponent(modal)?.$toast?.add({
+    (tmCadCadastroComponent(modal)?.$toast || tmCadBookingComponent(modal)?.$toast)?.add({
       severity: 'warn', summary: 'Atenção',
       detail: state?.matches > 1 ? 'Há mais de uma ficha com este CPF. Selecione a correta.' :
         state?.selectedCpf ? 'Aguarde a ficha existente carregar.' :
@@ -4046,9 +4054,43 @@ const tmBookingModalWatch = (() => {
   }
 
   for (const name of ['input', 'change']) document.addEventListener(name, (event) => {
-    const modal = event.target?.closest?.('#cadastroModal.tm-primeira-vez-layout');
+    const modal = event.target?.closest?.('#cadastroModal, #novoAtendimento2Modal, #editarMarcacaoModal');
     if (!modal || !modal.querySelector('#cadTemp')?.contains(event.target)) return;
     window.setTimeout(() => tmCadLookupCpf(modal), 0);
+  }, true);
+
+  document.addEventListener('shown.bs.modal', (event) => {
+    if (!['novoAtendimento2Modal', 'editarMarcacaoModal'].includes(event.target?.id)) return;
+    const modal = event.target;
+    window.setTimeout(() => {
+      const root = modal.querySelector('#cadTemp');
+      if (!root) return;
+      let observer = otherCpfObservers.get(modal);
+      if (!observer) {
+        observer = new MutationObserver(() => tmCadLookupCpf(modal));
+        otherCpfObservers.set(modal, observer);
+      }
+      observer.observe(root, { childList: true, subtree: true });
+      tmCadLookupCpf(modal);
+    }, 0);
+  }, true);
+
+  document.addEventListener('hidden.bs.modal', (event) => {
+    otherCpfObservers.get(event.target)?.disconnect();
+    const state = cpfLookups.get(tmCadCadastroComponent(event.target));
+    if (state) {
+      state.generation += 1;
+      state.pending = false;
+      state.done = false;
+      state.selectedCpf = '';
+    }
+  }, true);
+
+  document.addEventListener('click', (event) => {
+    const button = event.target?.closest?.('button');
+    const modal = button?.closest?.('#novoAtendimento2Modal, #editarMarcacaoModal');
+    if (!modal || !/^(Concluir|Atualizar)$/i.test(tmCadNorm(button.textContent))) return;
+    tmCadGuardCpfLookup(modal, event);
   }, true);
 
   // O observador roda na microtarefa em que o modal se torna visível, antes
