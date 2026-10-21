@@ -128,6 +128,36 @@ test('CPF cadastrado aparece uma só vez, somente para leitura, na primeira linh
   assert.match(source, /\.tm-paciente-cpf \{\s*grid-column: 4 !important;\s*grid-row: 2 !important;/);
 });
 
+test('altura do CPF acompanha o campo Nome renderizado, sem assumir pixels fixos', () => {
+  const values = new Map();
+  const cpf = { style: {
+    getPropertyValue: (property) => values.get(property),
+    setProperty: (property, value) => values.set(property, value)
+  } };
+  const reference = { getBoundingClientRect: () => ({ height: 29.17 }) };
+  const match = sourceFunction('patientMatchCpfHeight', 'patientValidateCellular');
+  match({ querySelector: () => cpf }, { querySelector: () => reference });
+  for (const property of ['height', 'min-height', 'max-height']) {
+    assert.equal(values.get(property), '29.17px');
+  }
+});
+
+test('nome e nascimento do paciente cadastrado ficam somente para leitura', () => {
+  const attributes = new Map();
+  const input = {
+    readOnly: false,
+    getAttribute: (name) => attributes.get(name),
+    setAttribute: (name, value) => attributes.set(name, value)
+  };
+  const lock = sourceFunction('patientLockIdentity', 'applyPacienteLayout');
+  lock({ querySelector: () => input });
+  assert.equal(input.readOnly, true);
+  assert.equal(attributes.get('aria-readonly'), 'true');
+  assert.doesNotMatch(source, /enableDatePaste\(nascimento\);/);
+  assert.doesNotMatch(source, /protectBirthDate\(nascimento\);/);
+  assert.match(source, /for \(const \{ input, readOnly, ariaReadOnly \} of baseline\.identity \|\| \[\]\)/);
+});
+
 test('campos digitáveis do paciente usam a tipografia medida no fluxo Primeira Vez', () => {
   assert.match(source, /\.tm-paciente-dados-grid \.tm-paciente-field \.form-control \{\s*font-family: "Open Sans", "Helvetica Neue", sans-serif !important;\s*font-size: 13\.125px !important;\s*font-weight: 400 !important;\s*color: #495057 !important;/);
   assert.doesNotMatch(source, /\.tm-paciente-observacao-textarea \{[^}]*font-size: 13\.125px/s);

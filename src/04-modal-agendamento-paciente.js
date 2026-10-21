@@ -620,6 +620,19 @@
     if (input && input.value !== formatted) input.value = formatted;
   }
 
+  function patientMatchCpfHeight(dados, referenceField) {
+    const reference = referenceField?.querySelector('input.form-control');
+    const cpf = dados.querySelector(':scope > .tm-paciente-cpf input');
+    const height = reference?.getBoundingClientRect().height;
+    if (!cpf || !height) return;
+    const pixels = `${height}px`;
+    for (const property of ['height', 'min-height', 'max-height']) {
+      if (cpf.style.getPropertyValue(property) !== pixels) {
+        cpf.style.setProperty(property, pixels, 'important');
+      }
+    }
+  }
+
   function patientValidateCellular(modal, event) {
     if (!modal || !isPacienteModal(modal)) return true;
     modal.dataset.tmPacienteValidationAttempted = '1';
@@ -1088,6 +1101,15 @@
     }, true);
   }
 
+  function patientLockIdentity(field) {
+    const input = field?.querySelector('input');
+    if (!input) return;
+    if (!input.readOnly) input.readOnly = true;
+    if (input.getAttribute('aria-readonly') !== 'true') {
+      input.setAttribute('aria-readonly', 'true');
+    }
+  }
+
   function applyPacienteLayout() {
     const modal = visibleModal();
     if (!modal) {
@@ -1108,12 +1130,17 @@
       const origemField = patientNativeOrigem(modal);
       const nameLabel = fieldByLabel(modal, 'Nome do Paciente')?.querySelector('small.form-text.text-muted');
       const emailInput = fieldByLabel(modal, 'e-mail')?.querySelector('input');
+      const identity = ['Nome do Paciente|Nome', 'Data de Nascimento'].map((label) => {
+        const input = fieldByLabel(modal, label)?.querySelector('input');
+        return input ? { input, readOnly: input.readOnly, ariaReadOnly: input.getAttribute('aria-readonly') } : null;
+      }).filter(Boolean);
       modalBaselines.set(modal, {
         attributes: tmCaptureAttributes(modal),
         headers: tmCaptureHeaderContents(modal),
         nameLabel: nameLabel ? { element: nameLabel, text: nameLabel.textContent } : null,
         emailInput,
         emailRequired: emailInput?.required,
+        identity,
         origem: origemField ? {
           element: origemField,
           parent: origemField.parentNode,
@@ -1146,6 +1173,8 @@
     addField(nome, 'tm-paciente-nome');
     renamePatientName(nome);
     addField(nascimento, 'tm-paciente-nascimento');
+    patientLockIdentity(nome);
+    patientLockIdentity(nascimento);
     addField(celular, 'tm-paciente-celular');
     addField(email, 'tm-paciente-email');
     const emailInput = email?.querySelector('input');
@@ -1179,8 +1208,7 @@
       });
     });
 
-    enableDatePaste(nascimento);
-    protectBirthDate(nascimento);
+    patientMatchCpfHeight(dados, nome || nascimento);
     enableDatePaste(validade);
     patientRefreshWarnings(modal);
   }
@@ -1201,6 +1229,12 @@
       baseline.nameLabel.element.textContent = baseline.nameLabel.text;
     }
     if (baseline.emailInput?.isConnected) baseline.emailInput.required = baseline.emailRequired;
+    for (const { input, readOnly, ariaReadOnly } of baseline.identity || []) {
+      if (!input.isConnected) continue;
+      input.readOnly = readOnly;
+      if (ariaReadOnly === null) input.removeAttribute('aria-readonly');
+      else input.setAttribute('aria-readonly', ariaReadOnly);
+    }
 
     const { origem } = baseline;
     if (origem?.element.isConnected && origem.parent.isConnected) {
