@@ -9,7 +9,8 @@ const source = fs.readFileSync(path.join(__dirname, '..', 'src', '08-recepcao-no
 test('Recepção coloca origem após celular e oculta apenas o título azul', () => {
   const start = source.indexOf('  function setClass(element');
   const end = source.indexOf('  function requiredReceptionCpf(', start);
-  const context = vm.createContext({});
+  const context = vm.createContext({ originRenderedField: null, originRenderedOwner: null,
+    receptionBookingComponent: () => null });
   vm.runInContext(source.slice(start, end), context);
 
   const classes = (initial = []) => {

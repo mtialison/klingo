@@ -19,10 +19,13 @@
   let originLastAttempt = 0;
   let originWasVisible = false;
   let originInjectedComponent = null;
+  let originRenderedField = null;
+  let originRenderedOwner = null;
   const guardedBookings = new WeakSet();
   const bookingModals = new WeakMap();
   const validationAttempted = new WeakSet();
   const lastValidationToast = new WeakMap();
+  const lastEnteredCpf = new WeakMap();
 
   function setClass(element, className, active) {
     if (element.classList.contains(className) !== active) {
@@ -151,6 +154,35 @@
       }
       #${MODAL_ID} .tm-recepcao-warning-control { padding-left: 30px !important; }
 
+      #${MODAL_ID} .tm-recepcao-birth-field .input-group {
+        display: flex !important; flex-wrap: nowrap !important; align-items: stretch !important;
+        width: 100% !important; min-width: 0 !important;
+      }
+      #${MODAL_ID} .tm-recepcao-birth-field .input-group > .form-control {
+        flex: 1 1 auto !important; width: 0 !important; min-width: 0 !important;
+      }
+      #${MODAL_ID} .tm-recepcao-birth-field .input-group > .input-group-append {
+        display: flex !important; flex: 0 0 auto !important;
+      }
+      #${MODAL_ID} .tm-recepcao-birth-field .input-group-text {
+        font-family: "Open Sans", "Helvetica Neue", sans-serif !important;
+        font-size: 13.125px !important; font-weight: 400 !important;
+        color: #495057 !important; line-height: 1.2 !important;
+      }
+      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-name {
+        flex: 0 0 50% !important; max-width: 50% !important;
+      }
+      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-birth,
+      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-cpf {
+        flex: 0 0 25% !important; max-width: 25% !important;
+      }
+
+      @media (max-width: 767px) {
+        #${MODAL_ID} .tm-recepcao-existing-identity-row > .col {
+          flex: 0 0 100% !important; max-width: 100% !important;
+        }
+      }
+
       @media (min-width: 768px) {
         #${MODAL_ID} .form-row > .tm-recepcao-origem-col {
           flex: 0 0 25% !important;
@@ -211,11 +243,45 @@
     return label?.closest('.col') || null;
   }
 
+  function receptionOriginField(modal, contactRow) {
+    const owner = receptionBookingComponent(modal);
+    let field = fieldByLabel(modal, 'Origem do Agendamento');
+    if (field) {
+      originRenderedField = field;
+      originRenderedOwner = owner;
+      return field;
+    }
+    if (!owner || !contactRow) return null;
+    const pending = [owner], seen = new Set();
+    while (pending.length && seen.size < 200) {
+      const child = pending.pop();
+      if (!child || seen.has(child)) continue;
+      seen.add(child);
+      if (norm(child.label) === 'Origem do Agendamento') {
+        const candidate = child.$el?.closest?.('.col');
+        if (candidate?.querySelector('select')) {
+          field = candidate;
+          break;
+        }
+      }
+      pending.push(...(child.$children || []));
+    }
+    if (!field && originRenderedOwner === owner && originRenderedField?.querySelector('select')) {
+      field = originRenderedField;
+    }
+    if (!field) return null;
+    if (field.parentElement !== contactRow) contactRow.appendChild(field);
+    field.classList.remove('tm-recepcao-hidden-field');
+    originRenderedField = field;
+    originRenderedOwner = owner;
+    return field;
+  }
+
   function arrangeReceptionBookingFields(modal) {
     const email = fieldByLabel(modal, 'e-mail');
     const cellular = fieldByLabel(modal, 'Celular');
-    const origin = fieldByLabel(modal, 'Origem do Agendamento');
     const contactRow = cellular?.parentElement;
+    const origin = receptionOriginField(modal, contactRow);
     if (origin && contactRow?.classList.contains('form-row') && contactRow.contains(email) &&
         (origin.parentElement !== contactRow || origin.previousElementSibling !== cellular)) {
       contactRow.insertBefore(origin, cellular.nextSibling);
@@ -261,9 +327,192 @@
     setClass(contactRow, 'tm-recepcao-contato-row', true);
   }
 
+  function patientIdentity(patient, keys) {
+    for (const source of [patient, patient?.cadastro, patient?.pessoa]) {
+      for (const key of keys) {
+        const value = source?.[key];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+      }
+    }
+    return '';
+  }
+
+  function patientBirth(patient) {
+    const known = patientIdentity(patient, ['dt_nascimento', 'data_nascimento',
+      'st_data_nascimento', 'st_nascimento', 'dt_data_nascimento', 'birth_date']);
+    if (known) return known;
+    for (const source of [patient, patient?.cadastro, patient?.pessoa]) {
+      const entry = Object.entries(source || {}).find(([key, value]) =>
+        /nasc|birth/i.test(key) && typeof value === 'string' && value.trim());
+      if (entry) return entry[1].trim();
+    }
+    return '';
+  }
+
+  function displayBirth(value) {
+    const iso = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    const local = String(value || '').match(/^(\d{2})[/-](\d{2})[/-](\d{4})/);
+    return local ? `${local[3]}-${local[2]}-${local[1]}` : '';
+  }
+
+  function displayCpf(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    return digits.length === 11 ? `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}` : '';
+  }
+
+  function identityField(row, key, labelText) {
+    let field = row.querySelector(`.tm-recepcao-identity-${key}`);
+    if (field) return field;
+    field = document.createElement('div');
+    field.className = `col col-12 tm-recepcao-identity-${key}`;
+    if (key === 'birth') field.classList.add('tm-recepcao-birth-field');
+    const label = document.createElement('small');
+    label.className = 'form-text text-muted';
+    label.textContent = labelText;
+    const group = document.createElement('div');
+    group.className = 'input-group';
+    const input = document.createElement('input');
+    input.className = 'form form-control';
+    input.type = key === 'birth' ? 'date' : 'text';
+    input.readOnly = true;
+    input.setAttribute('aria-readonly', 'true');
+    group.appendChild(input);
+    if (key === 'birth') {
+      const append = document.createElement('div');
+      append.className = 'input-group-append';
+      const age = document.createElement('span');
+      age.className = 'input-group-text tm-recepcao-identity-age';
+      append.appendChild(age);
+      group.appendChild(append);
+    }
+    field.append(label, group);
+    row.appendChild(field);
+    return field;
+  }
+
+  function showExistingIdentity(modal, contactRow) {
+    const component = receptionBookingComponent(modal);
+    const patient = component?.dados?.paciente;
+    if (!contactRow || !(Number(patient?.id_pessoa) > 0)) {
+      modal.querySelector('.tm-recepcao-existing-identity-row')?.remove();
+      return;
+    }
+    let row = modal.querySelector('.tm-recepcao-existing-identity-row');
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'form-row tm-recepcao-existing-identity-row';
+    }
+    if (row.parentElement !== contactRow.parentElement || row.nextElementSibling !== contactRow) {
+      contactRow.parentElement.insertBefore(row, contactRow);
+    }
+    const name = identityField(row, 'name', 'Nome');
+    const birth = identityField(row, 'birth', 'Data de Nascimento');
+    const cpf = identityField(row, 'cpf', 'CPF');
+    const values = [
+      patientIdentity(patient, ['st_nome', 'nome', 'nm_pessoa', 'st_nome_paciente']),
+      displayBirth(patientBirth(patient)),
+      displayCpf(patientIdentity(patient, ['st_cpf', 'cpf']) || lastEnteredCpf.get(modal))
+    ];
+    [name, birth, cpf].forEach((field, index) => {
+      const input = field.querySelector('input');
+      if (input.value !== values[index]) input.value = values[index];
+    });
+    const value = values[1];
+    const parts = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const age = birth.querySelector('.tm-recepcao-identity-age');
+    const ageDate = parts ? new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])) : null;
+    const today = new Date();
+    const years = ageDate && !Number.isNaN(ageDate.getTime()) ? today.getFullYear() - ageDate.getFullYear() -
+      (today.getMonth() < ageDate.getMonth() ||
+        (today.getMonth() === ageDate.getMonth() && today.getDate() < ageDate.getDate()) ? 1 : 0) : null;
+    const text = years != null && years >= 0 && years < 130 ? `${years}a` : '';
+    if (age.textContent !== text) age.textContent = text;
+    age.parentElement.style.display = text ? '' : 'none';
+  }
+
+  function alignReceptionBirth(modal) {
+    const name = fieldByLabel(modal, 'Nome')?.querySelector('input');
+    const birth = fieldByLabel(modal, 'Data de Nascimento');
+    const group = birth?.querySelector('.input-group');
+    if (!name || !group) return;
+    birth.classList.add('tm-recepcao-birth-field');
+    const nameRect = name.getBoundingClientRect();
+    const groupRect = group.getBoundingClientRect();
+    if (!nameRect.height || !groupRect.height) return;
+    const height = `${nameRect.height}px`;
+    for (const element of [group, ...group.querySelectorAll('input, .input-group-append, .input-group-text')]) {
+      if (element.style.getPropertyValue('height') !== height) {
+        element.style.setProperty('height', height, 'important');
+      }
+    }
+    const difference = nameRect.top - groupRect.top;
+    if (Math.abs(difference) > 0.5) {
+      const current = parseFloat(getComputedStyle(group).marginTop) || 0;
+      const margin = `${Math.round((current + difference) * 100) / 100}px`;
+      if (group.style.getPropertyValue('margin-top') !== margin) {
+        group.style.setProperty('margin-top', margin, 'important');
+      }
+    }
+  }
+
+  function protectReceptionBirthDate(modal) {
+    const input = fieldByLabel(modal, 'Data de Nascimento')?.querySelector('input[type="date"]');
+    if (!input || input.dataset.tmReceptionBirthGuard === '1') return;
+    input.dataset.tmReceptionBirthGuard = '1';
+    input.addEventListener('paste', (event) => {
+      const parsed = tmParseDateInput(event.clipboardData?.getData('text/plain') || '');
+      if (!parsed) return;
+      event.preventDefault();
+      input.value = parsed;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, true);
+    let lastValue = input.value, yearDigits = 0, yearActive = false, replacement = '', writing = false;
+    const parts = (value) => /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+    const reset = () => { lastValue = input.value; yearDigits = 0; yearActive = false; replacement = ''; };
+    input.addEventListener('pointerdown', reset, true);
+    input.addEventListener('focus', reset, true);
+    input.addEventListener('keydown', (event) => {
+      if (/^(?:Arrow|Backspace|Delete|Tab|Home|End)/.test(event.key)) { reset(); return; }
+      if (!/^\d$/.test(event.key) || event.ctrlKey || event.metaKey || event.altKey) return;
+      const current = parts(input.value);
+      if (!current || (!replacement && (!yearActive || yearDigits < 4))) return;
+      event.preventDefault();
+      replacement = replacement.length === 4 ? event.key : replacement + event.key;
+      const year = replacement.padStart(4, '0');
+      if (Number(year) === 0) return;
+      const next = `${year}-${current[2]}-${current[3]}`;
+      if (input.value !== next) {
+        writing = true;
+        input.value = next;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        writing = false;
+      }
+      lastValue = input.value;
+      yearActive = true;
+      yearDigits = replacement.length;
+    }, true);
+    input.addEventListener('input', () => {
+      if (writing) return;
+      const before = parts(lastValue), after = parts(input.value);
+      if (after && (!before || before[1] !== after[1]) &&
+          (!before || (before[2] === after[2] && before[3] === after[3]))) {
+        yearActive = true;
+        yearDigits = Math.min(4, yearDigits + 1);
+      } else if (!after || (before && (before[2] !== after[2] || before[3] !== after[3]))) {
+        yearActive = false;
+        yearDigits = 0;
+        replacement = '';
+      }
+      lastValue = input.value;
+    }, true);
+  }
+
   function requiredReceptionCpf(modal) {
     const input = fieldByLabel(modal, 'CPF')?.querySelector('input');
-    if (input) {
+    if (input && !input.readOnly) {
       input.required = true;
       input.setAttribute('aria-required', 'true');
     }
@@ -293,7 +542,7 @@
       const missing = !control || !value ||
         (control.tagName === 'SELECT' && /^Selecione/i.test(selectedText));
       return { name, field, control, missing };
-    }).filter((item) => firstTime || item.control);
+    }).filter((item) => firstTime || (item.control && !item.control.readOnly));
   }
 
   function setReceptionWarning(field, control, invalid) {
@@ -487,6 +736,9 @@
     const visible = modal.classList.contains('show') || getComputedStyle(modal).display !== 'none';
     if (!visible) {
       originWasVisible = false;
+      originRenderedField = null;
+      originRenderedOwner = null;
+      lastEnteredCpf.delete(modal);
       return;
     }
     if (!modal.querySelector('.modal-body') || !modal.textContent.includes('Concluir')) return;
@@ -574,6 +826,11 @@
       phoneInput.removeAttribute('aria-required');
     }
     const cpf = fieldByLabel(modal, 'CPF');
+    if (social) {
+      const entered = cpf?.querySelector('input')?.value;
+      if (String(entered || '').replace(/\D/g, '').length === 11) lastEnteredCpf.set(modal, entered);
+      else lastEnteredCpf.delete(modal);
+    }
     requiredReceptionCpf(modal);
     optionalReceptionEmail(modal);
     refreshReceptionWarnings(modal);
@@ -591,6 +848,12 @@
     setClass(modal, 'tm-recepcao-primeira-vez', firstTime);
 
     if (!firstTime) {
+      if (modal.classList.contains('show') || getComputedStyle(modal).display !== 'none') {
+        showExistingIdentity(modal, fieldByLabel(modal, 'Celular')?.parentElement);
+        alignReceptionBirth(modal);
+      } else {
+        modal.querySelector('.tm-recepcao-existing-identity-row')?.remove();
+      }
       modal.querySelectorAll('.tm-recepcao-hidden-field').forEach((field) =>
         setClass(field, 'tm-recepcao-hidden-field', field === phone));
       modal.querySelectorAll('.tm-recepcao-dados-row').forEach((row) =>
@@ -600,6 +863,8 @@
       return;
     }
 
+    modal.querySelector('.tm-recepcao-existing-identity-row')?.remove();
+
     for (const field of [social]) {
       if (!field) continue;
       setClass(field, 'tm-recepcao-hidden-field', true);
@@ -608,6 +873,8 @@
       }
     }
     arrangeFirstTimeReceptionFields(modal);
+    alignReceptionBirth(modal);
+    protectReceptionBirthDate(modal);
   }
 
   function observeReceptionMutations() {
@@ -684,7 +951,16 @@
     document.addEventListener(eventName, (event) => {
       if (observationStopped) return;
       const modal = event.target?.closest?.(`#${MODAL_ID}`);
-      if (modal) refreshReceptionWarnings(modal);
+      if (modal) {
+        if (event.target === fieldByLabel(modal, 'CPF')?.querySelector('input')) {
+          if (String(event.target.value || '').replace(/\D/g, '').length === 11) {
+            lastEnteredCpf.set(modal, event.target.value);
+          } else {
+            lastEnteredCpf.delete(modal);
+          }
+        }
+        refreshReceptionWarnings(modal);
+      }
       if (event.target?.matches?.('input#ref-data[type="date"]')) {
         applyReceptionLayout();
       }
