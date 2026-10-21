@@ -1409,6 +1409,19 @@ const tmBookingModalWatch = (() => {
     target.classList.add('tm-cad-header-ocupar');
   }
 
+  function tmCadHeaderNeedsLayout(modal) {
+    return Array.from(modal.querySelectorAll('ul.list-group > li.list-group-item')).some((item) => {
+      const title = item.querySelector('label .h4');
+      if (!title || !item.querySelector('label .fa-user-md') ||
+          !item.querySelector('label .fa-building') ||
+          !item.querySelector('label .fa-calendar-alt')) return false;
+      return !item.classList.contains('tm-cad-header-card') ||
+        !title.querySelector('.tm-cad-header-procedure-emoji') ||
+        !item.querySelector('label .tm-cad-header-info-wrap') ||
+        !item.querySelector('label .tm-cad-header-date-line');
+    });
+  }
+
   function tmCadApplyHeaderLayout(modal) {
     if (!modal) return;
 
@@ -1798,8 +1811,11 @@ const tmBookingModalWatch = (() => {
 
   function applyPrimeiraVezBeforePaint() {
     const modal = observedCadastroModal;
-    if (!modal?.isConnected || modal.classList.contains('tm-primeira-vez-layout') ||
-        tmCadVisibleModal() !== modal || !tmCadIsPrimeiraVez(modal)) return;
+    if (!modal?.isConnected || tmCadVisibleModal() !== modal || !tmCadIsPrimeiraVez(modal)) return;
+    if (modal.classList.contains('tm-primeira-vez-layout')) {
+      if (tmCadHeaderNeedsLayout(modal)) tmCadApplyHeaderLayout(modal);
+      return;
+    }
     tmCadApplyPrimeiraVezLayout();
   }
 

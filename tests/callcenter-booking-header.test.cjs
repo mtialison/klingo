@@ -93,3 +93,22 @@ test('botão Ocupar é ancorado no canto inferior direito de cada cartão', () =
   assert.doesNotMatch(source, /\.tm-cad-header-card \{\s*position: relative !important;\s*padding-bottom: 40px !important;/);
   assert.match(source, /headerItems\.forEach\(\(item\) => \{[\s\S]*?tmCadPositionOcuparButton\(item\)/);
 });
+
+test('retomada do rascunho redecorará cabeçalho recomposto pelo Klingo', () => {
+  const needsLayout = sourceFunction('tmCadHeaderNeedsLayout', 'tmCadApplyHeaderLayout');
+  let decorated = false;
+  const title = { querySelector: () => decorated ? {} : null };
+  const item = {
+    classList: { contains: () => decorated },
+    querySelector(selector) {
+      if (selector === 'label .h4') return title;
+      if (['label .fa-user-md', 'label .fa-building', 'label .fa-calendar-alt'].includes(selector)) return {};
+      return decorated ? {} : null;
+    }
+  };
+  const modal = { querySelectorAll: () => [item] };
+  assert.equal(needsLayout(modal), true);
+  decorated = true;
+  assert.equal(needsLayout(modal), false);
+  assert.match(source, /modal\.classList\.contains\('tm-primeira-vez-layout'\)\) \{\s*if \(tmCadHeaderNeedsLayout\(modal\)\) tmCadApplyHeaderLayout\(modal\);/);
+});
