@@ -88,6 +88,46 @@ test('paciente organiza nome e nascimento, depois celular, origem e sexo, sem al
   assert.match(source, /baseline\.emailInput\.required = baseline\.emailRequired;/);
 });
 
+test('troca automática recupera a origem nativa desconectada do Vue', () => {
+  const ownerRow = { isConnected: true, appendChild(field) { field.isConnected = true; } };
+  const field = { isConnected: false };
+  const component = {
+    label: 'Origem do Agendamento',
+    $el: { closest: () => field },
+    $parent: { $el: { querySelector: () => ownerRow } },
+    $children: []
+  };
+  const recover = sourceFunction('patientNativeOrigem', 'patientShowCpf', {
+    fieldByLabel: () => null,
+    patientBookingComponent: () => ({ $children: [component] }),
+    norm: (value) => String(value || '').trim()
+  });
+  assert.equal(recover({}), field);
+  assert.equal(field.isConnected, true);
+});
+
+test('CPF cadastrado aparece uma só vez, somente para leitura, na primeira linha', () => {
+  const children = [];
+  const createElement = (tag) => ({ tag, children: [], className: '',
+    append(...nodes) { this.children.push(...nodes); },
+    setAttribute() {}, querySelector(selector) { return selector === 'input' ? this.children[1] : null; }
+  });
+  const dados = {
+    querySelector: () => children.find((node) => node.className.includes('tm-paciente-cpf')),
+    appendChild(node) { children.push(node); }
+  };
+  const show = sourceFunction('patientShowCpf', 'patientValidateCellular', {
+    patientBookingComponent: () => ({ dados: { paciente: { cadastro: { st_cpf: '12345678901' } } } }),
+    document: { createElement }
+  });
+  show({}, dados);
+  show({}, dados);
+  assert.equal(children.length, 1);
+  assert.equal(children[0].children[1].value, '123.456.789-01');
+  assert.equal(children[0].children[1].readOnly, true);
+  assert.match(source, /\.tm-paciente-cpf \{\s*grid-column: 4 !important;\s*grid-row: 2 !important;/);
+});
+
 test('campos digitáveis do paciente usam a tipografia medida no fluxo Primeira Vez', () => {
   assert.match(source, /\.tm-paciente-dados-grid \.tm-paciente-field \.form-control \{\s*font-family: "Open Sans", "Helvetica Neue", sans-serif !important;\s*font-size: 13\.125px !important;\s*font-weight: 400 !important;\s*color: #495057 !important;/);
   assert.doesNotMatch(source, /\.tm-paciente-observacao-textarea \{[^}]*font-size: 13\.125px/s);

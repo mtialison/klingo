@@ -129,7 +129,7 @@
 
       #cadastroModal.tm-paciente-layout .tm-paciente-cpf {
         grid-column: 4 !important;
-        grid-row: 5 !important;
+        grid-row: 2 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-celular {
@@ -570,6 +570,56 @@
     return null;
   }
 
+  function patientNativeOrigem(modal) {
+    const visible = fieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
+    if (visible) return visible;
+
+    // A Primeira Vez da versão anterior podia deixar o componente Vue ligado
+    // a uma linha removida. Recupere somente o campo nativo, sem recriá-lo.
+    const root = patientBookingComponent(modal);
+    const pending = root ? [root] : [];
+    while (pending.length) {
+      const component = pending.pop();
+      if (norm(component?.label) === 'Origem do Agendamento') {
+        const field = component.$el?.closest('.col');
+        const ownerRow = component.$parent?.$el?.querySelector('.form-row');
+        if (field && ownerRow?.isConnected && !field.isConnected) {
+          ownerRow.appendChild(field);
+        }
+        return field?.isConnected ? field : null;
+      }
+      pending.push(...(component?.$children || []));
+    }
+    return null;
+  }
+
+  function patientShowCpf(modal, dados) {
+    const digits = String(patientBookingComponent(modal)?.dados?.paciente?.cadastro?.st_cpf || '')
+      .replace(/\D/g, '');
+    let field = dados.querySelector(':scope > .tm-paciente-cpf');
+    if (digits.length !== 11) {
+      field?.remove();
+      return;
+    }
+    if (!field) {
+      field = document.createElement('div');
+      field.className = 'col col-12 tm-paciente-field tm-paciente-cpf';
+      const label = document.createElement('small');
+      label.className = 'form-text text-muted';
+      label.textContent = 'CPF';
+      const input = document.createElement('input');
+      input.className = 'form form-control';
+      input.type = 'text';
+      input.readOnly = true;
+      input.setAttribute('aria-label', 'CPF do paciente cadastrado');
+      field.append(label, input);
+      dados.appendChild(field);
+    }
+    const formatted = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+    const input = field.querySelector('input');
+    if (input && input.value !== formatted) input.value = formatted;
+  }
+
   function patientValidateCellular(modal, event) {
     if (!modal || !isPacienteModal(modal)) return true;
     modal.dataset.tmPacienteValidationAttempted = '1';
@@ -644,7 +694,7 @@
   }
 
   function moveOrigem(modal, dados) {
-    const origem = fieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
+    const origem = patientNativeOrigem(modal);
     if (!origem || !dados) return;
 
     let row = dados.querySelector(':scope > .tm-paciente-origem-inline-row');
@@ -1055,7 +1105,7 @@
     if (modal.classList.contains('tm-primeira-vez-layout')) return;
 
     if (!modalBaselines.has(modal)) {
-      const origemField = fieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
+      const origemField = patientNativeOrigem(modal);
       const nameLabel = fieldByLabel(modal, 'Nome do Paciente')?.querySelector('small.form-text.text-muted');
       const emailInput = fieldByLabel(modal, 'e-mail')?.querySelector('input');
       modalBaselines.set(modal, {
@@ -1081,10 +1131,10 @@
 
     dados.classList.add('tm-paciente-dados-grid');
     ensurePersonalDataHeader(dados);
+    patientShowCpf(modal, dados);
 
     const nome = fieldByLabel(modal, 'Nome do Paciente|Nome');
     const nascimento = fieldByLabel(modal, 'Data de Nascimento');
-    const cpf = fieldByLabel(modal, 'CPF');
     const celular = fieldByLabel(modal, 'Celular');
     const email = fieldByLabel(modal, 'e-mail');
     const sexo = fieldByLabel(modal, 'Sexo');
@@ -1096,7 +1146,6 @@
     addField(nome, 'tm-paciente-nome');
     renamePatientName(nome);
     addField(nascimento, 'tm-paciente-nascimento');
-    addField(cpf, 'tm-paciente-cpf');
     addField(celular, 'tm-paciente-celular');
     addField(email, 'tm-paciente-email');
     const emailInput = email?.querySelector('input');
@@ -1147,6 +1196,7 @@
     modal.querySelectorAll('.tm-paciente-warning-control').forEach((node) => node.classList.remove('tm-paciente-warning-control'));
     delete modal.dataset.tmPacienteValidationAttempted;
     modal.querySelectorAll('.tm-paciente-dados-heading').forEach((node) => node.remove());
+    modal.querySelectorAll('.tm-paciente-cpf').forEach((node) => node.remove());
     if (baseline.nameLabel?.element.isConnected) {
       baseline.nameLabel.element.textContent = baseline.nameLabel.text;
     }
