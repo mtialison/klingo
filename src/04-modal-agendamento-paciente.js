@@ -122,6 +122,12 @@
         grid-row: 2 !important;
       }
 
+      #cadastroModal.tm-paciente-layout .tm-paciente-perfil-append button {
+        height: 100% !important;
+        padding: 3px 10px !important;
+        line-height: 1.2 !important;
+      }
+
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento {
         grid-column: 3 !important;
         grid-row: 2 !important;
@@ -1116,6 +1122,45 @@
     }
   }
 
+  function patientProfileButton(modal, nameField) {
+    const inputGroup = nameField?.querySelector('.input-group');
+    if (!inputGroup) return;
+    const component = patientBookingComponent(modal);
+    const patient = component?.dados?.paciente;
+    const existing = Number(patient?.id_pessoa) > 0 && typeof component?.$root?.perfil === 'function';
+    const current = inputGroup.querySelector(':scope > .tm-paciente-perfil-append');
+    if (!existing) {
+      current?.remove();
+      return;
+    }
+    if (current) return;
+
+    const append = document.createElement('div');
+    append.className = 'input-group-append tm-paciente-perfil-append';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn-outline-primary tm-paciente-perfil-button';
+    button.title = 'Abrir perfil do paciente';
+    button.setAttribute('aria-label', 'Abrir perfil do paciente');
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-id-badge';
+    icon.setAttribute('aria-hidden', 'true');
+    button.appendChild(icon);
+    append.appendChild(button);
+    inputGroup.appendChild(append);
+  }
+
+  function patientOpenProfile(modal) {
+    const component = patientBookingComponent(modal);
+    const patient = component?.dados?.paciente;
+    const jq = window.jQuery || window.$;
+    if (!(Number(patient?.id_pessoa) > 0) || typeof component?.$root?.perfil !== 'function' ||
+        typeof jq?.fn?.modal !== 'function') return false;
+    jq('.modal').modal('hide');
+    component.$root.perfil(patient);
+    return true;
+  }
+
   function applyPacienteLayout() {
     const modal = visibleModal();
     if (!modal) {
@@ -1178,6 +1223,7 @@
 
     addField(nome, 'tm-paciente-nome');
     renamePatientName(nome);
+    patientProfileButton(modal, nome);
     addField(nascimento, 'tm-paciente-nascimento');
     patientLockIdentity(nome);
     patientLockIdentity(nascimento);
@@ -1230,6 +1276,7 @@
     modal.querySelectorAll('.tm-paciente-warning-control').forEach((node) => node.classList.remove('tm-paciente-warning-control'));
     delete modal.dataset.tmPacienteValidationAttempted;
     modal.querySelectorAll('.tm-paciente-dados-heading').forEach((node) => node.remove());
+    modal.querySelectorAll('.tm-paciente-perfil-append').forEach((node) => node.remove());
     modal.querySelectorAll('.tm-paciente-cpf').forEach((node) => node.remove());
     if (baseline.nameLabel?.element.isConnected) {
       baseline.nameLabel.element.textContent = baseline.nameLabel.text;
@@ -1268,6 +1315,13 @@
   }, true);
 
   document.addEventListener('click', (event) => {
+    const profileButton = event.target?.closest?.('#cadastroModal.tm-paciente-layout .tm-paciente-perfil-button');
+    if (profileButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      patientOpenProfile(profileButton.closest('#cadastroModal'));
+      return;
+    }
     if (!window.location.hash.startsWith('#/call-center')) return;
     const button = event.target?.closest?.('button');
     const modal = button?.closest?.('#cadastroModal.tm-paciente-layout');
@@ -1315,7 +1369,12 @@
 
   tmBookingModalWatch.subscribe((modal) => {
     if (modal !== observedPacienteModal) observePacienteModal(modal);
-    else if (modal?.classList.contains('tm-paciente-layout')) patientRefreshWarnings(modal);
+    else if (modal?.classList.contains('tm-paciente-layout')) {
+      patientRefreshWarnings(modal);
+      if (!modal.querySelector('.tm-paciente-perfil-append')) {
+        patientProfileButton(modal, fieldByLabel(modal, 'Nome do Paciente|Nome'));
+      }
+    }
     else applyPacienteBeforePaint();
   });
 

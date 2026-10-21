@@ -162,6 +162,47 @@ test('nome e nascimento do paciente cadastrado ficam somente para leitura', () =
   assert.match(source, /for \(const \{ input, readOnly, ariaReadOnly \} of baseline\.identity \|\| \[\]\)/);
 });
 
+test('botão Perfil replica o ícone nativo e só aparece com ficha vinculada', () => {
+  const children = [];
+  const group = {
+    querySelector: () => children.find((node) => node.className?.includes('tm-paciente-perfil-append')),
+    appendChild(node) { children.push(node); }
+  };
+  const createElement = () => ({
+    children: [], className: '', appendChild(node) { this.children.push(node); },
+    setAttribute(name, value) { this[name] = value; }
+  });
+  const patient = { id_pessoa: 42 };
+  const show = sourceFunction('patientProfileButton', 'patientOpenProfile', {
+    document: { createElement },
+    patientBookingComponent: () => ({ dados: { paciente: patient }, $root: { perfil() {} } })
+  });
+  const field = { querySelector: () => group };
+  show({}, field);
+  show({}, field);
+  assert.equal(children.length, 1);
+  assert.equal(children[0].children[0].children[0].className, 'fas fa-id-badge');
+  assert.equal(children[0].children[0]['aria-label'], 'Abrir perfil do paciente');
+});
+
+test('botão Perfil chama a função nativa com a ficha certa sem concluir agendamento', () => {
+  const calls = [];
+  const patient = { id_pessoa: 42 };
+  const jquery = (selector) => ({ modal: (action) => calls.push([selector, action]) });
+  jquery.fn = { modal() {} };
+  const open = sourceFunction('patientOpenProfile', 'applyPacienteLayout', {
+    patientBookingComponent: () => ({
+      dados: { paciente: patient }, $root: { perfil(record) { calls.push(['perfil', record]); } }
+    }),
+    window: { jQuery: jquery }
+  });
+  assert.equal(open({}), true);
+  assert.deepEqual(calls, [['.modal', 'hide'], ['perfil', patient]]);
+  patient.id_pessoa = 0;
+  assert.equal(open({}), false);
+  assert.equal(calls.length, 2);
+});
+
 test('campos digitáveis do paciente usam a tipografia medida no fluxo Primeira Vez', () => {
   assert.match(source, /\.tm-paciente-dados-grid \.tm-paciente-field \.form-control \{\s*font-family: "Open Sans", "Helvetica Neue", sans-serif !important;\s*font-size: 13\.125px !important;\s*font-weight: 400 !important;\s*color: #495057 !important;/);
   assert.doesNotMatch(source, /\.tm-paciente-observacao-textarea \{[^}]*font-size: 13\.125px/s);
