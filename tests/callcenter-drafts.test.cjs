@@ -34,7 +34,10 @@ function setup() {
         if (windowHandlers[type] === handler) delete windowHandlers[type];
       } },
     document: { querySelectorAll: () => [], querySelector: () => null,
-      addEventListener(type, handler) { eventHandlers[type] = handler; } },
+      addEventListener(type, handler) { eventHandlers[type] = handler; },
+      removeEventListener(type, handler) {
+        if (eventHandlers[type] === handler) delete eventHandlers[type];
+      } },
     tmRuntime: { schedule() {} },
     console: { warn() {}, error() {} },
     eventHandlers, windowHandlers
@@ -100,12 +103,28 @@ test('não reaproveita unidade salva quando a vaga corresponde a outra sala ou u
       unidade: '(BANGU) - CLINICA DO SONO' };
     const otherRoom = { id_unidade_operacao: 500, id_local: 205 };
     const otherUnit = { id_unidade_operacao: 600 };
-    restoreSlotUnit(otherRoom, saved, otherRoom);
-    restoreSlotUnit(otherUnit, saved, otherUnit);
+    restoreSlotUnit({}, otherRoom, saved, otherRoom);
+    restoreSlotUnit({}, otherUnit, saved, otherUnit);
     return { room: otherRoom.unidade, unit: otherUnit.unidade };
   })()`, context);
   assert.equal(result.room, undefined);
   assert.equal(result.unit, undefined);
+});
+
+test('recupera pelo ID o nome da unidade ausente no rascunho', () => {
+  const context = setup();
+  const result = vm.runInContext(`(() => {
+    const vue = { unidadesTodas: [
+      { id_unidade_operacao: 5, st_nome: '(BANGU) - CLINICA DO SONO' },
+      { id_unidade_operacao: 6, st_nome: '(COPA) - CLINICA DO SONO' }
+    ] };
+    const saved = { id_unidade_operacao: 5, id_local: 30, unidade: null };
+    const slot = { id_unidade_operacao: 5, id_local: 30 };
+    const selected = { id_unidade_operacao: 5, id_local: 30, unidade: null };
+    restoreSlotUnit(vue, selected, saved, slot);
+    return selected.unidade;
+  })()`, context);
+  assert.equal(result, '(BANGU) - CLINICA DO SONO');
 });
 
 test('rascunho agrupa cada procedimento com seu profissional e horário', () => {
@@ -225,9 +244,17 @@ test('retomada confere a vaga e abre só o cadastro com os dados preservados', a
   vm.runInContext('component = () => vue;', context);
   await vm.runInContext('save()', context);
   let modalOpen = false;
+  let modalRebuilt = false;
   let openedDayAgenda = false;
   let selectedSlot = null;
-  context.document.querySelector = selector => selector === '#cadastroModal.show' && modalOpen ? {} : null;
+  context.document.querySelector = selector => {
+    if (selector !== '#cadastroModal.show' || !modalOpen) return null;
+    if (!modalRebuilt) {
+      vue.procedimentos[0].unidade = null;
+      modalRebuilt = true;
+    }
+    return {};
+  };
   vue.datas = [];
   vue.buscarHorarios = () => {
     vue.horarios = [{
@@ -249,6 +276,7 @@ test('retomada confere a vaga e abre só o cadastro com os dados preservados', a
   };
   await vm.runInContext('resume(1)', context);
   assert.equal(openedDayAgenda, false);
+  assert.equal(modalRebuilt, true);
   assert.equal(selectedSlot.id_agenda, 300);
   assert.equal(selectedSlot.unidade, '(BANGU) - CLINICA DO SONO');
   assert.equal(selectedSlot.local_nome, '204 - CONSULTORIO 1');

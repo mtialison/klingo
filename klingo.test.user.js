@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.28
+// @version      1.29
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -6091,6 +6091,22 @@ const tmBookingModalWatch = (() => {
     throw new Error('A busca de horários demorou demais. Use Buscar Horários para tentar novamente.');
   }
 
+  function waitForModalShown(modal) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        document.removeEventListener('shown.bs.modal', onShown, true);
+        resolve();
+      };
+      const onShown = (event) => { if (event.target === modal) finish(); };
+      document.addEventListener('shown.bs.modal', onShown, true);
+      // O evento pode ter ocorrido antes do registro; nunca bloqueie a retomada.
+      window.setTimeout(finish, 450);
+    });
+  }
+
   function matchingSlot(vue, preferred, used = new Set()) {
     return (vue.horarios || []).find((slot) =>
       !used.has(slot) &&
@@ -6106,20 +6122,41 @@ const tmBookingModalWatch = (() => {
         slot.unidade_operacao?.id_unidade_operacao || slot.unidade?.id_unidade_operacao) === preferred.unitId));
   }
 
-  function restoreSlotUnit(target, saved, currentSlot) {
-    if (!target || !saved?.unidade || !currentSlot) return;
-    const savedUnit = Number(saved.id_unidade_operacao || saved.unidade_operacao?.id_unidade_operacao ||
-      saved.unidade?.id_unidade_operacao);
+  function unitName(value) {
+    if (typeof value === 'string') return value.trim();
+    return String(value?.st_nome || value?.search || '').trim();
+  }
+
+  function catalogUnit(vue, unitId) {
+    if (!unitId) return '';
+    for (const source of [vue.unidadesTodas, vue.unidadesSelecionadas]) {
+      const units = Array.isArray(source) ? source : Array.isArray(source?.data) ? source.data : [];
+      const unit = units.find((item) =>
+        Number(item?.id_unidade_operacao ?? item?.id) === unitId);
+      if (unitName(unit)) return unitName(unit);
+    }
+    return '';
+  }
+
+  function restoreSlotUnit(vue, target, saved, currentSlot) {
+    if (!target || !currentSlot) return;
+    const savedUnit = Number(saved?.id_unidade_operacao || saved?.unidade_operacao?.id_unidade_operacao ||
+      saved?.unidade?.id_unidade_operacao);
     const currentUnit = Number(currentSlot.id_unidade_operacao ||
       currentSlot.unidade_operacao?.id_unidade_operacao || currentSlot.unidade?.id_unidade_operacao);
     const targetUnit = Number(target.id_unidade_operacao || target.unidade_operacao?.id_unidade_operacao ||
       target.unidade?.id_unidade_operacao);
     if (savedUnit && currentUnit && savedUnit !== currentUnit) return;
     if (savedUnit && targetUnit && savedUnit !== targetUnit) return;
-    if (saved.id_local && currentSlot.id_local &&
+    if (currentUnit && targetUnit && currentUnit !== targetUnit) return;
+    if (saved?.id_local && currentSlot.id_local &&
         Number(saved.id_local) !== Number(currentSlot.id_local)) return;
-    if (saved.id_local && target.id_local && Number(saved.id_local) !== Number(target.id_local)) return;
-    if (target.unidade == null || target.unidade === '') target.unidade = clone(saved.unidade);
+    if (saved?.id_local && target.id_local && Number(saved.id_local) !== Number(target.id_local)) return;
+    if (unitName(target.unidade)) return;
+    const unitId = currentUnit || targetUnit || savedUnit;
+    const name = unitName(saved?.unidade) || unitName(currentSlot.unidade) ||
+      unitName(currentSlot.unidade_operacao) || catalogUnit(vue, unitId);
+    if (name) target.unidade = name;
   }
 
   async function restoreDate(vue, preference, savedProcedures = []) {
@@ -6167,14 +6204,30 @@ const tmBookingModalWatch = (() => {
       if (component() !== vue) throw new Error('A página mudou durante a reserva das vagas.');
       const procedureIndex = preferences[index].procedureIndex ?? index;
       const savedProcedure = savedProcedures[procedureIndex];
-      restoreSlotUnit(slot, savedProcedure, slot);
+      restoreSlotUnit(vue, slot, savedProcedure, slot);
       await vue.selecionar_horario(slot);
       await new Promise((resolve) => vue.$nextTick(resolve));
-      restoreSlotUnit(vue.procedimentos?.[procedureIndex], savedProcedure, slot);
+      restoreSlotUnit(vue, vue.procedimentos?.[procedureIndex], savedProcedure, slot);
     }
-    vue.$forceUpdate?.();
     for (let attempt = 0; attempt < 120; attempt++) {
-      if (document.querySelector('#cadastroModal.show')) {
+      const modal = document.querySelector('#cadastroModal.show');
+      if (modal) {
+        // A abertura do modal ainda pode reconstruir `procedimentos` após a
+        // seleção do horário. Reponha a unidade só depois dessa montagem.
+        await waitForModalShown(modal);
+        if (!document.querySelector('#cadastroModal.show') || component() !== vue) return '';
+        await new Promise((resolve) => vue.$nextTick(resolve));
+        for (const [index, slot] of slots.entries()) {
+          const procedureIndex = preferences[index].procedureIndex ?? index;
+          const selected = vue.procedimentos?.[procedureIndex];
+          const preferredSlot = preferences[index];
+          if (!selected || (preferredSlot.agendaId && selected.id_agenda &&
+              Number(selected.id_agenda) !== preferredSlot.agendaId) ||
+              (selected.data && selected.data !== preferredSlot.date) ||
+              (selected.hora && String(selected.hora) !== preferredSlot.time)) continue;
+          restoreSlotUnit(vue, selected, savedProcedures[procedureIndex], slot);
+        }
+        vue.$forceUpdate?.();
         return '';
       }
       if (component() !== vue) throw new Error('A página mudou durante a reserva da vaga.');
