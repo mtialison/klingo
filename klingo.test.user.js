@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.34
+// @version      1.35
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -6740,6 +6740,17 @@ const tmBookingModalWatch = (() => {
       #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-cpf {
         flex: 0 0 25% !important; max-width: 25% !important;
       }
+      #${MODAL_ID} .tm-recepcao-existing-identity-row .form-control,
+      #${MODAL_ID} .tm-recepcao-existing-identity-row .input-group-text {
+        font-family: "Open Sans", "Helvetica Neue", sans-serif !important;
+        font-size: .875rem !important;
+        font-weight: 400 !important;
+        line-height: 1.5 !important;
+        color: #495057 !important;
+        height: calc(1.5em + .5rem + 2px) !important;
+        padding: .25rem .5rem !important;
+        box-sizing: border-box !important;
+      }
 
       @media (max-width: 767px) {
         #${MODAL_ID} .tm-recepcao-existing-identity-row > .col {
@@ -6993,6 +7004,22 @@ const tmBookingModalWatch = (() => {
     const text = years != null && years >= 0 && years < 130 ? `${years}a` : '';
     if (age.textContent !== text) age.textContent = text;
     age.parentElement.style.display = text ? '' : 'none';
+  }
+
+  function openReceptionPatientProfile(modal, event) {
+    const button = event.target?.closest?.('button');
+    if (!button || button.closest(`#${MODAL_ID}`) !== modal ||
+        norm(button.title) !== 'Histórico do paciente.' || !button.querySelector('.fa-id-badge')) return false;
+    const component = receptionBookingComponent(modal);
+    const patient = component?.dados?.paciente;
+    if (!(Number(patient?.id_pessoa) > 0) || typeof component?.$root?.perfil !== 'function') return false;
+
+    // O clique nativo fecha Novo Atendimento antes de abrir o perfil e perde o formulário.
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    // A ação raiz do Klingo apenas abre o perfil; não é necessário fechar o agendamento.
+    component.$root.perfil(patient);
+    return true;
   }
 
   function alignReceptionBirth(modal) {
@@ -7502,6 +7529,7 @@ const tmBookingModalWatch = (() => {
   document.addEventListener('click', (event) => {
     const button = event.target?.closest?.('button');
     const modal = button?.closest?.(`#${MODAL_ID}`);
+    if (modal && openReceptionPatientProfile(modal, event)) return;
     if (modal && (norm(button.textContent) === 'Concluir' ||
         button.closest('.tm-recepcao-concluir-section'))) {
       validateRequiredReceptionFields(modal, event);

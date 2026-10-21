@@ -73,6 +73,28 @@ test('ficha existente mostra Nome, Nascimento e CPF como leitura, antes do conta
   assert.match(fields[1].querySelector('.tm-recepcao-identity-age').textContent, /^\d+a$/);
 });
 
+test('identificação da ficha usa tamanho e tipografia dos campos nativos da Recepção', () => {
+  assert.match(source, /\.tm-recepcao-existing-identity-row \.form-control,[\s\S]*?font-size: \.875rem !important/);
+  assert.match(source, /\.tm-recepcao-existing-identity-row \.form-control,[\s\S]*?height: calc\(1\.5em \+ \.5rem \+ 2px\) !important/);
+});
+
+test('abrir histórico chama o perfil sem executar o clique nativo que fecha o agendamento', () => {
+  const patient = { id_pessoa: 42 };
+  const calls = [];
+  const modal = {};
+  const button = { title: 'Histórico do paciente.', closest: () => modal,
+    querySelector: () => ({}) };
+  const event = { target: { closest: () => button },
+    preventDefault: () => calls.push('preventDefault'),
+    stopImmediatePropagation: () => calls.push('stopImmediatePropagation') };
+  const context = vm.createContext({ MODAL_ID: 'novoAtendimento2Modal', norm: value => value,
+    receptionBookingComponent: () => ({ dados: { paciente: patient },
+      $root: { perfil: value => calls.push(value) } }) });
+  vm.runInContext(section('openReceptionPatientProfile', 'alignReceptionBirth'), context);
+  assert.equal(vm.runInContext('openReceptionPatientProfile', context)(modal, event), true);
+  assert.deepEqual(calls, ['preventDefault', 'stopImmediatePropagation', patient]);
+});
+
 test('origem nativa removida pela troca de ficha é recolocada após o celular', () => {
   const owner = {};
   const field = { parentElement: null, classList: { remove() {} }, querySelector: () => ({}) };
