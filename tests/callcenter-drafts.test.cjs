@@ -194,6 +194,8 @@ test('mantém vários rascunhos independentes na mesma aba', async () => {
 
 test('retomada confere a vaga e abre só o cadastro com os dados preservados', async () => {
   const context = setup();
+  let layoutPasses = 0;
+  context.tmRuntime.schedule = () => { layoutPasses += 1; };
   const vue = booking();
   vue.dados.plano = { id_plano: 100, search: 'Particular' };
   vue.cadastro_temporario.st_nome = 'Paciente de teste';
@@ -226,6 +228,7 @@ test('retomada confere a vaga e abre só o cadastro com os dados preservados', a
   assert.equal(selectedSlot.id_agenda, 300);
   assert.equal(vue.cadastro_temporario.st_nome, 'Paciente de teste');
   assert.equal(vm.runInContext('drafts.length', context), 0);
+  assert.equal(layoutPasses, 1);
 });
 
 test('retomada seleciona as vagas de todos os procedimentos antes de abrir o cadastro', async () => {

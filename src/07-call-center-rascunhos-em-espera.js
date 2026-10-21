@@ -431,6 +431,10 @@
         else if (status) notify(status);
       } catch (error) {
         notify(error.message || 'Preenchimento retomado; faça a busca de horários manualmente.');
+      } finally {
+        // A vaga reaberta recompõe o cabeçalho depois do formulário; execute
+        // mais uma passagem de layout quando o modal já tiver sido montado.
+        tmRuntime.schedule(0);
       }
     } catch (error) {
       console.warn('[TM] Falha ao retomar rascunho:', error);

@@ -102,7 +102,7 @@ test('retomada do rascunho redecorará cabeçalho recomposto pelo Klingo', () =>
     classList: { contains: () => decorated },
     querySelector(selector) {
       if (selector === 'label .h4') return title;
-      if (['label .fa-user-md', 'label .fa-building', 'label .fa-calendar-alt'].includes(selector)) return {};
+      if (['label .fa-user-md', 'label .fa-calendar-alt'].includes(selector)) return {};
       return decorated ? {} : null;
     }
   };
@@ -111,4 +111,38 @@ test('retomada do rascunho redecorará cabeçalho recomposto pelo Klingo', () =>
   decorated = true;
   assert.equal(needsLayout(modal), false);
   assert.match(source, /modal\.classList\.contains\('tm-primeira-vez-layout'\)\) \{\s*if \(tmCadHeaderNeedsLayout\(modal\)\) tmCadApplyHeaderLayout\(modal\);/);
+});
+
+test('cabeçalho retomado aceita ausência de unidade e coluna de data sem lead', () => {
+  class Element {}
+  const classes = () => ({ values: [], add(...values) { this.values.push(...values); }, remove() {} });
+  const title = { classList: classes() };
+  const professional = { classList: classes(), querySelector: selector => selector === '.fa-user-md' ? {} : null };
+  const left = { classList: classes(), querySelector: () => null,
+    querySelectorAll: () => [professional] };
+  const dateBlock = { classList: classes() };
+  const infoWrap = { classList: classes(), querySelector(selector) {
+    if (selector === ':scope > div:first-child') return left;
+    if (selector === ':scope > div.lead, :scope > div:not(:first-child)') return dateBlock;
+    return null;
+  } };
+  const item = Object.assign(new Element(), {
+    classList: classes(), matches: () => true,
+    querySelector(selector) {
+      if (selector === 'label .h4') return title;
+      if (selector === 'label .d-flex.justify-content-between') return infoWrap;
+      return ['label .fa-user-md', 'label .fa-calendar-alt']
+        .includes(selector) ? {} : null;
+    }
+  });
+  const listGroup = { children: [item], classList: classes() };
+  const apply = sourceFunction('tmCadApplyHeaderLayout', 'tmCadEnableObservacaoTextarea', {
+    HTMLElement: Element,
+    tmCadGetExternalConvenioForHeaderList: () => '',
+    tmCadPositionOcuparButton() {}, tmCadAddProcedureEmoji() {},
+    tmCadNormalizeHeaderDate() {}, tmCadDecorateHeader() {}
+  });
+  apply({ querySelectorAll: () => [listGroup], classList: classes() });
+  assert.ok(item.classList.values.includes('tm-cad-header-card'));
+  assert.ok(dateBlock.classList.values.includes('tm-cad-header-data'));
 });

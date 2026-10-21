@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.26
+// @version      1.27
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -3764,7 +3764,6 @@ const tmBookingModalWatch = (() => {
     return Array.from(modal.querySelectorAll('ul.list-group > li.list-group-item')).some((item) => {
       const title = item.querySelector('label .h4');
       if (!title || !item.querySelector('label .fa-user-md') ||
-          !item.querySelector('label .fa-building') ||
           !item.querySelector('label .fa-calendar-alt')) return false;
       return !item.classList.contains('tm-cad-header-card') ||
         !title.querySelector('.tm-cad-header-procedure-emoji') ||
@@ -3787,7 +3786,6 @@ const tmBookingModalWatch = (() => {
           item.matches('li.list-group-item') &&
           !!item.querySelector('label .h4') &&
           !!item.querySelector('label .fa-user-md') &&
-          !!item.querySelector('label .fa-building') &&
           !!item.querySelector('label .fa-calendar-alt')
         );
       });
@@ -3805,7 +3803,9 @@ const tmBookingModalWatch = (() => {
         if (!title || !infoWrap) return;
 
         const left = infoWrap.querySelector(':scope > div:first-child');
-        const dateBlock = infoWrap.querySelector(':scope > div.lead');
+        // Na retomada de rascunho o Klingo pode remontar a coluna da data sem
+        // a classe `lead`; ela continua sendo a segunda coluna do cabeçalho.
+        const dateBlock = infoWrap.querySelector(':scope > div.lead, :scope > div:not(:first-child)');
 
         if (!left || !dateBlock) return;
 
@@ -3820,7 +3820,7 @@ const tmBookingModalWatch = (() => {
         const profissional = spans.find((span) => !!span.querySelector('.fa-user-md'));
         const unidade = spans.find((span) => !!span.querySelector('.fa-building'));
 
-        if (!profissional || !unidade) return;
+        if (!profissional) return;
 
         if (!convenio && externalConvenioText) {
           convenio = tmCadBuildConvenioRowFromText(externalConvenioText);
@@ -3835,14 +3835,14 @@ const tmBookingModalWatch = (() => {
         left.classList.add('tm-cad-header-left');
 
         profissional.classList.add('tm-cad-header-row', 'tm-cad-header-profissional');
-        unidade.classList.add('tm-cad-header-row', 'tm-cad-header-unidade');
+        unidade?.classList.add('tm-cad-header-row', 'tm-cad-header-unidade');
         dateBlock.classList.add('tm-cad-header-data');
 
         if (convenio) {
           convenio.classList.add('tm-cad-header-row', 'tm-cad-header-convenio');
         }
 
-        unidade.querySelectorAll('small.text-muted').forEach((small) => {
+        unidade?.querySelectorAll('small.text-muted').forEach((small) => {
           small.classList.add('tm-cad-header-sala');
         });
 
@@ -6205,6 +6205,10 @@ const tmBookingModalWatch = (() => {
         else if (status) notify(status);
       } catch (error) {
         notify(error.message || 'Preenchimento retomado; faça a busca de horários manualmente.');
+      } finally {
+        // A vaga reaberta recompõe o cabeçalho depois do formulário; execute
+        // mais uma passagem de layout quando o modal já tiver sido montado.
+        tmRuntime.schedule(0);
       }
     } catch (error) {
       console.warn('[TM] Falha ao retomar rascunho:', error);
