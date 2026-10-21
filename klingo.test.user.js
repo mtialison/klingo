@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.38
+// @version      1.39
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -3093,7 +3093,11 @@ const tmBookingModalWatch = (() => {
   }
 
   function tmCadGuardCpfLookup(modal, event) {
+    // A ficha já vinculada na Recepção não possui consulta de CPF pendente.
+    // Não intercepte o Concluir: a validação própria da Recepção precisa rodar.
+    if (!tmCadIsCpfLookupTarget(modal)) return true;
     const input = tmCadFieldByLabel(modal, 'CPF')?.querySelector('input');
+    if (input?.readOnly) return true;
     if (!tmCadIsValidCpf(input?.value)) return true;
     const state = tmCadLookupCpf(modal);
     if (state?.done && state.matches === 0 && !state.selectedCpf) return true;

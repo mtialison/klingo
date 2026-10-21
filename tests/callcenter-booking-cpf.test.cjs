@@ -15,6 +15,28 @@ function sourceFunction(name, nextName, context = {}) {
 const isValidCpf = sourceFunction('tmCadIsValidCpf', 'tmCadPhoneInvalid');
 const phoneInvalid = sourceFunction('tmCadPhoneInvalid', 'tmCadRequiredProblems');
 
+test('guarda de CPF não intercepta Concluir com ficha já vinculada na Recepção', () => {
+  let lookups = 0;
+  const guard = sourceFunction('tmCadGuardCpfLookup', 'tmCadValidateRequiredFields', {
+    tmCadIsCpfLookupTarget: () => false,
+    tmCadFieldByLabel: () => { lookups++; return null; }
+  });
+  const event = { preventDefault() { throw new Error('Clique cancelado'); },
+    stopImmediatePropagation() { throw new Error('Validação da Recepção bloqueada'); } };
+  assert.equal(guard({ id: 'novoAtendimento2Modal' }, event), true);
+  assert.equal(lookups, 0);
+});
+
+test('guarda de CPF ignora campo somente leitura após vincular ficha', () => {
+  const guard = sourceFunction('tmCadGuardCpfLookup', 'tmCadValidateRequiredFields', {
+    tmCadIsCpfLookupTarget: () => true,
+    tmCadFieldByLabel: () => ({ querySelector: () => ({ readOnly: true, value: '529.982.247-25' }) })
+  });
+  assert.equal(guard({ id: 'novoAtendimento2Modal' }, {
+    preventDefault() { throw new Error('Clique cancelado'); }
+  }), true);
+});
+
 test('CPF exige dígitos verificadores válidos e rejeita sequências repetidas', () => {
   assert.equal(isValidCpf('529.982.247-25'), true);
   assert.equal(isValidCpf('123.456.789-09'), true);
