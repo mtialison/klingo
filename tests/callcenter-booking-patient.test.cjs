@@ -82,10 +82,68 @@ test('paciente organiza nome e nascimento, depois celular, origem e sexo, sem al
   assert.match(source, /\.tm-paciente-origem \{\s*grid-column: 2 \/ 4 !important;\s*grid-row: 3 !important;/);
   assert.match(source, /\.tm-paciente-sexo \{\s*grid-column: 4 !important;\s*grid-row: 3 !important;/);
   assert.match(source, /\.tm-paciente-validade \{\s*grid-column: 3 !important;\s*grid-row: 4 !important;/);
+  assert.match(source, /\.tm-paciente-cpf \{\s*grid-column: 4 !important;\s*grid-row: 2 !important;/);
+  assert.match(source, /ensureCpfDisplay\(modal, dados\)/);
+  assert.match(source, /input\.readOnly = true;/);
+  assert.match(source, /patient\?\.cadastro\?\.st_cpf/);
   assert.doesNotMatch(source, /telefone\.value\s*=/);
   assert.doesNotMatch(source, /email\.value\s*=/);
   assert.match(source, /if \(emailInput\) emailInput\.required = false;/);
   assert.match(source, /baseline\.emailInput\.required = baseline\.emailRequired;/);
+});
+
+test('recupera o seletor nativo de origem desconectado sem perder eventos do Vue', () => {
+  const select = {};
+  const field = { isConnected: false, querySelector: () => select };
+  const row = { isConnected: true, appendChild(node) { node.isConnected = true; } };
+  const component = {
+    label: 'Origem do Agendamento',
+    $el: { closest: () => field },
+    $parent: { $el: { querySelector: () => row } },
+    $children: []
+  };
+  const restore = sourceFunction('nativeOrigemField', 'moveOrigem', {
+    norm: (value) => String(value || '').trim(),
+    patientBookingComponent: () => ({ $children: [component] })
+  });
+  const modal = { querySelectorAll: () => [] };
+  assert.equal(restore(modal), field);
+  assert.equal(field.isConnected, true);
+  assert.match(source, /source\.dispatchEvent\(new Event\('change', \{ bubbles: true \}\)\)/);
+  assert.match(source, /nativeField\.classList\.add\('tm-paciente-native-origem-hidden'\)/);
+});
+
+test('CPF da ficha vinculada aparece uma só vez e acompanha a ficha atual', () => {
+  const formatCpf = sourceFunction('patientCpfValue', 'ensureCpfDisplay', {
+    norm: (value) => String(value || '').trim(),
+    patientBookingComponent: () => ({ dados: { paciente: { cadastro: { st_cpf: '52998224725' } } } })
+  });
+  assert.equal(formatCpf({}), '529.982.247-25');
+  const node = (tag) => ({
+    tag, className: '', children: [], value: '',
+    appendChild(child) { this.children.push(child); return child; },
+    append(...children) { this.children.push(...children); },
+    setAttribute() {},
+    querySelector(selector) {
+      const all = (item) => [item, ...item.children.flatMap(all)];
+      return all(this).find((item) => selector === 'input' ? item.tag === 'input' :
+        item.className?.split(' ').includes(selector.replace(/.*\./, ''))) || null;
+    }
+  });
+  const dados = node('div');
+  let cpf = '529.982.247-25';
+  const ensure = sourceFunction('ensureCpfDisplay', 'nativeOrigemField', {
+    patientCpfValue: () => cpf,
+    document: { createElement: node }
+  });
+  ensure({}, dados);
+  ensure({}, dados);
+  assert.equal(dados.children.length, 1);
+  assert.equal(dados.querySelector('input').value, cpf);
+  cpf = '123.456.789-09';
+  ensure({}, dados);
+  assert.equal(dados.children.length, 1);
+  assert.equal(dados.querySelector('input').value, cpf);
 });
 
 test('campos digitáveis do paciente usam a tipografia medida no fluxo Primeira Vez', () => {
@@ -207,7 +265,7 @@ test('confirmar bloqueia celular vazio e usa o balão nativo', () => {
   assert.equal(notifications[0].detail, 'O campo celular é obrigatório.');
 });
 
-test('aviso adicional só é usado no celular após confirmar', () => {
+test('aviso adicional é usado no celular e na origem após confirmar', () => {
   assert.match(source, /modal\.dataset\.tmPacienteValidationAttempted !== '1'\) return;/);
   const calls = [];
   sourceFunction('patientRefreshWarnings', 'patientBookingComponent', {
@@ -217,8 +275,9 @@ test('aviso adicional só é usado no celular após confirmar', () => {
     ],
     patientSetWarning: (...args) => calls.push(args)
   })({ classList: { contains: () => true }, dataset: { tmPacienteValidationAttempted: '1' } });
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.equal(calls[0][1], true);
+  assert.equal(calls[1][1], true);
 });
 
 test('não cria segundo aviso quando o Klingo já exibe o indicador nativo', () => {

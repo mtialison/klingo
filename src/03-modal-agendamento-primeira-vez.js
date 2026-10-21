@@ -661,8 +661,17 @@ const tmBookingModalWatch = (() => {
     if (modal.id === 'cadastroModal') {
       const cellular = tmCadFieldByLabel(modal, 'Celular')?.querySelector('input')?.value;
       if (cellular) pendingCpfTransfers.set(modal, { cellular, restoredInput: null });
+      // Restaurar o controle nativo antes que a troca de ficha desmonte o
+      // formulário temporário e desconecte o seletor de origem.
+      modal.dataset.tmCadCpfSelecting = '1';
+      tmCadClearPrimeiraVezLayout(modal);
     }
-    component.identificar_paciente(matches[0]);
+    try {
+      component.identificar_paciente(matches[0]);
+    } catch (error) {
+      if (modal.id === 'cadastroModal') delete modal.dataset.tmCadCpfSelecting;
+      throw error;
+    }
     return true;
   }
 
@@ -782,6 +791,7 @@ const tmBookingModalWatch = (() => {
 
   function tmCadIsPrimeiraVez(modal) {
     if (!modal || modal.id !== 'cadastroModal') return false;
+    if (modal.dataset.tmCadCpfSelecting === '1') return false;
     if (modal.classList.contains('tm-paciente-layout')) return false;
 
     const title = tmCadNorm(modal.querySelector('.modal-title')?.innerText || modal.querySelector('.modal-title')?.textContent || '');
@@ -1764,6 +1774,7 @@ const tmBookingModalWatch = (() => {
   document.addEventListener('hidden.bs.modal', (event) => {
     otherCpfObservers.get(event.target)?.disconnect();
     pendingCpfTransfers.delete(event.target);
+    if (event.target?.id === 'cadastroModal') delete event.target.dataset.tmCadCpfSelecting;
     const state = cpfLookups.get(tmCadCadastroComponent(event.target));
     if (state) {
       state.generation += 1;
@@ -1801,6 +1812,11 @@ const tmBookingModalWatch = (() => {
 
   tmBookingModalWatch.subscribe((modal) => {
     if (modal !== observedCadastroModal) observeCadastroModal(modal);
+    else if (modal?.dataset.tmCadCpfSelecting === '1' &&
+        tmCadHasLabel(modal, 'Nome do Paciente')) {
+      delete modal.dataset.tmCadCpfSelecting;
+      tmCadSchedulePendingRestore(modal);
+    }
     else if (modal?.classList.contains('tm-primeira-vez-layout') &&
         tmCadHasLabel(modal, 'Nome do Paciente')) {
       // Limpar antes do observador do layout Paciente capturar o novo estado.

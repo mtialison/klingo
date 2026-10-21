@@ -125,6 +125,25 @@ test('vincula somente uma ficha com CPF completo e id de pessoa válido', () => 
   assert.deepEqual(exact(records, '52998224724'), []);
 });
 
+test('devolve a origem ao formulário nativo antes de selecionar a ficha pelo CPF', () => {
+  const order = [];
+  const cpf = '52998224725';
+  const modal = { id: 'cadastroModal', isConnected: true, dataset: {} };
+  const component = { identificar_paciente() { order.push('selecionar'); } };
+  const select = sourceFunction('tmCadSelectExactCpf', 'tmCadRestorePendingFields', {
+    tmCadIsCpfLookupTarget: () => true,
+    tmCadCpfDigits: (value) => String(value).replace(/\D/g, ''),
+    tmCadFieldByLabel: (_modal, label) => ({ querySelector: () => ({ value: label === 'CPF' ? cpf : '' }) }),
+    tmCadExactCpfRecords: () => [{ id_pessoa: 42 }],
+    cpfLookups: new WeakMap(),
+    pendingCpfTransfers: new WeakMap(),
+    tmCadClearPrimeiraVezLayout() { order.push('restaurar'); }
+  });
+  assert.equal(select(modal, component, cpf, []), true);
+  assert.deepEqual(order, ['restaurar', 'selecionar']);
+  assert.equal(modal.dataset.tmCadCpfSelecting, '1');
+});
+
 test('a busca cobre cadastro temporário da recepção e edição, sem exigir CPF vazio', () => {
   const target = sourceFunction('tmCadIsCpfLookupTarget', 'tmCadCpfDigits', {
     tmCadIsPrimeiraVez: (modal) => modal.id === 'cadastroModal'

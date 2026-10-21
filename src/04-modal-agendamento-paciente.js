@@ -7,6 +7,7 @@
 
   const STYLE_ID = 'tm-cadastro-paciente-layout-23-0';
   const modalBaselines = new WeakMap();
+  const nativeOrigemRequired = new WeakMap();
 
   function norm(value) {
     return String(value || '').replace(/\s+/g, ' ').trim();
@@ -104,6 +105,7 @@
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento input,
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group,
       #cadastroModal.tm-paciente-layout .tm-paciente-nascimento .input-group-text,
+      #cadastroModal.tm-paciente-layout .tm-paciente-cpf input,
       #cadastroModal.tm-paciente-layout .tm-paciente-sexo select,
       #cadastroModal.tm-paciente-layout .tm-paciente-celular input,
       #cadastroModal.tm-paciente-layout .tm-paciente-email input,
@@ -129,7 +131,7 @@
 
       #cadastroModal.tm-paciente-layout .tm-paciente-cpf {
         grid-column: 4 !important;
-        grid-row: 5 !important;
+        grid-row: 2 !important;
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-celular {
@@ -258,6 +260,10 @@
       }
 
       #cadastroModal.tm-paciente-layout .tm-paciente-origem-section-hidden {
+        display: none !important;
+      }
+
+      #cadastroModal.tm-paciente-layout .tm-paciente-native-origem-hidden {
         display: none !important;
       }
 
@@ -554,8 +560,9 @@
   function patientRefreshWarnings(modal) {
     if (!modal?.classList.contains('tm-paciente-layout') ||
         modal.dataset.tmPacienteValidationAttempted !== '1') return;
-    const celular = patientFieldProblems(modal).find(({ key }) => key === 'celular');
-    if (celular) patientSetWarning(celular.control, celular.missing || celular.malformed);
+    patientFieldProblems(modal)
+      .filter(({ key }) => key === 'celular' || key === 'origem')
+      .forEach(({ control, missing, malformed }) => patientSetWarning(control, missing || malformed));
   }
 
   function patientBookingComponent(modal) {
@@ -643,20 +650,125 @@
     if (label) label.textContent = 'Nome';
   }
 
+  function patientCpfValue(modal) {
+    const patient = patientBookingComponent(modal)?.dados?.paciente;
+    const raw = norm(patient?.cadastro?.st_cpf || patient?.st_cpf || '');
+    const digits = raw.replace(/\D/g, '');
+    return digits.length === 11 ?
+      `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}` : raw;
+  }
+
+  function ensureCpfDisplay(modal, dados) {
+    if (!dados) return;
+    let field = dados.querySelector('.tm-paciente-cpf-display');
+    if (!field) {
+      field = document.createElement('div');
+      field.className = 'col col-12 tm-paciente-field tm-paciente-cpf tm-paciente-cpf-display';
+      const group = document.createElement('div');
+      group.className = 'form-group mb-1';
+      const label = document.createElement('small');
+      label.className = 'form-text text-muted text-nowrap text-truncate';
+      label.textContent = 'CPF';
+      const inputGroup = document.createElement('div');
+      inputGroup.className = 'input-group';
+      const input = document.createElement('input');
+      input.className = 'form form-control';
+      input.type = 'text';
+      input.readOnly = true;
+      input.setAttribute('aria-label', 'CPF');
+      inputGroup.appendChild(input);
+      group.append(label, inputGroup);
+      field.appendChild(group);
+      let row = dados.querySelector(':scope > .tm-paciente-cpf-row');
+      if (!row) {
+        row = document.createElement('div');
+        row.className = 'form-row tm-paciente-cpf-row';
+        dados.appendChild(row);
+      }
+      row.appendChild(field);
+    }
+    const input = field.querySelector('input');
+    const cpf = patientCpfValue(modal);
+    if (input && input.value !== cpf) input.value = cpf;
+  }
+
+  function nativeOrigemField(modal) {
+    const present = Array.from(modal.querySelectorAll('small.form-text.text-muted'))
+      .find((label) => /^(Origem de Pacientes|Origem do Agendamento)$/i.test(norm(label.textContent)) &&
+        !label.closest('.tm-paciente-origem-mirror'))?.closest('.col');
+    if (present?.querySelector('select')) return present;
+
+    // O Klingo pode manter o componente Vue vivo depois de retirar seu nó
+    // da árvore. Reanexe o próprio controle nativo, sem recriar seus eventos.
+    const root = patientBookingComponent(modal);
+    const stack = [...(root?.$children || [])];
+    const seen = new Set();
+    while (stack.length && seen.size < 300) {
+      const component = stack.pop();
+      if (!component || seen.has(component)) continue;
+      seen.add(component);
+      if (/^(Origem de Pacientes|Origem do Agendamento)$/i.test(norm(component.label))) {
+        const field = component.$el?.closest?.('.col');
+        const nativeRow = component.$parent?.$el?.querySelector?.(':scope > .form-row');
+        if (field && nativeRow?.isConnected && !field.isConnected) nativeRow.appendChild(field);
+        if (field?.isConnected && field.querySelector('select')) return field;
+      }
+      stack.push(...(component.$children || []));
+    }
+    return null;
+  }
+
   function moveOrigem(modal, dados) {
-    const origem = fieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
-    if (!origem || !dados) return;
+    if (!dados) return;
+    const nativeField = nativeOrigemField(modal);
+    const nativeSelect = nativeField?.querySelector('select');
+    if (!nativeSelect) return;
 
     let row = dados.querySelector(':scope > .tm-paciente-origem-inline-row');
     if (!row) {
       row = document.createElement('div');
       row.className = 'form-row tm-paciente-origem-inline-row';
+      const mirror = document.createElement('div');
+      mirror.className = 'col col-12 tm-paciente-field tm-paciente-origem tm-paciente-origem-mirror';
+      const group = document.createElement('div');
+      group.className = 'form-group mb-1';
+      const label = document.createElement('small');
+      label.className = 'form-text text-muted text-nowrap text-truncate';
+      label.textContent = 'Origem do Agendamento';
+      const inputGroup = document.createElement('div');
+      inputGroup.className = 'input-group input-group-sm';
+      const select = document.createElement('select');
+      select.className = 'form form-control';
+      select.setAttribute('aria-label', 'Origem do Agendamento');
+      select.addEventListener('change', () => {
+        const source = nativeOrigemField(modal)?.querySelector('select');
+        if (!source) return;
+        source.value = select.value;
+        source.dispatchEvent(new Event('input', { bubbles: true }));
+        source.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      inputGroup.appendChild(select);
+      group.append(label, inputGroup);
+      mirror.appendChild(group);
+      row.appendChild(mirror);
       dados.appendChild(row);
     }
 
-    if (origem.parentElement !== row) row.appendChild(origem);
-
-    addField(origem, 'tm-paciente-origem');
+    const mirrorSelect = row.querySelector('select');
+    const nativeOptions = Array.from(nativeSelect.options);
+    const signature = nativeOptions.map((option) => `${option.value}\u0000${option.textContent}`).join('\u0001');
+    if (mirrorSelect.dataset.tmOptionsSignature !== signature) {
+      mirrorSelect.replaceChildren(...nativeOptions.map((option) =>
+        new Option(option.textContent, option.value, false, option.selected)));
+      mirrorSelect.dataset.tmOptionsSignature = signature;
+    }
+    if (document.activeElement !== mirrorSelect && mirrorSelect.value !== nativeSelect.value) {
+      mirrorSelect.value = nativeSelect.value;
+    }
+    if (!nativeOrigemRequired.has(nativeSelect)) nativeOrigemRequired.set(nativeSelect, nativeSelect.required);
+    nativeSelect.required = false;
+    mirrorSelect.required = nativeOrigemRequired.get(nativeSelect);
+    nativeField.classList.add('tm-paciente-native-origem-hidden');
   }
 
   function hideOrigemSection(modal) {
@@ -1108,6 +1220,7 @@
 
     nomeSocial?.classList.add('tm-paciente-hidden');
 
+    ensureCpfDisplay(modal, dados);
     moveOrigem(modal, dados);
     hideOrigemSection(modal);
     setupObservacao(modal);
@@ -1152,12 +1265,22 @@
     }
     if (baseline.emailInput?.isConnected) baseline.emailInput.required = baseline.emailRequired;
 
+    modal.querySelectorAll('.tm-paciente-native-origem-hidden').forEach((field) => {
+      const select = field.querySelector('select');
+      if (select && nativeOrigemRequired.has(select)) {
+        select.required = nativeOrigemRequired.get(select);
+        nativeOrigemRequired.delete(select);
+      }
+      field.classList.remove('tm-paciente-native-origem-hidden');
+    });
+
     const { origem } = baseline;
     if (origem?.element.isConnected && origem.parent.isConnected) {
       const next = origem.next?.parentNode === origem.parent ? origem.next : null;
       origem.parent.insertBefore(origem.element, next);
     }
     modal.querySelectorAll('.tm-paciente-origem-inline-row').forEach((row) => row.remove());
+    modal.querySelectorAll('.tm-paciente-cpf-row').forEach((row) => row.remove());
 
     tmRestoreAttributes(baseline.attributes);
     tmRestoreHeaderContents(baseline.headers);
@@ -1225,7 +1348,12 @@
 
   tmBookingModalWatch.subscribe((modal) => {
     if (modal !== observedPacienteModal) observePacienteModal(modal);
-    else if (modal?.classList.contains('tm-paciente-layout')) patientRefreshWarnings(modal);
+    else if (modal?.classList.contains('tm-paciente-layout')) {
+      const dados = findDadosContainer(modal);
+      ensureCpfDisplay(modal, dados);
+      moveOrigem(modal, dados);
+      patientRefreshWarnings(modal);
+    }
     else applyPacienteBeforePaint();
   });
 
