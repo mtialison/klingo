@@ -136,23 +136,35 @@ test('a busca cobre cadastro temporário da recepção e edição, sem exigir CP
 });
 
 test('ao trocar para a ficha existente preserva celular informado somente se destino estiver vazio', () => {
-  const modal = {};
+  const modal = { classList: { contains: () => true } };
   const pendingCpfTransfers = new WeakMap([[modal, { cellular: '(21) 98888-7777' }]]);
-  const input = { value: '' };
+  let input = { value: '' };
   const restore = sourceFunction('tmCadRestorePendingFields', 'tmCadLookupCpf', {
     pendingCpfTransfers,
     tmCadIsPrimeiraVez: () => false,
+    tmCadHasLabel: () => false,
     tmCadFieldByLabel: () => ({ querySelector: () => input }),
     tmCadSetInputValue: (el, value) => { el.value = value; }
   });
   restore(modal);
   assert.equal(input.value, '(21) 98888-7777');
-  assert.equal(pendingCpfTransfers.has(modal), false);
+  assert.equal(pendingCpfTransfers.has(modal), true);
 
-  input.value = '(21) 97777-6666';
-  pendingCpfTransfers.set(modal, { cellular: '(21) 98888-7777' });
+  input = { value: '(21) 97777-6666' };
   restore(modal);
   assert.equal(input.value, '(21) 97777-6666');
+
+  input = { value: '' };
+  restore(modal);
+  assert.equal(input.value, '(21) 98888-7777');
+});
+
+test('troca de ficha limpa o layout anterior antes de montar Paciente', () => {
+  const patientSource = fs.readFileSync(path.join(__dirname, '..', 'src', '04-modal-agendamento-paciente.js'), 'utf8');
+  assert.match(source, /tmCadClearPrimeiraVezLayout\(modal\);\s*tmCadSchedulePendingRestore\(modal\);/);
+  assert.match(source, /\.tm-cad-header-procedure-emoji/);
+  assert.match(source, /fallback\?\.appendChild\(origem\.element\)/);
+  assert.match(patientSource, /if \(modal\.classList\.contains\('tm-primeira-vez-layout'\)\) return;/);
 });
 
 test('consulta CPF sem aguardar sexo, nascimento ou celular e seleciona só o resultado exato', async () => {

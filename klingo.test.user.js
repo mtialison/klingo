@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.16
+// @version      1.17
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -3011,7 +3011,7 @@ const tmBookingModalWatch = (() => {
     if (state) state.selectedCpf = cpf;
     if (modal.id === 'cadastroModal') {
       const cellular = tmCadFieldByLabel(modal, 'Celular')?.querySelector('input')?.value;
-      if (cellular) pendingCpfTransfers.set(modal, { cellular });
+      if (cellular) pendingCpfTransfers.set(modal, { cellular, restoredInput: null });
     }
     component.identificar_paciente(matches[0]);
     return true;
@@ -3020,10 +3020,31 @@ const tmBookingModalWatch = (() => {
   function tmCadRestorePendingFields(modal) {
     const pending = pendingCpfTransfers.get(modal);
     if (!pending || tmCadIsPrimeiraVez(modal)) return;
+    if (!tmCadHasLabel(modal, 'Nome do Paciente') &&
+        !modal.classList.contains('tm-paciente-layout')) return;
     const cellular = tmCadFieldByLabel(modal, 'Celular')?.querySelector('input');
     if (!cellular) return;
-    if (!cellular.value) tmCadSetInputValue(cellular, pending.cellular);
-    pendingCpfTransfers.delete(modal);
+    if (cellular !== pending.restoredInput) {
+      if (!cellular.value) tmCadSetInputValue(cellular, pending.cellular);
+      pending.restoredInput = cellular;
+    }
+  }
+
+  function tmCadSchedulePendingRestore(modal) {
+    const pending = pendingCpfTransfers.get(modal);
+    if (!pending || pending.restoreScheduled) return;
+    pending.restoreScheduled = true;
+    tmCadRestorePendingFields(modal);
+    for (const delay of [80, 250, 600]) {
+      window.setTimeout(() => {
+        if (pendingCpfTransfers.get(modal) === pending && modal.isConnected) {
+          tmCadRestorePendingFields(modal);
+        }
+      }, delay);
+    }
+    window.setTimeout(() => {
+      if (pendingCpfTransfers.get(modal) === pending) pendingCpfTransfers.delete(modal);
+    }, 700);
   }
 
   function tmCadLookupCpf(modal) {
@@ -3897,13 +3918,21 @@ const tmBookingModalWatch = (() => {
     const baseline = modalBaselines.get(modal);
     if (!baseline) return;
 
-    modal.querySelectorAll('.tm-cad-header-emoji, .tm-cad-header-convenio-injetado, textarea.tm-cad-observacao-textarea')
+    modal.querySelectorAll('.tm-cad-header-emoji, .tm-cad-header-procedure-emoji, .tm-cad-header-convenio-injetado, textarea.tm-cad-observacao-textarea')
       .forEach((node) => node.remove());
 
     const { origem, cpfInput, cpfRequired, cpfAriaRequired, emailInput, emailRequired } = baseline;
-    if (origem?.element.isConnected && origem.parent.isConnected) {
-      const next = origem.next?.parentNode === origem.parent ? origem.next : null;
-      origem.parent.insertBefore(origem.element, next);
+    if (origem?.element.isConnected) {
+      if (origem.parent.isConnected) {
+        const next = origem.next?.parentNode === origem.parent ? origem.next : null;
+        origem.parent.insertBefore(origem.element, next);
+      } else {
+        // A troca de ficha pode substituir o contêiner original. Não deixe o
+        // campo ser removido junto com a linha provisória da Primeira Vez.
+        const fallback = tmCadFieldByLabel(modal, 'Nome do Paciente')?.closest('.mt-3') ||
+          modal.querySelector('#cadTemp');
+        fallback?.appendChild(origem.element);
+      }
     }
     modal.querySelectorAll('.tm-cad-origem-inline-row').forEach((row) => row.remove());
     modal.querySelectorAll('.tm-cad-required-warning').forEach((warning) => warning.remove());
@@ -3938,7 +3967,7 @@ const tmBookingModalWatch = (() => {
 
     if (!tmCadIsPrimeiraVez(modal)) {
       tmCadClearPrimeiraVezLayout(modal);
-      tmCadRestorePendingFields(modal);
+      tmCadSchedulePendingRestore(modal);
       return;
     }
 
@@ -4123,7 +4152,12 @@ const tmBookingModalWatch = (() => {
 
   tmBookingModalWatch.subscribe((modal) => {
     if (modal !== observedCadastroModal) observeCadastroModal(modal);
-    else applyPrimeiraVezBeforePaint();
+    else if (modal?.classList.contains('tm-primeira-vez-layout') &&
+        tmCadHasLabel(modal, 'Nome do Paciente')) {
+      // Limpar antes do observador do layout Paciente capturar o novo estado.
+      tmCadClearPrimeiraVezLayout(modal);
+      tmCadSchedulePendingRestore(modal);
+    } else applyPrimeiraVezBeforePaint();
   });
 
   tmRuntime.register('cadastro de primeira vez', tmCadApplyPrimeiraVezLayout, ['#/call-center']);
@@ -5181,6 +5215,10 @@ const tmBookingModalWatch = (() => {
       return;
     }
 
+    // O mesmo nó de modal é reutilizado após identificar um CPF. Aguarde a
+    // limpeza do layout Primeira Vez para não capturar campos já reposicionados.
+    if (modal.classList.contains('tm-primeira-vez-layout')) return;
+
     if (!modalBaselines.has(modal)) {
       const origemField = fieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
       const nameLabel = fieldByLabel(modal, 'Nome do Paciente')?.querySelector('small.form-text.text-muted');
@@ -5337,6 +5375,7 @@ const tmBookingModalWatch = (() => {
   function applyPacienteBeforePaint() {
     const modal = observedPacienteModal;
     if (!modal?.isConnected || modal.classList.contains('tm-paciente-layout') ||
+        modal.classList.contains('tm-primeira-vez-layout') ||
         visibleModal() !== modal || !isPacienteModal(modal)) return;
     applyPacienteLayout();
   }

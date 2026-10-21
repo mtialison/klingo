@@ -1050,6 +1050,10 @@
       return;
     }
 
+    // O mesmo nó de modal é reutilizado após identificar um CPF. Aguarde a
+    // limpeza do layout Primeira Vez para não capturar campos já reposicionados.
+    if (modal.classList.contains('tm-primeira-vez-layout')) return;
+
     if (!modalBaselines.has(modal)) {
       const origemField = fieldByLabel(modal, 'Origem de Pacientes|Origem do Agendamento');
       const nameLabel = fieldByLabel(modal, 'Nome do Paciente')?.querySelector('small.form-text.text-muted');
@@ -1206,6 +1210,7 @@
   function applyPacienteBeforePaint() {
     const modal = observedPacienteModal;
     if (!modal?.isConnected || modal.classList.contains('tm-paciente-layout') ||
+        modal.classList.contains('tm-primeira-vez-layout') ||
         visibleModal() !== modal || !isPacienteModal(modal)) return;
     applyPacienteLayout();
   }
