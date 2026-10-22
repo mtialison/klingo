@@ -1,6 +1,6 @@
 /* =========================
    NOTIFICAÇÃO VISUAL - NOVA MENSAGEM
-   v25.14 - alerta apenas no chat aberto em segundo plano
+   v25.15 - diagnóstico de alerta no chat aberto
 ========================= */
 (function(){
   const OWNER_KEY = 'klingo_message_alert_owner_v1';
@@ -49,6 +49,17 @@
         }));
       }, true);
     }
+  }
+
+  function chatDiagnostic(event, state = {}) {
+    if (typeof GM_info === 'undefined' || GM_info.script?.name !== 'klingo (testes)') return;
+    console.info('[TM-CHAT-DIAG]', JSON.stringify({
+      event,
+      visibility: state.visibility,
+      focused: state.focused,
+      background: state.background,
+      error: state.error
+    }));
   }
 
   function normalizeToastText(toast) {
@@ -119,8 +130,11 @@
     if (content === openChatContent && sender === openChatSender) {
       const arrived = Array.from(current).some(([key, count]) =>
         count > (knownIncoming.get(key) || 0));
-      if (arrived && (document.visibilityState !== 'visible' || !document.hasFocus())) {
-        notifyOpenChat();
+      if (arrived) {
+        const focused = document.hasFocus();
+        const background = document.visibilityState !== 'visible' || !focused;
+        chatDiagnostic('arrival', { visibility: document.visibilityState, focused, background });
+        if (background) notifyOpenChat();
       }
     }
     openChatContent = content;
@@ -133,7 +147,9 @@
     startBlink();
     if (!openChatAudio) openChatAudio = new Audio('/notific.mp3');
     try { openChatAudio.currentTime = 0; } catch (_) {}
-    openChatAudio.play().catch(() => {});
+    chatDiagnostic('audio-attempt');
+    openChatAudio.play().then(() => chatDiagnostic('audio-played'))
+      .catch((error) => chatDiagnostic('audio-rejected', { error: error?.name || 'unknown' }));
   }
 
   function syncOpenChat() {
@@ -334,6 +350,7 @@
   function startBlink() {
     if (blinking) return;
     blinking = true;
+    chatDiagnostic('blink-start');
 
     blinkInterval = setInterval(() => {
       document.title = document.title === '💬 Nova mensagem'
@@ -345,6 +362,7 @@
   function stopBlink() {
     if (!blinking) return;
     blinking = false;
+    chatDiagnostic('blink-stop');
 
     clearInterval(blinkInterval);
     blinkInterval = null;

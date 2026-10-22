@@ -21,6 +21,20 @@ function storage() {
     get length() { return values.size; }, key: index => [...values.keys()][index] };
 }
 
+test('diagnóstico do chat exclui texto e só aparece no userscript de testes', () => {
+  const lines = [];
+  const context = vm.createContext({ GM_info: { script: { name: 'klingo (testes)' } },
+    console: { info: (...parts) => lines.push(parts.join(' ')) } });
+  functions('chatDiagnostic', 'normalizeToastText', context);
+  vm.runInContext('chatDiagnostic("arrival", {visibility:"hidden", focused:false, text:"segredo"})', context);
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].includes('hidden'), true);
+  assert.equal(lines[0].includes('segredo'), false);
+  context.GM_info.script.name = 'klingo';
+  vm.runInContext('chatDiagnostic("arrival", {visibility:"hidden"})', context);
+  assert.equal(lines.length, 1);
+});
+
 test('conversa aberta em outra aba suprime só o remetente correspondente e expira', () => {
   const localStorage = storage();
   let now = 100000;
@@ -303,11 +317,13 @@ test('só nova mensagem recebida no chat aberto em segundo plano gera alerta', (
   let sender = 'TESTE';
   let focused = false;
   let alerts = 0;
+  const diagnostics = [];
   const document = { visibilityState: 'hidden', hasFocus: () => focused,
     querySelectorAll: () => [textarea] };
   const context = vm.createContext({ document, directChatSender: () => sender,
     openChatContent: null, openChatSender: '', knownIncoming: new Map(),
-    notifyOpenChat: () => alerts++ });
+    notifyOpenChat: () => alerts++,
+    chatDiagnostic: (event, data) => diagnostics.push({ event, ...data }) });
   const start = source.indexOf('  function scanOpenChatMessages(');
   const end = source.indexOf('  function notifyOpenChat(', start);
   assert.ok(start >= 0 && end > start);
@@ -332,6 +348,8 @@ test('só nova mensagem recebida no chat aberto em segundo plano gera alerta', (
     textContent: '22/10/2026 16:40:03 vista' });
   vm.runInContext('scanOpenChatMessages()', context);
   assert.equal(alerts, 2);
+  assert.deepEqual(diagnostics.map(item => item.background), [true, true, false]);
+  assert.equal(JSON.stringify(diagnostics).includes('recebida'), false);
   focused = false;
   document.visibilityState = 'hidden';
   sender = 'OUTRO';
@@ -341,14 +359,16 @@ test('só nova mensagem recebida no chat aberto em segundo plano gera alerta', (
   assert.equal(alerts, 2);
 });
 
-test('alerta do chat em segundo plano pisca sem ser dono global e para ao focar', () => {
+test('alerta do chat em segundo plano registra áudio e ciclo visual sem conteúdo', async () => {
   let title = 'klingo';
   let plays = 0;
   const intervals = [];
+  const diagnostics = [];
   const document = { visibilityState: 'hidden', hasFocus: () => false,
     get title() { return title; }, set title(value) { title = value; } };
   const context = vm.createContext({ document, originalTitle: 'klingo', blinking: false,
     backgroundChatAlert: false, blinkInterval: null, openChatAudio: null,
+    chatDiagnostic: (event, data) => diagnostics.push({ event, ...data }),
     Audio: class { play() { plays++; return Promise.resolve(); } set currentTime(_) {} },
     setInterval: callback => { intervals.push(callback); return 1; },
     clearInterval() {} });
@@ -358,11 +378,14 @@ test('alerta do chat em segundo plano pisca sem ser dono global e para ao focar'
   assert.ok(start >= 0 && end > start);
   vm.runInContext(source.slice(start, end), context);
   vm.runInContext('notifyOpenChat()', context);
+  await Promise.resolve();
   assert.equal(plays, 1);
   intervals[0]();
   assert.equal(title, '💬 Nova mensagem');
   vm.runInContext('backgroundChatAlert = false; stopBlink()', context);
   assert.equal(title, 'klingo');
+  assert.deepEqual(diagnostics.map(item => item.event),
+    ['blink-start', 'audio-attempt', 'audio-played', 'blink-stop']);
 });
 
 test('mudança na lista da conversa aberta verifica mensagem sem aguardar temporizador', () => {
