@@ -52,7 +52,7 @@ test('aviso da conversa aberta é fechado; outro remetente permanece', () => {
   const closed = [];
   const context = vm.createContext({
     isChatOpen: sender => sender === 'ANA', toastSender: toast => toast.sender,
-    closingToasts: new WeakSet(),
+    closingToasts: new WeakSet(), nativeChatAudio: null,
     findToastAction: toast => ({ click: () => closed.push(toast.sender) }),
     window: { setTimeout() {} }
   });
@@ -62,6 +62,21 @@ test('aviso da conversa aberta é fechado; outro remetente permanece', () => {
   assert.deepEqual(closed, ['ANA']);
   assert.equal(context.closingToasts.has(ana), true);
   assert.equal(context.closingToasts.has(bruno), false);
+});
+
+test('aviso coberto interrompe áudio já tocando sem novo evento play', () => {
+  const audio = { muted: false, paused: false, stops: 0,
+    pause() { this.paused = true; this.stops++; } };
+  const context = vm.createContext({
+    isChatOpen: sender => sender === 'ANA', toastSender: toast => toast.sender,
+    closingToasts: new WeakSet(), nativeChatAudio: audio,
+    findToastAction: () => ({ click() {} }),
+    window: { setTimeout() {} }
+  });
+  functions('dismissCoveredToasts', 'findToastAction', context);
+  vm.runInContext('dismissCoveredToasts([{ sender: "ANA", isConnected: false }])', context);
+  assert.equal(audio.muted, true);
+  assert.equal(audio.stops, 1);
 });
 
 test('toast coberto não pisca; outro remetente continua com aviso visual, sem som próprio', () => {
@@ -112,6 +127,27 @@ test('áudio nativo do chat é interrompido para remetente aberto em outra aba',
   assert.equal(audio.muted, true);
 });
 
+test('áudio começa silenciado mesmo se a presença oscilar antes do aviso chegar', () => {
+  const callbacks = [];
+  let presence = false;
+  const audio = { id: 'beepChatId', muted: false, currentTime: 0,
+    pauses: 0, pause() { this.pauses++; } };
+  const context = vm.createContext({ Date: { now: () => 1000 },
+    window: { setTimeout: callback => callbacks.push(callback) },
+    hasOpenChatPresence: () => presence,
+    isChatOpen: sender => presence && sender === 'ANA',
+    recentNativeSender: '', recentNativeSenderAt: 0,
+    messageToasts: () => [{ sender: 'ANA' }], toastSender: toast => toast.sender });
+  functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
+  vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
+  assert.equal(audio.muted, true);
+  assert.equal(callbacks.length, 1);
+  presence = true;
+  callbacks.shift()();
+  assert.equal(audio.pauses, 1);
+  assert.equal(audio.muted, true);
+});
+
 test('áudio nativo continua para remetente diferente e sons de outras áreas não são afetados', () => {
   const callbacks = [];
   const chat = { id: 'beepChatId', muted: true, currentTime: 1,
@@ -133,7 +169,7 @@ test('áudio nativo continua para remetente diferente e sons de outras áreas n�
   assert.equal(chat.currentTime, 0);
 });
 
-test('som do chat nativo é preparado uma vez e volta ao normal ao fechar a conversa', () => {
+test('som do chat nativo permanece preparado mesmo sem presença compartilhada', () => {
   const listeners = [];
   const audio = { id: 'beepChatId', paused: true, muted: false,
     addEventListener: (name, handler) => listeners.push([name, handler]),
@@ -145,11 +181,27 @@ test('som do chat nativo é preparado uma vez e volta ao normal ao fechar a conv
   functions('syncNativeChatAudio', 'dismissCoveredToasts', context);
   vm.runInContext('syncNativeChatAudio(); syncNativeChatAudio()', context);
   assert.equal(audio.muted, true);
-  assert.equal(listeners.length, 1);
+  assert.equal(listeners.length, 3);
   assert.equal(listeners[0][0], 'play');
   open = false;
   vm.runInContext('syncNativeChatAudio()', context);
-  assert.equal(audio.muted, false);
+  assert.equal(audio.muted, true);
+});
+
+test('ao terminar um som permitido, o player silencia antes da próxima mensagem', () => {
+  const listeners = new Map();
+  const audio = { id: 'beepChatId', paused: true, muted: false,
+    addEventListener: (name, handler) => listeners.set(name, handler),
+    removeEventListener() {} };
+  const context = vm.createContext({ document: { getElementById: () => audio },
+    nativeChatAudio: null, hasOpenChatPresence: () => false,
+    handleNativeChatPlay() {} });
+  functions('syncNativeChatAudio', 'dismissCoveredToasts', context);
+  vm.runInContext('syncNativeChatAudio()', context);
+  audio.muted = false;
+  assert.equal(typeof listeners.get('ended'), 'function');
+  listeners.get('ended')({ target: audio });
+  assert.equal(audio.muted, true);
 });
 
 test('mensagem coberta logo após outra mensagem ainda bloqueia o segundo som', () => {

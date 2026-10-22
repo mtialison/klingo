@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.42
+// @version      1.43
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -1219,7 +1219,7 @@ function setDateCalculatorOpen(isOpen) {
 
 /* =========================
    NOTIFICAÇÃO VISUAL - NOVA MENSAGEM
-   v25.11 - alerta e fechamento coordenados entre as guias
+   v25.12 - alerta e fechamento coordenados entre as guias
 ========================= */
 (function(){
   const OWNER_KEY = 'klingo_message_alert_owner_v1';
@@ -1357,7 +1357,7 @@ function setDateCalculatorOpen(isOpen) {
 
   function handleNativeChatPlay(event) {
     const audio = event.target;
-    if (audio.id !== 'beepChatId' || !hasOpenChatPresence()) return;
+    if (audio.id !== 'beepChatId') return;
     audio.muted = true;
     // O Klingo pode iniciar o som antes de inserir o toast no DOM.
     window.setTimeout(() => {
@@ -1383,13 +1383,21 @@ function setDateCalculatorOpen(isOpen) {
       nativeChatAudio?.removeEventListener('play', handleNativeChatPlay);
       nativeChatAudio = audio;
       audio.addEventListener('play', handleNativeChatPlay);
+      const prepareNextSound = () => { audio.muted = true; };
+      audio.addEventListener('pause', prepareNextSound);
+      audio.addEventListener('ended', prepareNextSound);
     }
-    if (audio.paused) audio.muted = hasOpenChatPresence();
+    if (audio.paused) audio.muted = true;
   }
 
   function dismissCoveredToasts(toasts) {
     for (const toast of toasts) {
       if (!isChatOpen(toastSender(toast))) continue;
+      if (nativeChatAudio && !nativeChatAudio.paused) {
+        nativeChatAudio.muted = true;
+        nativeChatAudio.pause();
+        try { nativeChatAudio.currentTime = 0; } catch (_) {}
+      }
       closingToasts.add(toast);
       findToastAction(toast, 'FECHAR')?.click();
       window.setTimeout(() => { if (toast.isConnected) toast.remove(); }, 300);
