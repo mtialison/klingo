@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.43
+// @version      1.44
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -1219,7 +1219,7 @@ function setDateCalculatorOpen(isOpen) {
 
 /* =========================
    NOTIFICAÇÃO VISUAL - NOVA MENSAGEM
-   v25.12 - alerta e fechamento coordenados entre as guias
+   v25.13 - alerta e contador coordenados entre as guias
 ========================= */
 (function(){
   const OWNER_KEY = 'klingo_message_alert_owner_v1';
@@ -1392,13 +1392,18 @@ function setDateCalculatorOpen(isOpen) {
 
   function dismissCoveredToasts(toasts) {
     for (const toast of toasts) {
+      if (closingToasts.has(toast)) continue;
       if (!isChatOpen(toastSender(toast))) continue;
+      const sender = toastSender(toast);
+      toast.style.display = 'none';
+      toast.dataset.tmCovered = '1';
       if (nativeChatAudio && !nativeChatAudio.paused) {
         nativeChatAudio.muted = true;
         nativeChatAudio.pause();
         try { nativeChatAudio.currentTime = 0; } catch (_) {}
       }
       closingToasts.add(toast);
+      document.dispatchEvent(new CustomEvent('tm-chat-covered-message', { detail: { sender } }));
       findToastAction(toast, 'FECHAR')?.click();
       window.setTimeout(() => { if (toast.isConnected) toast.remove(); }, 300);
     }
@@ -1719,6 +1724,7 @@ function setDateCalculatorOpen(isOpen) {
   function toastMessages() {
     const counts = new Map();
     document.querySelectorAll('.toasted.toastnafrente').forEach((toast) => {
+      if (toast.dataset.tmCovered === '1') return;
       const directText = Array.from(toast.childNodes)
         .filter((node) => node.nodeType === Node.TEXT_NODE)
         .map((node) => node.textContent).join(' ');
@@ -1888,6 +1894,16 @@ function setDateCalculatorOpen(isOpen) {
     nativeCount = current;
     renderCount();
   }
+
+  function recordCoveredMessage(event) {
+    const sender = normalize(event.detail?.sender);
+    if (!sender) return;
+    pendingDiscount += 1;
+    subtractNewMessages(sender, 1);
+    updateCount();
+  }
+
+  document.addEventListener('tm-chat-covered-message', recordCoveredMessage);
 
   document.addEventListener('click', (event) => {
     if (!event.isTrusted) return;

@@ -54,14 +54,37 @@ test('aviso da conversa aberta é fechado; outro remetente permanece', () => {
     isChatOpen: sender => sender === 'ANA', toastSender: toast => toast.sender,
     closingToasts: new WeakSet(), nativeChatAudio: null,
     findToastAction: toast => ({ click: () => closed.push(toast.sender) }),
+    CustomEvent: function (type, options) { return { type, detail: options.detail }; },
+    document: { dispatchEvent() {} },
     window: { setTimeout() {} }
   });
   functions('dismissCoveredToasts', 'findToastAction', context);
-  const ana = { sender: 'ANA' }, bruno = { sender: 'BRUNO' };
+  const ana = { sender: 'ANA', style: {}, dataset: {} };
+  const bruno = { sender: 'BRUNO', style: {}, dataset: {} };
   vm.runInContext('dismissCoveredToasts(toasts)', Object.assign(context, { toasts: [ana, bruno] }));
   assert.deepEqual(closed, ['ANA']);
   assert.equal(context.closingToasts.has(ana), true);
   assert.equal(context.closingToasts.has(bruno), false);
+});
+
+test('aviso coberto desaparece antes da animação e sinaliza uma única mensagem', () => {
+  const events = [];
+  const toast = { sender: 'ANA', isConnected: true, style: { display: '' }, dataset: {} };
+  const context = vm.createContext({
+    isChatOpen: sender => sender === 'ANA', toastSender: item => item.sender,
+    closingToasts: new WeakSet(), nativeChatAudio: null,
+    findToastAction: () => ({ click() {} }),
+    CustomEvent: function (type, options) { return { type, detail: options.detail }; },
+    document: { dispatchEvent: event => events.push(event) },
+    window: { setTimeout() {} }
+  });
+  functions('dismissCoveredToasts', 'findToastAction', context);
+  vm.runInContext('dismissCoveredToasts([toast]); dismissCoveredToasts([toast])',
+    Object.assign(context, { toast }));
+  assert.equal(toast.style.display, 'none');
+  assert.equal(toast.dataset.tmCovered, '1');
+  assert.deepEqual(events.map(event => [event.type, event.detail.sender]),
+    [['tm-chat-covered-message', 'ANA']]);
 });
 
 test('aviso coberto interrompe áudio já tocando sem novo evento play', () => {
@@ -71,10 +94,12 @@ test('aviso coberto interrompe áudio já tocando sem novo evento play', () => {
     isChatOpen: sender => sender === 'ANA', toastSender: toast => toast.sender,
     closingToasts: new WeakSet(), nativeChatAudio: audio,
     findToastAction: () => ({ click() {} }),
+    CustomEvent: function (type, options) { return { type, detail: options.detail }; },
+    document: { dispatchEvent() {} },
     window: { setTimeout() {} }
   });
   functions('dismissCoveredToasts', 'findToastAction', context);
-  vm.runInContext('dismissCoveredToasts([{ sender: "ANA", isConnected: false }])', context);
+  vm.runInContext('dismissCoveredToasts([{ sender: "ANA", isConnected: false, style: {}, dataset: {} }])', context);
   assert.equal(audio.muted, true);
   assert.equal(audio.stops, 1);
 });
@@ -224,4 +249,46 @@ test('mensagem coberta logo após outra mensagem ainda bloqueia o segundo som', 
   assert.equal(callbacks.length, 1);
   callbacks.shift()();
   assert.equal(audio.pauses, 1);
+});
+
+test('mensagem coberta não aumenta o contador exibido, mas outra mensagem aumenta', () => {
+  let mirror = null;
+  const style = { getPropertyValue: () => '', getPropertyPriority: () => '',
+    setProperty() {}, removeProperty() {} };
+  const badge = { textContent: '3', style,
+    querySelector: () => null,
+    cloneNode: () => ({ dataset: {}, style, querySelector: () => null,
+      replaceChildren(...nodes) { this.textContent = nodes.map(n => n.textContent).join(''); },
+      remove() { mirror = null; } }),
+    insertAdjacentElement(_where, element) { mirror = element; } };
+  const button = { querySelector: selector => selector.includes('data-tm-unread-mirror') ? mirror : null,
+    append(element) { mirror = element; } };
+  const document = { querySelector: selector => selector === '#botao-chat' ? button : badge,
+    addEventListener() {},
+    createTextNode: text => ({ textContent: text }) };
+  const context = vm.createContext({ document, nativeCount: 3, pendingDiscount: 0,
+    newMessagesBySender: new Map(), hiddenBadges: new WeakMap(), Date });
+  const start = source.lastIndexOf('  function normalize(value)');
+  const end = source.indexOf("  document.addEventListener('click'", start);
+  assert.ok(start >= 0 && end > start);
+  vm.runInContext(source.slice(start, end), context);
+  vm.runInContext('recordCoveredMessage({detail:{sender:"ANA"}})', context);
+  assert.equal(mirror.dataset.tmUnreadCount, '2');
+  badge.textContent = '4';
+  vm.runInContext('updateCount()', context);
+  assert.equal(mirror.dataset.tmUnreadCount, '3');
+});
+
+test('toast coberto não é recontado como mensagem nova', () => {
+  const toast = (sender, covered) => ({
+    dataset: { tmCovered: covered ? '1' : undefined },
+    childNodes: [{ nodeType: 3, textContent: `De: ${sender} >> oi` }],
+    textContent: `De: ${sender} >> oi Fechar Chat`
+  });
+  const context = vm.createContext({ Node: { TEXT_NODE: 3 },
+    normalize: value => String(value || '').trim().toUpperCase(),
+    document: { querySelectorAll: () => [toast('ANA', true), toast('BRUNO', false)] } });
+  functions('toastMessages', 'newMessageCount', context);
+  const senders = vm.runInContext('Array.from(toastMessages().values(), item => item.sender)', context);
+  assert.deepEqual(Array.from(senders), ['BRUNO']);
 });
