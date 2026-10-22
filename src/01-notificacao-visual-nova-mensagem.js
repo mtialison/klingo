@@ -7,8 +7,10 @@
   const NOTIFICATION_AUDIO_DATA = '__TM_MESSAGE_SOUND_DATA__';
   const OWNER_KEY = 'klingo_message_alert_owner_v1';
   const DISMISS_KEY = 'klingo_message_alert_dismiss_v1';
+  const OPEN_CHAT_PREFIX = 'klingo_chat_open_sender_v1:';
   const OWNER_TTL = 7000;
   const DISMISS_TTL = 30000;
+  const OPEN_CHAT_TTL = 90000;
   const tabId = typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random()}`;
@@ -19,11 +21,14 @@
   let audioWarningShown = false;
   let audioPrimed = false;
   let audioPriming = false;
-  let pendingSounds = 0;
+  let pendingSounds = [];
   let soundPlaying = false;
   let claimTimer = null;
   let dismissalSequence = 0;
   let knownToastCounts = new Map();
+  let pendingChatSender = '';
+  let publishedSenderKey = '';
+  let lastPresenceWrite = 0;
   const pendingDismissals = [];
   const closingToasts = new WeakSet();
 
@@ -45,8 +50,72 @@
   }
 
   function toastSender(toast) {
-    return normalizeToastText(toast).match(/^De:\s*(.*?)\s*>>/i)?.[1]
-      ?.replace(/\s+/g, ' ').trim().toLocaleUpperCase('pt-BR') || '';
+    return normalizeSender(normalizeToastText(toast).match(/^De:\s*(.*?)\s*>>/i)?.[1]);
+  }
+
+  function normalizeSender(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim().toLocaleUpperCase('pt-BR');
+  }
+
+  function directChatSender() {
+    const textarea = Array.from(document.querySelectorAll(
+      '.modal.show .modal-footer.d-flex.flex-column textarea')).find((item) =>
+      item.closest('.modal-footer')?.querySelector('.fa-paper-plane'));
+    const content = textarea?.closest('.modal-content');
+    if (!content) return '';
+    const header = normalizeSender(content.querySelector('.modal-header .modal-title')?.textContent ||
+      content.querySelector('.modal-header')?.textContent)
+      .replace(/^CHAT\s*(?:COM|:|[-–])\s*/i, '');
+    if (pendingChatSender &&
+        (header === pendingChatSender || header.includes(pendingChatSender))) return pendingChatSender;
+    return header && header !== 'CHAT' ? header : '';
+  }
+
+  function syncOpenChat() {
+    const sender = directChatSender();
+    const senderKey = sender ? messageKey(sender) : '';
+    const now = Date.now();
+    try {
+      if (!senderKey) {
+        if (publishedSenderKey) localStorage.removeItem(OPEN_CHAT_PREFIX + tabId);
+        publishedSenderKey = '';
+        return;
+      }
+      if (senderKey !== publishedSenderKey || now - lastPresenceWrite >= 5000) {
+        localStorage.setItem(OPEN_CHAT_PREFIX + tabId, JSON.stringify({ senderKey, at: now }));
+        publishedSenderKey = senderKey;
+        lastPresenceWrite = now;
+      }
+    } catch (_) {
+      // Sem armazenamento compartilhado, mantenha os avisos em vez de ocultá-los às cegas.
+      publishedSenderKey = '';
+    }
+  }
+
+  function isChatOpen(sender) {
+    if (!sender) return false;
+    const senderKey = messageKey(sender);
+    try {
+      for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (!key?.startsWith(OPEN_CHAT_PREFIX)) continue;
+        const presence = JSON.parse(localStorage.getItem(key) || 'null');
+        if (presence?.senderKey === senderKey && Number.isFinite(presence.at) &&
+            Date.now() - presence.at >= 0 && Date.now() - presence.at < OPEN_CHAT_TTL) return true;
+      }
+    } catch (_) {
+      return false;
+    }
+    return false;
+  }
+
+  function dismissCoveredToasts(toasts) {
+    for (const toast of toasts) {
+      if (!isChatOpen(toastSender(toast))) continue;
+      closingToasts.add(toast);
+      findToastAction(toast, 'FECHAR')?.click();
+      window.setTimeout(() => { if (toast.isConnected) toast.remove(); }, 300);
+    }
   }
 
   function findToastAction(toast, label) {
@@ -86,9 +155,9 @@
       .filter((toast) => !closingToasts.has(toast) && /De:/i.test(normalizeToastText(toast)));
   }
 
-  function countMessageToasts() {
+  function countMessageToasts(toasts = messageToasts()) {
     const counts = new Map();
-    messageToasts().forEach((toast) => {
+    toasts.forEach((toast) => {
       const key = messageKey(normalizeToastText(toast));
       counts.set(key, (counts.get(key) || 0) + 1);
     });
@@ -179,17 +248,18 @@
   document.addEventListener('keydown', primeNotificationAudio, true);
 
   function playNextMessageSound() {
-    if (!pendingSounds) {
+    while (pendingSounds.length && isChatOpen(pendingSounds[0])) pendingSounds.shift();
+    if (!pendingSounds.length) {
       soundPlaying = false;
       return;
     }
     const audio = ensureNotificationAudio();
     if (!audio) {
-      pendingSounds = 0;
+      pendingSounds = [];
       soundPlaying = false;
       return;
     }
-    pendingSounds--;
+    pendingSounds.shift();
     soundPlaying = true;
     audio.pause();
     try { audio.currentTime = 0; } catch (_) {}
@@ -206,7 +276,7 @@
     playback?.catch((error) => {
       audio.removeEventListener('ended', finished);
       audio.removeEventListener('error', finished);
-      pendingSounds = 0;
+      pendingSounds = [];
       soundPlaying = false;
       audioPrimed = false;
       if (!audioWarningShown) {
@@ -216,8 +286,9 @@
     });
   }
 
-  function playNewMessageSound() {
-    pendingSounds++;
+  function playNewMessageSound(sender) {
+    if (isChatOpen(sender)) return;
+    pendingSounds.push(sender);
     if (!soundPlaying) playNextMessageSound();
   }
 
@@ -246,17 +317,25 @@
   function checkMessages() {
     try {
       if (!blinking) originalTitle = document.title;
+      syncOpenChat();
       applyPendingDismissals();
-      const currentCounts = countMessageToasts();
+      const toasts = messageToasts();
+      const currentCounts = countMessageToasts(toasts);
+      dismissCoveredToasts(toasts);
+      const activeToasts = toasts.filter((toast) => !closingToasts.has(toast) &&
+        !isChatOpen(toastSender(toast)));
+      const activeCounts = countMessageToasts(activeToasts);
       if (!isOwner()) {
         stopBlink();
       } else {
-        currentCounts.forEach((count, key) => {
+        activeCounts.forEach((count, key) => {
           const newMessages = Math.max(0, count - (knownToastCounts.get(key) || 0));
-          for (let index = 0; index < newMessages; index++) playNewMessageSound();
+          const sender = toastSender(activeToasts.find((toast) =>
+            messageKey(normalizeToastText(toast)) === key));
+          for (let index = 0; index < newMessages; index++) playNewMessageSound(sender);
           if (newMessages) startBlink();
         });
-        if (!currentCounts.size) {
+        if (!activeCounts.size) {
           stopBlink();
         }
       }
@@ -292,6 +371,18 @@
     if (!event.isTrusted) return;
     const target = event.target?.nodeType === 1 ? event.target : event.target?.parentElement;
     const unreadRow = target?.closest('#modalChat button.list-group-item.list-group-item-action');
+    const toastAction = target?.closest('.toasted.toastnafrente a.action');
+    const openingSender = unreadRow ? normalizeSender(unreadRow.textContent.replace(
+      unreadRow.querySelector('.badge-secondary')?.textContent || '', '')) :
+      normalizeSender(toastAction?.textContent) === 'CHAT'
+        ? toastSender(toastAction.closest('.toasted.toastnafrente')) : '';
+    if (openingSender) {
+      pendingChatSender = openingSender;
+      for (const delay of [0, 100, 300]) window.setTimeout(() => {
+        syncOpenChat();
+        checkMessages();
+      }, delay);
+    }
     const unreadBadge = unreadRow?.querySelector('.badge-secondary');
     if (unreadBadge && Number(unreadBadge.textContent.trim()) > 0) {
       const sender = unreadRow.textContent.replace(unreadBadge.textContent, '')
@@ -352,6 +443,17 @@
     applyPendingDismissals();
     tmRuntime.schedule(0);
   });
+
+  window.addEventListener('storage', (event) => {
+    if (event.key?.startsWith(OPEN_CHAT_PREFIX)) checkMessages();
+  });
+  window.addEventListener('pagehide', () => {
+    try { localStorage.removeItem(OPEN_CHAT_PREFIX + tabId); } catch (_) {}
+  });
+  window.setInterval(() => {
+    syncOpenChat();
+    checkMessages();
+  }, 2000);
 
   window.addEventListener('focus', () => claimOwner(true));
   document.addEventListener('visibilitychange', () => {
