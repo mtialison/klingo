@@ -3,8 +3,6 @@
    v25.11 - alerta e fechamento coordenados entre as guias
 ========================= */
 (function(){
-  // MP3 fornecido pelo usuário, embutido no arquivo final para facilitar a promoção à main.
-  const NOTIFICATION_AUDIO_DATA = '__TM_MESSAGE_SOUND_DATA__';
   const OWNER_KEY = 'klingo_message_alert_owner_v1';
   const DISMISS_KEY = 'klingo_message_alert_dismiss_v1';
   const OPEN_CHAT_PREFIX = 'klingo_chat_open_sender_v1:';
@@ -17,18 +15,15 @@
   let originalTitle = document.title;
   let blinking = false;
   let blinkInterval = null;
-  let notificationAudio = null;
-  let audioWarningShown = false;
-  let audioPrimed = false;
-  let audioPriming = false;
-  let pendingSounds = [];
-  let soundPlaying = false;
   let claimTimer = null;
   let dismissalSequence = 0;
   let knownToastCounts = new Map();
   let pendingChatSender = '';
   let publishedSenderKey = '';
   let lastPresenceWrite = 0;
+  let recentNativeSender = '';
+  let recentNativeSenderAt = 0;
+  let nativeChatAudio = null;
   const pendingDismissals = [];
   const closingToasts = new WeakSet();
 
@@ -107,6 +102,51 @@
       return false;
     }
     return false;
+  }
+
+  function hasOpenChatPresence() {
+    try {
+      for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (!key?.startsWith(OPEN_CHAT_PREFIX)) continue;
+        const presence = JSON.parse(localStorage.getItem(key) || 'null');
+        if (presence?.senderKey && Number.isFinite(presence.at) &&
+            Date.now() - presence.at >= 0 && Date.now() - presence.at < OPEN_CHAT_TTL) return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function handleNativeChatPlay(event) {
+    const audio = event.target;
+    if (audio.id !== 'beepChatId' || !hasOpenChatPresence()) return;
+    audio.muted = true;
+    // O Klingo pode iniciar o som antes de inserir o toast no DOM.
+    window.setTimeout(() => {
+      const latestToast = messageToasts().at(-1);
+      const currentSender = latestToast ? toastSender(latestToast) : '';
+      const sender = Date.now() - recentNativeSenderAt < 1000
+        ? recentNativeSender : currentSender;
+      if (sender && isChatOpen(sender)) {
+        audio.pause();
+        try { audio.currentTime = 0; } catch (_) {}
+        return;
+      }
+      // Sem remetente identificável, preserve o aviso nativo (falha aberta).
+      try { audio.currentTime = 0; } catch (_) {}
+      audio.muted = false;
+    }, 80);
+  }
+
+  function syncNativeChatAudio() {
+    const audio = document.getElementById('beepChatId');
+    if (!audio) return;
+    if (audio !== nativeChatAudio) {
+      nativeChatAudio?.removeEventListener('play', handleNativeChatPlay);
+      nativeChatAudio = audio;
+      audio.addEventListener('play', handleNativeChatPlay);
+    }
+    if (audio.paused) audio.muted = hasOpenChatPresence();
   }
 
   function dismissCoveredToasts(toasts) {
@@ -208,92 +248,6 @@
     }
   }
 
-  function ensureNotificationAudio() {
-    if (notificationAudio) return notificationAudio;
-    try {
-      notificationAudio = new Audio(NOTIFICATION_AUDIO_DATA);
-      notificationAudio.preload = 'auto';
-      notificationAudio.load();
-    } catch (error) {
-      if (!audioWarningShown) {
-        audioWarningShown = true;
-        console.warn('[TM] Não foi possível carregar o áudio de notificação.', error);
-      }
-    }
-    return notificationAudio;
-  }
-
-  function primeNotificationAudio(event) {
-    if (!event.isTrusted || audioPrimed || audioPriming) return;
-    audioPriming = true;
-    try {
-      // A primeira interação libera áudio futuro; esta reprodução é inaudível.
-      const silentAudio = new Audio(NOTIFICATION_AUDIO_DATA);
-      silentAudio.volume = 0;
-      Promise.resolve(silentAudio.play()).then(() => {
-        silentAudio.pause();
-        try { silentAudio.currentTime = 0; } catch (_) {}
-        audioPrimed = true;
-      }).catch(() => {
-        // Outra interação poderá tentar novamente, sem tocar som atrasado.
-      }).finally(() => {
-        audioPriming = false;
-      });
-    } catch (_) {
-      audioPriming = false;
-    }
-  }
-
-  document.addEventListener('pointerdown', primeNotificationAudio, true);
-  document.addEventListener('keydown', primeNotificationAudio, true);
-
-  function playNextMessageSound() {
-    while (pendingSounds.length && isChatOpen(pendingSounds[0])) pendingSounds.shift();
-    if (!pendingSounds.length) {
-      soundPlaying = false;
-      return;
-    }
-    const audio = ensureNotificationAudio();
-    if (!audio) {
-      pendingSounds = [];
-      soundPlaying = false;
-      return;
-    }
-    pendingSounds.shift();
-    soundPlaying = true;
-    audio.pause();
-    try { audio.currentTime = 0; } catch (_) {}
-    const finished = () => {
-      audio.removeEventListener('ended', finished);
-      audio.removeEventListener('error', finished);
-      soundPlaying = false;
-      playNextMessageSound();
-    };
-    audio.addEventListener('ended', finished);
-    audio.addEventListener('error', finished);
-    const playback = audio.play();
-    playback?.then(() => { audioPrimed = true; });
-    playback?.catch((error) => {
-      audio.removeEventListener('ended', finished);
-      audio.removeEventListener('error', finished);
-      pendingSounds = [];
-      soundPlaying = false;
-      audioPrimed = false;
-      if (!audioWarningShown) {
-        audioWarningShown = true;
-        console.warn('[TM] O navegador bloqueou ou não pôde reproduzir o som da mensagem. Interaja uma vez com esta guia para liberar os próximos alertas.', error);
-      }
-    });
-  }
-
-  function playNewMessageSound(sender) {
-    if (isChatOpen(sender)) return;
-    pendingSounds.push(sender);
-    if (!soundPlaying) playNextMessageSound();
-  }
-
-  ensureNotificationAudio();
-
   function startBlink() {
     if (blinking) return;
     blinking = true;
@@ -318,9 +272,18 @@
     try {
       if (!blinking) originalTitle = document.title;
       syncOpenChat();
+      syncNativeChatAudio();
       applyPendingDismissals();
       const toasts = messageToasts();
       const currentCounts = countMessageToasts(toasts);
+      const newestToast = toasts.find((toast) => {
+        const key = messageKey(normalizeToastText(toast));
+        return currentCounts.get(key) > (knownToastCounts.get(key) || 0);
+      });
+      if (newestToast) {
+        recentNativeSender = toastSender(newestToast);
+        recentNativeSenderAt = Date.now();
+      }
       dismissCoveredToasts(toasts);
       const activeToasts = toasts.filter((toast) => !closingToasts.has(toast) &&
         !isChatOpen(toastSender(toast)));
@@ -330,9 +293,6 @@
       } else {
         activeCounts.forEach((count, key) => {
           const newMessages = Math.max(0, count - (knownToastCounts.get(key) || 0));
-          const sender = toastSender(activeToasts.find((toast) =>
-            messageKey(normalizeToastText(toast)) === key));
-          for (let index = 0; index < newMessages; index++) playNewMessageSound(sender);
           if (newMessages) startBlink();
         });
         if (!activeCounts.size) {

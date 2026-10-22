@@ -14,15 +14,12 @@ test('os dois arquivos finais têm o mesmo código e incorporam os recursos orig
   const main = read('klingo.user.js');
   const draft = read('klingo.test.user.js');
   assert.equal(fs.readFileSync(path.join(root, 'assets/login-icon.png')).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
-  assert.equal(fs.readFileSync(path.join(root, 'assets/message-alert.mp3')).subarray(0, 3).toString(), 'ID3');
   const image = main.match(/data:image\/png;base64,([A-Za-z0-9+/=]+)/)?.[1];
-  const sound = main.match(/data:audio\/mpeg;base64,([A-Za-z0-9+/=]+)/)?.[1];
-  assert.ok(image && sound);
+  assert.ok(image);
+  assert.doesNotMatch(main, /data:audio\/mpeg;base64,/);
   assert.deepEqual(Buffer.from(image, 'base64'), fs.readFileSync(path.join(root, 'assets/login-icon.png')));
-  assert.deepEqual(Buffer.from(sound, 'base64'), fs.readFileSync(path.join(root, 'assets/message-alert.mp3')));
   const expectedMain = source
-    .replace("'__TM_LOGIN_ICON_DATA__'", JSON.stringify(`data:image/png;base64,${image}`))
-    .replace("'__TM_MESSAGE_SOUND_DATA__'", JSON.stringify(`data:audio/mpeg;base64,${sound}`));
+    .replace("'__TM_LOGIN_ICON_DATA__'", JSON.stringify(`data:image/png;base64,${image}`));
   assert.equal(main, expectedMain);
   const endHeader = '// ==/UserScript==\n';
   assert.equal(draft.slice(draft.indexOf(endHeader) + endHeader.length),

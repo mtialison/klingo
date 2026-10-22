@@ -11,6 +11,6 @@ node tools/build.cjs
 
 Se você já instalou o antigo arquivo de testes `klingo.user.js`, desative ou remova aquela instalação antes de instalar `klingo.test.user.js`. Esta migração é feita uma vez; depois, cada arquivo segue sua própria branch.
 
-Os ícones e o som ficam separados em `assets/` para manutenção, mas o comando de build os embute nos dois arquivos finais. Portanto, promover para `main` continua sendo uma cópia de **um único arquivo**, sem dependências da branch de testes.
+O ícone fica separado em `assets/` para manutenção, mas o comando de build o embute nos dois arquivos finais. O chat usa apenas o aviso sonoro nativo do Klingo. Portanto, promover para `main` continua sendo uma cópia de **um único arquivo**, sem dependências da branch de testes.
 
 Antes de promover, rode cada `tests/*.test.cjs` com Node, confirme `node --check klingo.user.js` e faça os testes visuais no Klingo. Aumente `@version` quando quiser disparar uma atualização automática. O arquivo de testes nunca deve ser copiado para `main`.
