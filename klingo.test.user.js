@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.44
+// @version      1.45
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -1219,7 +1219,7 @@ function setDateCalculatorOpen(isOpen) {
 
 /* =========================
    NOTIFICAÇÃO VISUAL - NOVA MENSAGEM
-   v25.13 - alerta e contador coordenados entre as guias
+   v25.14 - alerta apenas no chat aberto em segundo plano
 ========================= */
 (function(){
   const OWNER_KEY = 'klingo_message_alert_owner_v1';
@@ -1243,6 +1243,11 @@ function setDateCalculatorOpen(isOpen) {
   let recentNativeSender = '';
   let recentNativeSenderAt = 0;
   let nativeChatAudio = null;
+  let openChatAudio = null;
+  let openChatContent = null;
+  let openChatSender = '';
+  let knownIncoming = new Map();
+  let backgroundChatAlert = false;
   const pendingDismissals = [];
   const closingToasts = new WeakSet();
 
@@ -1302,6 +1307,52 @@ function setDateCalculatorOpen(isOpen) {
     if (pendingChatSender &&
         (header === pendingChatSender || header.includes(pendingChatSender))) return pendingChatSender;
     return header && header !== 'CHAT' ? header : '';
+  }
+
+  function scanOpenChatMessages() {
+    const textarea = Array.from(document.querySelectorAll(
+      '.modal.show .modal-footer.d-flex.flex-column textarea')).find((item) =>
+      item.closest('.modal-footer')?.querySelector('.fa-paper-plane'));
+    const content = textarea?.closest('.modal-content');
+    const sender = directChatSender();
+    if (!content || !sender) {
+      openChatContent = null;
+      openChatSender = '';
+      knownIncoming = new Map();
+      if (backgroundChatAlert) {
+        backgroundChatAlert = false;
+        stopBlink();
+      }
+      return;
+    }
+    const current = new Map();
+    content.querySelectorAll('.modal-body li.list-group-item').forEach((item) => {
+      if (!item.classList.contains('list-group-item-secondary')) return;
+      const header = item.querySelector?.('.small')?.textContent
+        .replace(/\bNova\b/gi, '') || '';
+      const body = item.lastElementChild?.textContent || '';
+      const key = (header || body ? `${header} ${body}` : item.textContent)
+        .replace(/\s+/g, ' ').trim();
+      current.set(key, (current.get(key) || 0) + 1);
+    });
+    if (content === openChatContent && sender === openChatSender) {
+      const arrived = Array.from(current).some(([key, count]) =>
+        count > (knownIncoming.get(key) || 0));
+      if (arrived && (document.visibilityState !== 'visible' || !document.hasFocus())) {
+        notifyOpenChat();
+      }
+    }
+    openChatContent = content;
+    openChatSender = sender;
+    knownIncoming = current;
+  }
+
+  function notifyOpenChat() {
+    backgroundChatAlert = true;
+    startBlink();
+    if (!openChatAudio) openChatAudio = new Audio('/notific.mp3');
+    try { openChatAudio.currentTime = 0; } catch (_) {}
+    openChatAudio.play().catch(() => {});
   }
 
   function syncOpenChat() {
@@ -1494,7 +1545,7 @@ function setDateCalculatorOpen(isOpen) {
     if (owner?.id === tabId) {
       GM_setValue(OWNER_KEY, { id: tabId, updatedAt: Date.now() });
     } else {
-      stopBlink();
+      if (!backgroundChatAlert) stopBlink();
       if (!owner || Date.now() - owner.updatedAt >= OWNER_TTL) scheduleTakeover();
     }
   }
@@ -1523,6 +1574,7 @@ function setDateCalculatorOpen(isOpen) {
     try {
       if (!blinking) originalTitle = document.title;
       syncOpenChat();
+      scanOpenChatMessages();
       syncNativeChatAudio();
       applyPendingDismissals();
       const toasts = messageToasts();
@@ -1540,13 +1592,13 @@ function setDateCalculatorOpen(isOpen) {
         !isChatOpen(toastSender(toast)));
       const activeCounts = countMessageToasts(activeToasts);
       if (!isOwner()) {
-        stopBlink();
+        if (!backgroundChatAlert) stopBlink();
       } else {
         activeCounts.forEach((count, key) => {
           const newMessages = Math.max(0, count - (knownToastCounts.get(key) || 0));
           if (newMessages) startBlink();
         });
-        if (!activeCounts.size) {
+        if (!activeCounts.size && !backgroundChatAlert) {
           stopBlink();
         }
       }
@@ -1559,6 +1611,16 @@ function setDateCalculatorOpen(isOpen) {
   // O monitor geral da página pode atrasar durante atualizações grandes. Observe os
   // avisos diretamente para registrar cada chegada antes de uma nova renderização.
   const notificationObserver = new MutationObserver((mutations) => {
+    const changedOpenChat = mutations.some((mutation) => {
+      const target = mutation.target.nodeType === Node.ELEMENT_NODE
+        ? mutation.target : mutation.target.parentElement;
+      return !!target?.closest?.('.modal.show .modal-body li.list-group-item') ||
+        Array.from(mutation.addedNodes || []).some((node) =>
+          node.nodeType === Node.ELEMENT_NODE &&
+          (node.matches?.('.modal.show .modal-body li.list-group-item') ||
+            node.querySelector?.('.modal.show .modal-body li.list-group-item')));
+    });
+    if (changedOpenChat) scanOpenChatMessages();
     const changedToast = mutations.some((mutation) => {
       const target = mutation.target.nodeType === Node.ELEMENT_NODE
         ? mutation.target : mutation.target.parentElement;
@@ -1666,10 +1728,17 @@ function setDateCalculatorOpen(isOpen) {
     checkMessages();
   }, 2000);
 
-  window.addEventListener('focus', () => claimOwner(true));
+  window.addEventListener('focus', () => {
+    backgroundChatAlert = false;
+    stopBlink();
+    claimOwner(true);
+  });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && document.hasFocus()) claimOwner(true);
-    else if (document.visibilityState === 'hidden') stopBlink();
+    if (document.visibilityState === 'visible' && document.hasFocus()) {
+      backgroundChatAlert = false;
+      stopBlink();
+      claimOwner(true);
+    }
   });
   window.setInterval(maintainOwner, 2000);
   knownToastCounts = countMessageToasts();

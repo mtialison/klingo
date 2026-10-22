@@ -110,7 +110,8 @@ test('toast coberto não pisca; outro remetente continua com aviso visual, sem s
   const closingToasts = new WeakSet();
   const context = vm.createContext({ blinking: false, originalTitle: 'klingo',
     document: { title: 'klingo' }, knownToastCounts: new Map(), closingToasts,
-    syncOpenChat() {}, applyPendingDismissals() {}, messageToasts: () => toasts,
+    syncOpenChat() {}, scanOpenChatMessages() {}, backgroundChatAlert: false,
+    applyPendingDismissals() {}, messageToasts: () => toasts,
     syncNativeChatAudio() {},
     countMessageToasts: items => new Map(items.map(item => [item.key, 1])),
     dismissCoveredToasts: items => items.forEach(item => {
@@ -291,4 +292,113 @@ test('toast coberto não é recontado como mensagem nova', () => {
   functions('toastMessages', 'newMessageCount', context);
   const senders = vm.runInContext('Array.from(toastMessages().values(), item => item.sender)', context);
   assert.deepEqual(Array.from(senders), ['BRUNO']);
+});
+
+test('só nova mensagem recebida no chat aberto em segundo plano gera alerta', () => {
+  const items = [{ classList: { contains: name => name === 'list-group-item-secondary' },
+    textContent: '22/10/2026 16:39:11 antiga' }];
+  const content = { querySelectorAll: () => items };
+  const textarea = { closest: selector => selector === '.modal-content' ? content :
+    { querySelector: () => ({}) } };
+  let sender = 'TESTE';
+  let focused = false;
+  let alerts = 0;
+  const document = { visibilityState: 'hidden', hasFocus: () => focused,
+    querySelectorAll: () => [textarea] };
+  const context = vm.createContext({ document, directChatSender: () => sender,
+    openChatContent: null, openChatSender: '', knownIncoming: new Map(),
+    notifyOpenChat: () => alerts++ });
+  const start = source.indexOf('  function scanOpenChatMessages(');
+  const end = source.indexOf('  function notifyOpenChat(', start);
+  assert.ok(start >= 0 && end > start);
+  vm.runInContext(source.slice(start, end), context);
+  vm.runInContext('scanOpenChatMessages()', context);
+  assert.equal(alerts, 0);
+  items.push({ classList: { contains: name => name === 'list-group-item-success' },
+    textContent: '22/10/2026 16:40:00 enviada' });
+  vm.runInContext('scanOpenChatMessages()', context);
+  assert.equal(alerts, 0);
+  items.push({ classList: { contains: name => name === 'list-group-item-secondary' },
+    textContent: '22/10/2026 16:40:01 recebida' });
+  vm.runInContext('scanOpenChatMessages(); scanOpenChatMessages()', context);
+  assert.equal(alerts, 1);
+  document.visibilityState = 'visible';
+  items.push({ classList: { contains: name => name === 'list-group-item-secondary' },
+    textContent: '22/10/2026 16:40:02 outra janela' });
+  vm.runInContext('scanOpenChatMessages()', context);
+  assert.equal(alerts, 2);
+  focused = true;
+  items.push({ classList: { contains: name => name === 'list-group-item-secondary' },
+    textContent: '22/10/2026 16:40:03 vista' });
+  vm.runInContext('scanOpenChatMessages()', context);
+  assert.equal(alerts, 2);
+  focused = false;
+  document.visibilityState = 'hidden';
+  sender = 'OUTRO';
+  items.push({ classList: { contains: name => name === 'list-group-item-secondary' },
+    textContent: '22/10/2026 16:40:04 histórico de outro chat' });
+  vm.runInContext('scanOpenChatMessages()', context);
+  assert.equal(alerts, 2);
+});
+
+test('alerta do chat em segundo plano pisca sem ser dono global e para ao focar', () => {
+  let title = 'klingo';
+  let plays = 0;
+  const intervals = [];
+  const document = { visibilityState: 'hidden', hasFocus: () => false,
+    get title() { return title; }, set title(value) { title = value; } };
+  const context = vm.createContext({ document, originalTitle: 'klingo', blinking: false,
+    backgroundChatAlert: false, blinkInterval: null, openChatAudio: null,
+    Audio: class { play() { plays++; return Promise.resolve(); } set currentTime(_) {} },
+    setInterval: callback => { intervals.push(callback); return 1; },
+    clearInterval() {} });
+  functions('startBlink', 'checkMessages', context);
+  const start = source.indexOf('  function notifyOpenChat(');
+  const end = source.indexOf('  function checkMessages(', start);
+  assert.ok(start >= 0 && end > start);
+  vm.runInContext(source.slice(start, end), context);
+  vm.runInContext('notifyOpenChat()', context);
+  assert.equal(plays, 1);
+  intervals[0]();
+  assert.equal(title, '💬 Nova mensagem');
+  vm.runInContext('backgroundChatAlert = false; stopBlink()', context);
+  assert.equal(title, 'klingo');
+});
+
+test('mudança na lista da conversa aberta verifica mensagem sem aguardar temporizador', () => {
+  let callback;
+  let scans = 0;
+  const target = { nodeType: 1, closest: selector =>
+    selector === '.modal.show .modal-body li.list-group-item' ? {} : null };
+  const context = vm.createContext({ Node: { ELEMENT_NODE: 1 }, document: { body: {} },
+    MutationObserver: class { constructor(fn) { callback = fn; } observe() {} },
+    scanOpenChatMessages: () => scans++, checkMessages() {} });
+  const start = source.indexOf('  const notificationObserver = new MutationObserver(');
+  const end = source.indexOf('  document.addEventListener(\'click\'', start);
+  assert.ok(start >= 0 && end > start);
+  vm.runInContext(source.slice(start, end), context);
+  callback([{ target, addedNodes: [] }]);
+  assert.equal(scans, 1);
+});
+
+test('selo Nova no histórico não dispara alerta como se fosse outra mensagem', () => {
+  let badge = '';
+  let alerts = 0;
+  const item = { classList: { contains: name => name === 'list-group-item-secondary' },
+    textContent: '22/10/2026 16:40:01 recebida',
+    querySelector: () => ({ get textContent() { return `22/10/2026 16:40:01 ${badge}`; } }),
+    lastElementChild: { textContent: 'recebida' } };
+  const content = { querySelectorAll: () => [item] };
+  const textarea = { closest: selector => selector === '.modal-content' ? content :
+    { querySelector: () => ({}) } };
+  const context = vm.createContext({ document: { visibilityState: 'hidden',
+    hasFocus: () => false, querySelectorAll: () => [textarea] },
+    directChatSender: () => 'TESTE', openChatContent: null, openChatSender: '',
+    knownIncoming: new Map(), notifyOpenChat: () => alerts++ });
+  functions('scanOpenChatMessages', 'notifyOpenChat', context);
+  vm.runInContext('scanOpenChatMessages()', context);
+  badge = 'Nova';
+  item.textContent = '22/10/2026 16:40:01 Nova recebida';
+  vm.runInContext('scanOpenChatMessages()', context);
+  assert.equal(alerts, 0);
 });
