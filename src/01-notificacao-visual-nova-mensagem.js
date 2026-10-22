@@ -27,6 +27,25 @@
   const pendingDismissals = [];
   const closingToasts = new WeakSet();
 
+  // Diagnóstico temporário apenas na edição de testes: não registra remetente nem mensagem.
+  if (typeof GM_info !== 'undefined' && GM_info.script?.name === 'klingo (testes)') {
+    for (const type of ['play', 'playing', 'pause', 'ended', 'volumechange']) {
+      document.addEventListener(type, (event) => {
+        const audio = event.target;
+        if (!(audio instanceof HTMLMediaElement)) return;
+        console.info('[TM-AUDIO]', JSON.stringify({
+          type,
+          id: audio.id || '',
+          src: audio.currentSrc?.split('/').at(-1) || audio.getAttribute('src')?.split('/').at(-1) || '',
+          muted: audio.muted,
+          paused: audio.paused,
+          presence: hasOpenChatPresence(),
+          recentSenderOpen: Date.now() - recentNativeSenderAt < 1000 && isChatOpen(recentNativeSender)
+        }));
+      }, true);
+    }
+  }
+
   function normalizeToastText(toast) {
     const message = Array.from(toast.childNodes)
       .filter((node) => node.nodeType === Node.TEXT_NODE)
