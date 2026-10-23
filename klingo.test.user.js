@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.46
+// @version      1.47
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -1219,7 +1219,7 @@ function setDateCalculatorOpen(isOpen) {
 
 /* =========================
    NOTIFICAÇÃO VISUAL - NOVA MENSAGEM
-   v25.15 - diagnóstico de alerta no chat aberto
+   v25.16 - diagnóstico compartilhado de alerta no chat aberto
 ========================= */
 (function(){
   const OWNER_KEY = 'klingo_message_alert_owner_v1';
@@ -1272,13 +1272,22 @@ function setDateCalculatorOpen(isOpen) {
 
   function chatDiagnostic(event, state = {}) {
     if (typeof GM_info === 'undefined' || GM_info.script?.name !== 'klingo (testes)') return;
-    console.info('[TM-CHAT-DIAG]', JSON.stringify({
-      event,
+    const entry = {
+      at: Date.now(), event,
       visibility: state.visibility,
       focused: state.focused,
       background: state.background,
       error: state.error
-    }));
+    };
+    console.info('[TM-CHAT-DIAG]', JSON.stringify(entry));
+    try {
+      const key = 'tm_chat_diag_v1';
+      const history = JSON.parse(localStorage.getItem(key) || '[]');
+      history.push(entry);
+      localStorage.setItem(key, JSON.stringify(history.slice(-50)));
+    } catch (_) {
+      // O registro de diagnóstico não deve afetar as notificações.
+    }
   }
 
   function normalizeToastText(toast) {

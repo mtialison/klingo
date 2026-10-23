@@ -23,16 +23,22 @@ function storage() {
 
 test('diagnóstico do chat exclui texto e só aparece no userscript de testes', () => {
   const lines = [];
+  const localStorage = storage();
   const context = vm.createContext({ GM_info: { script: { name: 'klingo (testes)' } },
+    localStorage, Date: { now: () => 123456 },
     console: { info: (...parts) => lines.push(parts.join(' ')) } });
   functions('chatDiagnostic', 'normalizeToastText', context);
   vm.runInContext('chatDiagnostic("arrival", {visibility:"hidden", focused:false, text:"segredo"})', context);
   assert.equal(lines.length, 1);
   assert.equal(lines[0].includes('hidden'), true);
   assert.equal(lines[0].includes('segredo'), false);
+  assert.deepEqual(JSON.parse(localStorage.getItem('tm_chat_diag_v1')), [{
+    at: 123456, event: 'arrival', visibility: 'hidden', focused: false
+  }]);
   context.GM_info.script.name = 'klingo';
   vm.runInContext('chatDiagnostic("arrival", {visibility:"hidden"})', context);
   assert.equal(lines.length, 1);
+  assert.equal(JSON.parse(localStorage.getItem('tm_chat_diag_v1')).length, 1);
 });
 
 test('conversa aberta em outra aba suprime só o remetente correspondente e expira', () => {
