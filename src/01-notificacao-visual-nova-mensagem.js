@@ -27,8 +27,7 @@
   let openChatAudio = null;
   let openChatContent = null;
   let openChatSender = '';
-  let knownIncoming = new Map();
-  let knownIncomingItems = [];
+  let knownChatRows = [];
   let backgroundChatAlert = false;
   const pendingDismissals = [];
   const closingToasts = new WeakSet();
@@ -122,7 +121,7 @@
     return document.visibilityState !== 'visible' || !document.hasFocus();
   }
 
-  function scanOpenChatMessages() {
+  function scanOpenChatMessages(mutations = []) {
     const textarea = Array.from(document.querySelectorAll(
       '.modal.show .modal-footer.d-flex.flex-column textarea')).find((item) =>
       item.closest('.modal-footer')?.querySelector('.fa-paper-plane'));
@@ -131,34 +130,41 @@
     if (!content || !sender) {
       openChatContent = null;
       openChatSender = '';
-      knownIncoming = new Map();
-      knownIncomingItems = [];
+      knownChatRows = [];
       if (backgroundChatAlert) {
         backgroundChatAlert = false;
         stopBlink();
       }
       return;
     }
-    const current = new Map();
-    const incomingItems = [];
+    const rows = [];
     content.querySelectorAll('.modal-body li.list-group-item').forEach((item) => {
-      if (!item.classList.contains('list-group-item-secondary')) return;
-      incomingItems.push(item);
+      const incoming = item.classList.contains('list-group-item-secondary');
       const header = item.querySelector?.('.small')?.textContent
         .replace(/\bNova\b/gi, '') || '';
       const body = item.lastElementChild?.textContent || '';
       const key = (header || body ? `${header} ${body}` : item.textContent)
         .replace(/\s+/g, ' ').trim();
-      current.set(key, (current.get(key) || 0) + 1);
+      rows.push({ item, key, incoming });
     });
     if (content === openChatContent && sender === openChatSender) {
-      const newText = Array.from(current).some(([key, count]) =>
-        count > (knownIncoming.get(key) || 0));
-      const shiftedFullList = !newText && incomingItems.length === 50 &&
-        knownIncomingItems.length === 50 &&
-        incomingItems[0] === knownIncomingItems[1] &&
-        incomingItems.at(-1) !== knownIncomingItems.at(-1);
-      const arrived = newText || shiftedFullList;
+      const tail = rows.at(-1);
+      const previousTail = knownChatRows.at(-1);
+      const oldTailRetained = previousTail && rows.slice(0, -1).some((row) =>
+        row.item === previousTail.item);
+      const appended = tail?.incoming && (!previousTail ||
+        (tail.item !== previousTail.item && oldTailRetained));
+      const changedTail = tail?.incoming && previousTail && tail.key !== previousTail.key;
+      const listShift = mutations.some((mutation) => mutation.type === 'childList' &&
+        mutation.removedNodes?.length &&
+        mutation.target.closest?.('.modal.show .modal-body') &&
+        !mutation.target.closest?.('.modal.show .modal-body li.list-group-item'));
+      const tailTouched = mutations.some((mutation) =>
+        (mutation.target.closest?.('.modal.show .modal-body li.list-group-item') ||
+          mutation.target.parentElement?.closest?.('.modal.show .modal-body li.list-group-item')) === tail?.item);
+      const reusedTail = tail?.incoming && rows.length === 50 &&
+        knownChatRows.length === 50 && listShift && tailTouched;
+      const arrived = appended || changedTail || reusedTail;
       if (arrived) {
         const focused = document.hasFocus();
         const background = isChatTabBackground();
@@ -168,8 +174,7 @@
     }
     openChatContent = content;
     openChatSender = sender;
-    knownIncoming = current;
-    knownIncomingItems = incomingItems;
+    knownChatRows = rows;
   }
 
   function notifyOpenChat() {
@@ -464,7 +469,7 @@
           (node.matches?.('.modal.show .modal-body li.list-group-item') ||
             node.querySelector?.('.modal.show .modal-body li.list-group-item')));
     });
-    if (changedOpenChat) scanOpenChatMessages();
+    if (changedOpenChat) scanOpenChatMessages(mutations);
     const changedToast = mutations.some((mutation) => {
       const target = mutation.target.nodeType === Node.ELEMENT_NODE
         ? mutation.target : mutation.target.parentElement;
