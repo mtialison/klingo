@@ -28,6 +28,7 @@
   let openChatContent = null;
   let openChatSender = '';
   let knownIncoming = new Map();
+  let knownIncomingItems = [];
   let backgroundChatAlert = false;
   const pendingDismissals = [];
   const closingToasts = new WeakSet();
@@ -110,6 +111,17 @@
     return header && header !== 'CHAT' ? header : '';
   }
 
+  function isChatTabBackground() {
+    const root = document.documentElement;
+    const foreground = root?.getAttribute('data-tm-chrome-foreground');
+    const updatedAt = Number(root?.getAttribute('data-tm-chrome-focus-at'));
+    if ((foreground === 'true' || foreground === 'false') && updatedAt > 0 &&
+        Date.now() - updatedAt >= 0 && Date.now() - updatedAt < 6000) {
+      return foreground === 'false';
+    }
+    return document.visibilityState !== 'visible' || !document.hasFocus();
+  }
+
   function scanOpenChatMessages() {
     const textarea = Array.from(document.querySelectorAll(
       '.modal.show .modal-footer.d-flex.flex-column textarea')).find((item) =>
@@ -120,6 +132,7 @@
       openChatContent = null;
       openChatSender = '';
       knownIncoming = new Map();
+      knownIncomingItems = [];
       if (backgroundChatAlert) {
         backgroundChatAlert = false;
         stopBlink();
@@ -127,8 +140,10 @@
       return;
     }
     const current = new Map();
+    const incomingItems = [];
     content.querySelectorAll('.modal-body li.list-group-item').forEach((item) => {
       if (!item.classList.contains('list-group-item-secondary')) return;
+      incomingItems.push(item);
       const header = item.querySelector?.('.small')?.textContent
         .replace(/\bNova\b/gi, '') || '';
       const body = item.lastElementChild?.textContent || '';
@@ -137,11 +152,16 @@
       current.set(key, (current.get(key) || 0) + 1);
     });
     if (content === openChatContent && sender === openChatSender) {
-      const arrived = Array.from(current).some(([key, count]) =>
+      const newText = Array.from(current).some(([key, count]) =>
         count > (knownIncoming.get(key) || 0));
+      const shiftedFullList = !newText && incomingItems.length === 50 &&
+        knownIncomingItems.length === 50 &&
+        incomingItems[0] === knownIncomingItems[1] &&
+        incomingItems.at(-1) !== knownIncomingItems.at(-1);
+      const arrived = newText || shiftedFullList;
       if (arrived) {
         const focused = document.hasFocus();
-        const background = document.visibilityState !== 'visible' || !focused;
+        const background = isChatTabBackground();
         chatDiagnostic('arrival', { visibility: document.visibilityState, focused, background });
         if (background) notifyOpenChat();
       }
@@ -149,6 +169,7 @@
     openChatContent = content;
     openChatSender = sender;
     knownIncoming = current;
+    knownIncomingItems = incomingItems;
   }
 
   function notifyOpenChat() {
@@ -380,6 +401,10 @@
 
   function checkMessages() {
     try {
+      if (backgroundChatAlert && !isChatTabBackground()) {
+        backgroundChatAlert = false;
+        stopBlink();
+      }
       if (!blinking) originalTitle = document.title;
       syncOpenChat();
       scanOpenChatMessages();
@@ -418,6 +443,17 @@
 
   // O monitor geral da página pode atrasar durante atualizações grandes. Observe os
   // avisos diretamente para registrar cada chegada antes de uma nova renderização.
+  const focusObserver = new MutationObserver((mutations) => {
+    if (mutations.some((mutation) => mutation.attributeName === 'data-tm-chrome-foreground') &&
+        backgroundChatAlert && !isChatTabBackground()) {
+      backgroundChatAlert = false;
+      stopBlink();
+    }
+  });
+  focusObserver.observe(document.documentElement, {
+    attributes: true, attributeFilter: ['data-tm-chrome-foreground']
+  });
+
   const notificationObserver = new MutationObserver((mutations) => {
     const changedOpenChat = mutations.some((mutation) => {
       const target = mutation.target.nodeType === Node.ELEMENT_NODE

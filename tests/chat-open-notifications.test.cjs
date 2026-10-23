@@ -327,10 +327,10 @@ test('só nova mensagem recebida no chat aberto em segundo plano gera alerta', (
   const document = { visibilityState: 'hidden', hasFocus: () => focused,
     querySelectorAll: () => [textarea] };
   const context = vm.createContext({ document, directChatSender: () => sender,
-    openChatContent: null, openChatSender: '', knownIncoming: new Map(),
+    openChatContent: null, openChatSender: '', knownIncoming: new Map(), knownIncomingItems: [],
     notifyOpenChat: () => alerts++,
     chatDiagnostic: (event, data) => diagnostics.push({ event, ...data }) });
-  const start = source.indexOf('  function scanOpenChatMessages(');
+  const start = source.indexOf('  function isChatTabBackground(');
   const end = source.indexOf('  function notifyOpenChat(', start);
   assert.ok(start >= 0 && end > start);
   vm.runInContext(source.slice(start, end), context);
@@ -363,6 +363,26 @@ test('só nova mensagem recebida no chat aberto em segundo plano gera alerta', (
     textContent: '22/10/2026 16:40:04 histórico de outro chat' });
   vm.runInContext('scanOpenChatMessages()', context);
   assert.equal(alerts, 2);
+});
+
+test('estado recente da extensão decide foco mesmo quando o documento discorda', () => {
+  let now = 10000;
+  const attributes = new Map([
+    ['data-tm-chrome-foreground', 'false'],
+    ['data-tm-chrome-focus-at', '9000']
+  ]);
+  const context = vm.createContext({ Date: { now: () => now },
+    document: { visibilityState: 'visible', hasFocus: () => true,
+      documentElement: { getAttribute: key => attributes.get(key) ?? null } } });
+  functions('isChatTabBackground', 'scanOpenChatMessages', context);
+  assert.equal(vm.runInContext('isChatTabBackground()', context), true);
+  attributes.set('data-tm-chrome-foreground', 'true');
+  assert.equal(vm.runInContext('isChatTabBackground()', context), false);
+  now = 20000;
+  assert.equal(vm.runInContext('isChatTabBackground()', context), false);
+  attributes.delete('data-tm-chrome-foreground');
+  context.document.visibilityState = 'hidden';
+  assert.equal(vm.runInContext('isChatTabBackground()', context), true);
 });
 
 test('alerta do chat em segundo plano registra áudio e ciclo visual sem conteúdo', async () => {
@@ -423,11 +443,57 @@ test('selo Nova no histórico não dispara alerta como se fosse outra mensagem',
   const context = vm.createContext({ document: { visibilityState: 'hidden',
     hasFocus: () => false, querySelectorAll: () => [textarea] },
     directChatSender: () => 'TESTE', openChatContent: null, openChatSender: '',
-    knownIncoming: new Map(), notifyOpenChat: () => alerts++ });
-  functions('scanOpenChatMessages', 'notifyOpenChat', context);
+    knownIncoming: new Map(), knownIncomingItems: [], notifyOpenChat: () => alerts++ });
+  functions('isChatTabBackground', 'notifyOpenChat', context);
   vm.runInContext('scanOpenChatMessages()', context);
   badge = 'Nova';
   item.textContent = '22/10/2026 16:40:01 Nova recebida';
   vm.runInContext('scanOpenChatMessages()', context);
   assert.equal(alerts, 0);
+});
+
+test('mensagens idênticas continuam detectadas quando a lista gira em 50 itens', () => {
+  const incoming = () => ({ classList: { contains: name => name === 'list-group-item-secondary' },
+    textContent: '23/10/2026 10:00:00 teste' });
+  let items = Array.from({ length: 50 }, incoming);
+  const content = { querySelectorAll: () => items };
+  const textarea = { closest: selector => selector === '.modal-content' ? content :
+    { querySelector: () => ({}) } };
+  let alerts = 0;
+  const context = vm.createContext({ document: { visibilityState: 'hidden',
+    hasFocus: () => false, querySelectorAll: () => [textarea] },
+    directChatSender: () => 'TESTE', openChatContent: null, openChatSender: '',
+    knownIncoming: new Map(), knownIncomingItems: [], notifyOpenChat: () => alerts++,
+    chatDiagnostic() {} });
+  functions('isChatTabBackground', 'notifyOpenChat', context);
+  vm.runInContext('scanOpenChatMessages()', context);
+  items = [...items.slice(1), incoming()];
+  vm.runInContext('scanOpenChatMessages(); scanOpenChatMessages()', context);
+  assert.equal(alerts, 1);
+  items = [...items.slice(1), incoming()];
+  vm.runInContext('scanOpenChatMessages()', context);
+  assert.equal(alerts, 2);
+  items = Array.from({ length: 50 }, incoming);
+  vm.runInContext('scanOpenChatMessages()', context);
+  assert.equal(alerts, 2);
+});
+
+test('foco da extensão interrompe imediatamente o piscar do chat', () => {
+  let callback;
+  let observed;
+  let stopped = 0;
+  const context = vm.createContext({
+    document: { documentElement: {} }, backgroundChatAlert: true,
+    isChatTabBackground: () => false, stopBlink: () => stopped++,
+    MutationObserver: class { constructor(fn) { callback = fn; }
+      observe(target, options) { observed = { target, options }; } }
+  });
+  const start = source.indexOf('  const focusObserver = new MutationObserver(');
+  const end = source.indexOf('  const notificationObserver = new MutationObserver(', start);
+  assert.ok(start >= 0 && end > start);
+  vm.runInContext(source.slice(start, end), context);
+  assert.equal(observed.target, context.document.documentElement);
+  callback([{ attributeName: 'data-tm-chrome-foreground' }]);
+  assert.equal(stopped, 1);
+  assert.equal(context.backgroundChatAlert, false);
 });
