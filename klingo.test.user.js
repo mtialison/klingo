@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.48
+// @version      1.49
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -1219,7 +1219,7 @@ function setDateCalculatorOpen(isOpen) {
 
 /* =========================
    NOTIFICAÇÃO VISUAL - NOVA MENSAGEM
-   v25.16 - diagnóstico compartilhado de alerta no chat aberto
+   alertas nativos de mensagens e coordenação entre abas
 ========================= */
 (function(){
   const OWNER_KEY = 'klingo_message_alert_owner_v1';
@@ -1243,52 +1243,8 @@ function setDateCalculatorOpen(isOpen) {
   let recentNativeSender = '';
   let recentNativeSenderAt = 0;
   let nativeChatAudio = null;
-  let openChatAudio = null;
-  let openChatContent = null;
-  let openChatSender = '';
-  let knownChatRows = [];
-  let backgroundChatAlert = false;
   const pendingDismissals = [];
   const closingToasts = new WeakSet();
-
-  // Diagnóstico temporário apenas na edição de testes: não registra remetente nem mensagem.
-  if (typeof GM_info !== 'undefined' && GM_info.script?.name === 'klingo (testes)') {
-    for (const type of ['play', 'playing', 'pause', 'ended', 'volumechange']) {
-      document.addEventListener(type, (event) => {
-        const audio = event.target;
-        if (!(audio instanceof HTMLMediaElement)) return;
-        console.info('[TM-AUDIO]', JSON.stringify({
-          type,
-          id: audio.id || '',
-          src: audio.currentSrc?.split('/').at(-1) || audio.getAttribute('src')?.split('/').at(-1) || '',
-          muted: audio.muted,
-          paused: audio.paused,
-          presence: hasOpenChatPresence(),
-          recentSenderOpen: Date.now() - recentNativeSenderAt < 1000 && isChatOpen(recentNativeSender)
-        }));
-      }, true);
-    }
-  }
-
-  function chatDiagnostic(event, state = {}) {
-    if (typeof GM_info === 'undefined' || GM_info.script?.name !== 'klingo (testes)') return;
-    const entry = {
-      at: Date.now(), event,
-      visibility: state.visibility,
-      focused: state.focused,
-      background: state.background,
-      error: state.error
-    };
-    console.info('[TM-CHAT-DIAG]', JSON.stringify(entry));
-    try {
-      const key = 'tm_chat_diag_v1';
-      const history = JSON.parse(localStorage.getItem(key) || '[]');
-      history.push(entry);
-      localStorage.setItem(key, JSON.stringify(history.slice(-50)));
-    } catch (_) {
-      // O registro de diagnóstico não deve afetar as notificações.
-    }
-  }
 
   function normalizeToastText(toast) {
     const message = Array.from(toast.childNodes)
@@ -1329,83 +1285,6 @@ function setDateCalculatorOpen(isOpen) {
     return header && header !== 'CHAT' ? header : '';
   }
 
-  function isChatTabBackground() {
-    const root = document.documentElement;
-    const foreground = root?.getAttribute('data-tm-chrome-foreground');
-    const updatedAt = Number(root?.getAttribute('data-tm-chrome-focus-at'));
-    if ((foreground === 'true' || foreground === 'false') && updatedAt > 0 &&
-        Date.now() - updatedAt >= 0 && Date.now() - updatedAt < 6000) {
-      return foreground === 'false';
-    }
-    return document.visibilityState !== 'visible' || !document.hasFocus();
-  }
-
-  function scanOpenChatMessages(mutations = []) {
-    const textarea = Array.from(document.querySelectorAll(
-      '.modal.show .modal-footer.d-flex.flex-column textarea')).find((item) =>
-      item.closest('.modal-footer')?.querySelector('.fa-paper-plane'));
-    const content = textarea?.closest('.modal-content');
-    const sender = directChatSender();
-    if (!content || !sender) {
-      openChatContent = null;
-      openChatSender = '';
-      knownChatRows = [];
-      if (backgroundChatAlert) {
-        backgroundChatAlert = false;
-        stopBlink();
-      }
-      return;
-    }
-    const rows = [];
-    content.querySelectorAll('.modal-body li.list-group-item').forEach((item) => {
-      const incoming = item.classList.contains('list-group-item-secondary');
-      const header = item.querySelector?.('.small')?.textContent
-        .replace(/\bNova\b/gi, '') || '';
-      const body = item.lastElementChild?.textContent || '';
-      const key = (header || body ? `${header} ${body}` : item.textContent)
-        .replace(/\s+/g, ' ').trim();
-      rows.push({ item, key, incoming });
-    });
-    if (content === openChatContent && sender === openChatSender) {
-      const tail = rows.at(-1);
-      const previousTail = knownChatRows.at(-1);
-      const oldTailRetained = previousTail && rows.slice(0, -1).some((row) =>
-        row.item === previousTail.item);
-      const appended = tail?.incoming && (!previousTail ||
-        (tail.item !== previousTail.item && oldTailRetained));
-      const changedTail = tail?.incoming && previousTail && tail.key !== previousTail.key;
-      const listShift = mutations.some((mutation) => mutation.type === 'childList' &&
-        mutation.removedNodes?.length &&
-        mutation.target.closest?.('.modal.show .modal-body') &&
-        !mutation.target.closest?.('.modal.show .modal-body li.list-group-item'));
-      const tailTouched = mutations.some((mutation) =>
-        (mutation.target.closest?.('.modal.show .modal-body li.list-group-item') ||
-          mutation.target.parentElement?.closest?.('.modal.show .modal-body li.list-group-item')) === tail?.item);
-      const reusedTail = tail?.incoming && rows.length === 50 &&
-        knownChatRows.length === 50 && listShift && tailTouched;
-      const arrived = appended || changedTail || reusedTail;
-      if (arrived) {
-        const focused = document.hasFocus();
-        const background = isChatTabBackground();
-        chatDiagnostic('arrival', { visibility: document.visibilityState, focused, background });
-        if (background) notifyOpenChat();
-      }
-    }
-    openChatContent = content;
-    openChatSender = sender;
-    knownChatRows = rows;
-  }
-
-  function notifyOpenChat() {
-    backgroundChatAlert = true;
-    startBlink();
-    if (!openChatAudio) openChatAudio = new Audio('/notific.mp3');
-    try { openChatAudio.currentTime = 0; } catch (_) {}
-    chatDiagnostic('audio-attempt');
-    openChatAudio.play().then(() => chatDiagnostic('audio-played'))
-      .catch((error) => chatDiagnostic('audio-rejected', { error: error?.name || 'unknown' }));
-  }
-
   function syncOpenChat() {
     const sender = directChatSender();
     const senderKey = sender ? messageKey(sender) : '';
@@ -1441,19 +1320,6 @@ function setDateCalculatorOpen(isOpen) {
     } catch (_) {
       return false;
     }
-    return false;
-  }
-
-  function hasOpenChatPresence() {
-    try {
-      for (let index = 0; index < localStorage.length; index++) {
-        const key = localStorage.key(index);
-        if (!key?.startsWith(OPEN_CHAT_PREFIX)) continue;
-        const presence = JSON.parse(localStorage.getItem(key) || 'null');
-        if (presence?.senderKey && Number.isFinite(presence.at) &&
-            Date.now() - presence.at >= 0 && Date.now() - presence.at < OPEN_CHAT_TTL) return true;
-      }
-    } catch (_) {}
     return false;
   }
 
@@ -1596,7 +1462,7 @@ function setDateCalculatorOpen(isOpen) {
     if (owner?.id === tabId) {
       GM_setValue(OWNER_KEY, { id: tabId, updatedAt: Date.now() });
     } else {
-      if (!backgroundChatAlert) stopBlink();
+      stopBlink();
       if (!owner || Date.now() - owner.updatedAt >= OWNER_TTL) scheduleTakeover();
     }
   }
@@ -1604,8 +1470,6 @@ function setDateCalculatorOpen(isOpen) {
   function startBlink() {
     if (blinking) return;
     blinking = true;
-    chatDiagnostic('blink-start');
-
     blinkInterval = setInterval(() => {
       document.title = document.title === '💬 Nova mensagem'
         ? originalTitle
@@ -1616,8 +1480,6 @@ function setDateCalculatorOpen(isOpen) {
   function stopBlink() {
     if (!blinking) return;
     blinking = false;
-    chatDiagnostic('blink-stop');
-
     clearInterval(blinkInterval);
     blinkInterval = null;
     document.title = originalTitle;
@@ -1625,13 +1487,8 @@ function setDateCalculatorOpen(isOpen) {
 
   function checkMessages() {
     try {
-      if (backgroundChatAlert && !isChatTabBackground()) {
-        backgroundChatAlert = false;
-        stopBlink();
-      }
       if (!blinking) originalTitle = document.title;
       syncOpenChat();
-      scanOpenChatMessages();
       syncNativeChatAudio();
       applyPendingDismissals();
       const toasts = messageToasts();
@@ -1649,13 +1506,13 @@ function setDateCalculatorOpen(isOpen) {
         !isChatOpen(toastSender(toast)));
       const activeCounts = countMessageToasts(activeToasts);
       if (!isOwner()) {
-        if (!backgroundChatAlert) stopBlink();
+        stopBlink();
       } else {
         activeCounts.forEach((count, key) => {
           const newMessages = Math.max(0, count - (knownToastCounts.get(key) || 0));
           if (newMessages) startBlink();
         });
-        if (!activeCounts.size && !backgroundChatAlert) {
+        if (!activeCounts.size) {
           stopBlink();
         }
       }
@@ -1665,30 +1522,7 @@ function setDateCalculatorOpen(isOpen) {
     }
   }
 
-  // O monitor geral da página pode atrasar durante atualizações grandes. Observe os
-  // avisos diretamente para registrar cada chegada antes de uma nova renderização.
-  const focusObserver = new MutationObserver((mutations) => {
-    if (mutations.some((mutation) => mutation.attributeName === 'data-tm-chrome-foreground') &&
-        backgroundChatAlert && !isChatTabBackground()) {
-      backgroundChatAlert = false;
-      stopBlink();
-    }
-  });
-  focusObserver.observe(document.documentElement, {
-    attributes: true, attributeFilter: ['data-tm-chrome-foreground']
-  });
-
   const notificationObserver = new MutationObserver((mutations) => {
-    const changedOpenChat = mutations.some((mutation) => {
-      const target = mutation.target.nodeType === Node.ELEMENT_NODE
-        ? mutation.target : mutation.target.parentElement;
-      return !!target?.closest?.('.modal.show .modal-body li.list-group-item') ||
-        Array.from(mutation.addedNodes || []).some((node) =>
-          node.nodeType === Node.ELEMENT_NODE &&
-          (node.matches?.('.modal.show .modal-body li.list-group-item') ||
-            node.querySelector?.('.modal.show .modal-body li.list-group-item')));
-    });
-    if (changedOpenChat) scanOpenChatMessages(mutations);
     const changedToast = mutations.some((mutation) => {
       const target = mutation.target.nodeType === Node.ELEMENT_NODE
         ? mutation.target : mutation.target.parentElement;
@@ -1797,13 +1631,11 @@ function setDateCalculatorOpen(isOpen) {
   }, 2000);
 
   window.addEventListener('focus', () => {
-    backgroundChatAlert = false;
     stopBlink();
     claimOwner(true);
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && document.hasFocus()) {
-      backgroundChatAlert = false;
       stopBlink();
       claimOwner(true);
     }
