@@ -15,4 +15,6 @@ O ícone fica separado em `assets/` para manutenção, mas o comando de build o 
 
 O aviso personalizado (som e título piscando) para mensagens da conversa já aberta foi retirado na versão de testes **1.49**. Permanecem a supressão dos avisos duplicados em outras abas e o ajuste da contagem. Se você carregou manualmente o antigo complemento de foco, remova-o em `chrome://extensions`; o userscript já não depende dele.
 
+Na versão de testes **1.50**, as abas coordenam o som nativo de cada novo aviso para que apenas uma o reproduza, inclusive quando a aba responsável muda ou é fechada. A regra que silencia mensagens de uma conversa aberta em outra aba continua ativa.
+
 Antes de promover, rode cada `tests/*.test.cjs` com Node, confirme `node --check klingo.user.js` e faça os testes visuais no Klingo. Aumente `@version` quando quiser disparar uma atualização automática. O arquivo de testes nunca deve ser copiado para `main`.

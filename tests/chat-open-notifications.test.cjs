@@ -161,7 +161,7 @@ test('áudio nativo do chat é interrompido para remetente aberto em outra aba',
   const context = vm.createContext({ Date: { now: () => 1000 },
     window: { setTimeout: callback => callbacks.push(callback) },
     hasOpenChatPresence: () => true,
-    isChatOpen: sender => sender === 'ANA', recentNativeSender: 'ANA',
+    isChatOpen: sender => sender === 'ANA', isOwner: () => true, recentNativeSender: 'ANA',
     recentNativeSenderAt: 1000, nativePlaybackAllowedUntil: 0,
     messageToasts: () => [], toastSender: () => '' });
   functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
@@ -180,7 +180,7 @@ test('áudio começa silenciado mesmo se a presença oscilar antes do aviso cheg
   const context = vm.createContext({ Date: { now: () => 1000 },
     window: { setTimeout: callback => callbacks.push(callback) },
     hasOpenChatPresence: () => presence,
-    isChatOpen: sender => presence && sender === 'ANA',
+    isChatOpen: sender => presence && sender === 'ANA', isOwner: () => true,
     recentNativeSender: '', recentNativeSenderAt: 0,
     messageToasts: () => [{ sender: 'ANA' }], toastSender: toast => toast.sender });
   functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
@@ -201,7 +201,7 @@ test('áudio nativo continua para remetente diferente e sons de outras áreas n�
   const context = vm.createContext({ Date: { now: () => 1000 },
     window: { setTimeout: callback => callbacks.push(callback) },
     hasOpenChatPresence: () => true,
-    isChatOpen: sender => sender === 'ANA', recentNativeSender: 'BRUNO',
+    isChatOpen: sender => sender === 'ANA', isOwner: () => true, recentNativeSender: 'BRUNO',
     recentNativeSenderAt: 1000, nativePlaybackAllowedUntil: 0,
     messageToasts: () => [], toastSender: () => '' });
   functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
@@ -212,6 +212,98 @@ test('áudio nativo continua para remetente diferente e sons de outras áreas n�
   assert.equal(chat.muted, false);
   assert.equal(chat.plays, 0);
   assert.equal(chat.currentTime, 0);
+});
+
+test('som nativo de uma mensagem toca em apenas uma das duas abas', () => {
+  const tab = (owner) => {
+    const callbacks = [];
+    const audio = { id: 'beepChatId', muted: false, currentTime: 1,
+      pauses: 0, pause() { this.pauses++; } };
+    const context = vm.createContext({ Date: { now: () => 1000 },
+      window: { setTimeout: callback => callbacks.push(callback) },
+      isOwner: () => owner, isChatOpen: () => false,
+      recentNativeSender: 'BRUNO', recentNativeSenderAt: 1000,
+      messageToasts: () => [], toastSender: () => '' });
+    functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
+    vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
+    callbacks.shift()();
+    return audio;
+  };
+  const ownerAudio = tab(true);
+  const otherAudio = tab(false);
+  assert.equal(ownerAudio.muted, false);
+  assert.equal(otherAudio.muted, true);
+  assert.equal(otherAudio.pauses, 1);
+});
+
+test('troca de aba durante o aviso não duplica o som nativo', async () => {
+  const claims = new Map();
+  let lockQueue = Promise.resolve();
+  const locks = { request(_name, callback) {
+    const next = lockQueue.then(callback);
+    lockQueue = next.catch(() => {});
+    return next;
+  } };
+  let owner = 'aba-a';
+  const makeTab = (id) => {
+    const callbacks = [];
+    const audio = { id: 'beepChatId', muted: false, currentTime: 1,
+      pauses: 0, pause() { this.pauses++; } };
+    const context = vm.createContext({ Date: { now: () => 1000 },
+      window: { setTimeout: callback => callbacks.push(callback) },
+      navigator: { locks }, tabId: id,
+      GM_getValue: key => claims.get(key) ?? null,
+      GM_setValue: (key, value) => claims.set(key, value),
+      isOwner: () => owner === id, isChatOpen: () => false,
+      recentNativeSender: 'BRUNO', recentNativeSenderAt: 1000,
+      messageToasts: () => [{ text: 'De: Bruno >> Olá' }],
+      normalizeToastText: toast => toast.text,
+      toastSender: () => 'BRUNO', messageKey: text => text,
+      countMessageToasts: () => new Map([['De: Bruno >> Olá', 1]]),
+      AUDIO_CLAIM_KEY: 'audio-claim', AUDIO_CLAIM_TTL: 1200 });
+    functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
+    vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
+    return { audio, run: () => callbacks.shift()() };
+  };
+  const a = makeTab('aba-a');
+  const b = makeTab('aba-b');
+  const first = a.run();
+  owner = 'aba-b';
+  const second = b.run();
+  await Promise.all([first, second]);
+  assert.equal([a.audio, b.audio].filter(audio => !audio.muted).length, 1);
+});
+
+test('som toca uma vez mesmo se a aba responsável foi fechada', async () => {
+  const claims = new Map();
+  let lockQueue = Promise.resolve();
+  const locks = { request(_name, callback) {
+    const next = lockQueue.then(callback);
+    lockQueue = next.catch(() => {});
+    return next;
+  } };
+  const callbacks = [];
+  const audios = ['aba-b', 'aba-c'].map(id => {
+    const audio = { id: 'beepChatId', muted: false, currentTime: 1,
+      pauses: 0, pause() { this.pauses++; } };
+    const context = vm.createContext({ Date: { now: () => 1000 },
+      window: { setTimeout: callback => callbacks.push(callback) },
+      navigator: { locks }, tabId: id,
+      GM_getValue: key => claims.get(key) ?? null,
+      GM_setValue: (key, value) => claims.set(key, value),
+      isOwner: () => false, isChatOpen: () => false,
+      recentNativeSender: 'BRUNO', recentNativeSenderAt: 1000,
+      messageToasts: () => [{ text: 'De: Bruno >> Olá' }],
+      normalizeToastText: toast => toast.text,
+      toastSender: () => 'BRUNO', messageKey: text => text,
+      countMessageToasts: () => new Map([['De: Bruno >> Olá', 1]]),
+      AUDIO_CLAIM_KEY: 'audio-claim', AUDIO_CLAIM_TTL: 1200 });
+    functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
+    vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
+    return audio;
+  });
+  await Promise.all(callbacks.map(callback => callback()));
+  assert.equal(audios.filter(audio => !audio.muted).length, 1);
 });
 
 test('som do chat nativo permanece preparado mesmo sem presença compartilhada', () => {
@@ -256,7 +348,7 @@ test('mensagem coberta logo após outra mensagem ainda bloqueia o segundo som', 
     pauses: 0, pause() { this.pauses++; }, play() { return Promise.resolve(); } };
   const context = vm.createContext({ Date: { now: () => now },
     window: { setTimeout: callback => callbacks.push(callback) },
-    hasOpenChatPresence: () => true, isChatOpen: sender => sender === 'ANA',
+    hasOpenChatPresence: () => true, isChatOpen: sender => sender === 'ANA', isOwner: () => true,
     recentNativeSender: 'BRUNO', recentNativeSenderAt: 1000,
     nativePlaybackAllowedUntil: 0, messageToasts: () => [] });
   functions('handleNativeChatPlay', 'dismissCoveredToasts', context);

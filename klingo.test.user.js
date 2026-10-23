@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.49
+// @version      1.50
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -1225,6 +1225,8 @@ function setDateCalculatorOpen(isOpen) {
   const OWNER_KEY = 'klingo_message_alert_owner_v1';
   const DISMISS_KEY = 'klingo_message_alert_dismiss_v1';
   const OPEN_CHAT_PREFIX = 'klingo_chat_open_sender_v1:';
+  const AUDIO_CLAIM_KEY = 'klingo_native_chat_audio_claim_v1';
+  const AUDIO_CLAIM_TTL = 1200;
   const OWNER_TTL = 7000;
   const DISMISS_TTL = 30000;
   const OPEN_CHAT_TTL = 90000;
@@ -1338,9 +1340,33 @@ function setDateCalculatorOpen(isOpen) {
         try { audio.currentTime = 0; } catch (_) {}
         return;
       }
-      // Sem remetente identificável, preserve o aviso nativo (falha aberta).
-      try { audio.currentTime = 0; } catch (_) {}
-      audio.muted = false;
+      const allow = () => {
+        try { audio.currentTime = 0; } catch (_) {}
+        audio.muted = false;
+      };
+      const suppress = () => {
+        audio.pause();
+        try { audio.currentTime = 0; } catch (_) {}
+      };
+      // O bloqueio do navegador serializa a escolha entre abas, inclusive durante
+      // troca de foco ou após o fechamento da antiga aba responsável.
+      if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+        const key = latestToast
+          ? messageKey(normalizeToastText(latestToast)) : messageKey(sender || 'sem-remetente');
+        return navigator.locks.request('klingo-native-chat-audio-v1', () => {
+          const previous = GM_getValue(AUDIO_CLAIM_KEY, null);
+          if (previous?.key === key && Date.now() - previous.at >= 0 &&
+              Date.now() - previous.at < AUDIO_CLAIM_TTL) {
+            suppress();
+            return;
+          }
+          GM_setValue(AUDIO_CLAIM_KEY, { key, at: Date.now() });
+          allow();
+        }).catch(() => { if (isOwner()) allow(); else suppress(); });
+      }
+      // Fallback para navegadores sem Web Locks: mantenha uma única aba eleita.
+      if (isOwner()) allow();
+      else suppress();
     }, 80);
   }
 
