@@ -257,6 +257,17 @@ test('foco em qualquer aba Klingo impede alerta e expira após fechamento', () =
   assert.equal(vm.runInContext('isAnyKlingoTabFocused()', context), false);
 });
 
+test('foco simultâneo impossível em várias abas não suprime o alerta', () => {
+  const localStorage = storage();
+  const context = vm.createContext({ Date: { now: () => 1000 },
+    FOCUS_PREFIX: 'focus:', FOCUS_TTL: 3000, tabId: 'aba-a', localStorage,
+    document: { visibilityState: 'hidden', hasFocus: () => false } });
+  functions('syncGlobalFocus', 'handleNativeChatPlay', context);
+  localStorage.setItem('focus:aba-a', JSON.stringify({ at: 900 }));
+  localStorage.setItem('focus:aba-b', JSON.stringify({ at: 1000 }));
+  assert.equal(vm.runInContext('isAnyKlingoTabFocused()', context), false);
+});
+
 test('aba oculta pode assumir avisos quando não existe responsável', () => {
   const timers = [];
   const context = vm.createContext({ claimTimer: null,

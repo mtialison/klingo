@@ -21,4 +21,6 @@ Na versão de testes **1.51**, o vídeo nativo de aviso é silenciado em todas a
 
 Na versão de testes **1.52**, a aba eleita reutiliza o player nativo do Klingo em vez de criar áudio no contexto da extensão, que o Chrome bloqueava em segundo plano com `NotAllowedError`. Mensagens que chegam rapidamente entram em uma fila e cada som termina antes do próximo começar, sem reiniciar o alerta anterior.
 
+Na versão de testes **1.53**, heartbeats simultâneos de foco vindos de várias abas são descartados como um estado impossível. Isso impede que foco emulado ou inconsistente suprima o som e o título quando o usuário está fora do Klingo.
+
 Antes de promover, rode cada `tests/*.test.cjs` com Node, confirme `node --check klingo.user.js` e faça os testes visuais no Klingo. Aumente `@version` quando quiser disparar uma atualização automática. O arquivo de testes nunca deve ser copiado para `main`.

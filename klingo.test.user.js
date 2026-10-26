@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.52
+// @version      1.53
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -1360,16 +1360,19 @@ function setDateCalculatorOpen(isOpen) {
   }
 
   function isAnyKlingoTabFocused() {
+    let focusedTabs = 0;
     try {
       for (let index = 0; index < localStorage.length; index++) {
         const key = localStorage.key(index);
         if (!key?.startsWith(FOCUS_PREFIX)) continue;
         const state = JSON.parse(localStorage.getItem(key) || 'null');
         if (Number.isFinite(state?.at) && Date.now() - state.at >= 0 &&
-            Date.now() - state.at < FOCUS_TTL) return true;
+            Date.now() - state.at < FOCUS_TTL) focusedTabs++;
       }
     } catch (_) {}
-    return false;
+    // Uma janela do Chrome só pode entregar foco real a uma aba por vez.
+    // Múltiplos heartbeats simultâneos indicam estado emulado/inconsistente.
+    return focusedTabs === 1;
   }
 
   function handleNativeChatPlay(event) {
