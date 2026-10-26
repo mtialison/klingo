@@ -119,7 +119,7 @@ test('mensagens idênticas sucessivas da mesma aba alertam; eco de outra aba nã
     isOwner: () => true, isChatOpen: () => false,
     syncGlobalFocus() {}, isAnyKlingoTabFocused: () => false,
     navigator: { locks: { request: async (_name, callback) => callback() } },
-    startBlink() {}, queueAlertSound: () => events.push('som'), console });
+    startBlink: () => events.push('visual'), console });
   functions('publishChatAlert', 'detectChatRows', context);
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast",key:"igual"})', context);
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast",key:"igual"})', context);
@@ -140,7 +140,7 @@ test('dona executa um único aviso de duas abas com toasts divergentes', async (
     isChatOpen: () => false, syncGlobalFocus() {},
     isAnyKlingoTabFocused: () => false,
     navigator: { locks: { request: async (_name, callback) => callback() } },
-    startBlink() {}, queueAlertSound: () => sounds.push('som'),
+    startBlink: () => sounds.push('visual'),
     GM_addValueChangeListener: (_key, callback) => { listener = callback; }, console });
   functions('publishChatAlert', 'detectChatRows', context);
   const start = source.indexOf('  GM_addValueChangeListener(ALERT_EVENT_KEY');
@@ -171,7 +171,7 @@ test('eco atrasado e troca de aba dona não repetem o mesmo aviso', async () => 
       navigator: { locks: { request: async (_name, callback) => callback() } },
       GM_getValue: key => shared.get(key) ?? null,
       GM_setValue: (key, value) => shared.set(key, value),
-      startBlink() {}, queueAlertSound: () => sounds.push(id), console });
+      startBlink: () => sounds.push(id), console });
     functions('publishChatAlert', 'detectChatRows', context);
     return context;
   };
@@ -188,7 +188,7 @@ test('eco atrasado e troca de aba dona não repetem o mesmo aviso', async () => 
   assert.deepEqual(sounds, ['dona-um', 'dona-dois', 'dona-dois']);
 });
 
-test('o mesmo id nativo não toca novamente mesmo após quinze segundos', async () => {
+test('o mesmo id nativo não pisca novamente mesmo após quinze segundos', async () => {
   let now = 1000;
   const shared = new Map();
   const sounds = [];
@@ -201,7 +201,7 @@ test('o mesmo id nativo não toca novamente mesmo após quinze segundos', async 
       isOwner: () => true, isChatOpen: () => false,
       syncGlobalFocus() {}, isAnyKlingoTabFocused: () => false,
       navigator: { locks: { request: async (_name, callback) => callback() } },
-      startBlink() {}, queueAlertSound: () => sounds.push(id), console });
+      startBlink: () => sounds.push(id), console });
     functions('publishChatAlert', 'detectChatRows', context);
     return context;
   };
@@ -284,7 +284,7 @@ test('vídeo nativo do Klingo permanece mudo até para remetente sem conversa ab
   const audio = { id: 'beepChatId', muted: false, currentTime: 1,
     pauses: 0, pause() { this.pauses++; } };
   const context = vm.createContext({ window: { setTimeout() {} },
-    managedNativePlayback: false, nativeChatAudio: null,
+    nativeNotificationAudio: new Map(),
     isOwner: () => true, isChatOpen: () => false });
   functions('handleNativeChatPlay', 'syncNativeChatAudio', context);
   vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
@@ -332,7 +332,7 @@ test('dois toasts idênticos novos são dois eventos, mas os antigos são baseli
   assert.equal(arrivals.length, 2);
 });
 
-test('som e título são acionados juntos só no dono em segundo plano', async () => {
+test('título pisca só no dono em segundo plano, sem reproduzir som', async () => {
   const events = [];
   const context = vm.createContext({ alertAudio: null, isOwner: () => true,
     alertAccountId: () => 'destinatario', recentAlertKeys: new Map(),
@@ -345,11 +345,10 @@ test('som e título são acionados juntos só no dono em segundo plano', async (
     readOwner: () => ({ updatedAt: Date.now() }), OWNER_TTL: 7000,
     isAnyKlingoTabFocused: () => false, syncGlobalFocus() {},
     directChatSender: () => '', startBlink: () => events.push('piscar'),
-    queueAlertSound: () => events.push('som-nativo'),
     console });
   functions('publishChatAlert', 'detectChatRows', context);
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
-  assert.deepEqual(events, ['piscar', 'som-nativo']);
+  assert.deepEqual(events, ['piscar']);
   events.length = 0;
   context.isAnyKlingoTabFocused = () => true;
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
@@ -358,26 +357,6 @@ test('som e título são acionados juntos só no dono em segundo plano', async (
   context.isOwner = () => false;
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
   assert.deepEqual(events, []);
-});
-
-test('mensagens rápidas usam o player nativo e aguardam o som anterior terminar', async () => {
-  const events = [];
-  const audio = {
-    id: 'beepChatId', muted: true, paused: true, currentTime: 0,
-    play() { this.paused = false; events.push('som-nativo'); return Promise.resolve(); },
-    pause() { this.paused = true; }
-  };
-  const context = vm.createContext({ document: { getElementById: () => audio },
-    nativeChatAudio: audio, alertSoundQueue: 0,
-    managedNativePlayback: false, console });
-  functions('handleNativeChatPlay', 'syncNativeMessageHook', context);
-  await vm.runInContext('queueAlertSound(); queueAlertSound()', context);
-  assert.deepEqual(events, ['som-nativo']);
-  assert.equal(context.alertSoundQueue, 1);
-  audio.paused = true;
-  await vm.runInContext('handleAlertSoundFinished()', context);
-  assert.deepEqual(events, ['som-nativo', 'som-nativo']);
-  assert.equal(context.alertSoundQueue, 0);
 });
 
 test('chegada durante troca de responsável não perde o alerta', async () => {
@@ -393,12 +372,11 @@ test('chegada durante troca de responsável não perde o alerta', async () => {
     claimOwner: () => { owner = true; },
     isAnyKlingoTabFocused: () => false, syncGlobalFocus() {},
     directChatSender: () => '', startBlink: () => events.push('piscar'),
-    queueAlertSound: () => events.push('som'),
     navigator: { locks: { request: (_name, callback) => Promise.resolve(callback()) } },
     console });
   functions('publishChatAlert', 'detectChatRows', context);
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
-  assert.deepEqual(events, ['piscar', 'som']);
+  assert.deepEqual(events, ['piscar']);
 });
 
 test('verificação de avisos não inicia alerta personalizado da conversa aberta', () => {
@@ -493,23 +471,6 @@ test('aviso coberto desaparece antes da animação e sinaliza uma única mensage
     [['tm-chat-covered-message', 'ANA']]);
 });
 
-test('aviso coberto interrompe áudio já tocando sem novo evento play', () => {
-  const audio = { muted: false, paused: false, stops: 0,
-    pause() { this.paused = true; this.stops++; } };
-  const context = vm.createContext({
-    isChatOpen: sender => sender === 'ANA', toastSender: toast => toast.sender,
-    closingToasts: new WeakSet(), nativeChatAudio: audio,
-    findToastAction: () => ({ click() {} }),
-    CustomEvent: function (type, options) { return { type, detail: options.detail }; },
-    document: { dispatchEvent() {} },
-    window: { setTimeout() {} }
-  });
-  functions('dismissCoveredToasts', 'findToastAction', context);
-  vm.runInContext('dismissCoveredToasts([{ sender: "ANA", isConnected: false, style: {}, dataset: {} }])', context);
-  assert.equal(audio.muted, true);
-  assert.equal(audio.stops, 1);
-});
-
 test('checagem periódica não dispara alerta a partir de toasts antigos', () => {
   const seen = [];
   const toasts = [{ sender: 'ANA', key: '1' }, { sender: 'BRUNO', key: '2' }];
@@ -543,39 +504,29 @@ test('checagem periódica não dispara alerta a partir de toasts antigos', () =>
   assert.deepEqual(seen, []);
 });
 
-test('som do chat nativo permanece preparado mesmo sem presença compartilhada', () => {
+test('som nativo permanece silenciado mesmo sem presença compartilhada', () => {
   const listeners = [];
   const audio = { id: 'beepChatId', paused: true, muted: false,
     addEventListener: (name, handler) => listeners.push([name, handler]),
     removeEventListener() {} };
+  const pageAudio = { id: 'beepPagId', paused: true, muted: false,
+    addEventListener: (name, handler) => listeners.push([name, handler]),
+    removeEventListener() {} };
   let open = true;
-  const context = vm.createContext({ document: { getElementById: () => audio },
-    nativeChatAudio: null, alertSoundQueue: 0, managedNativePlayback: false,
+  const context = vm.createContext({ document: { getElementById: id =>
+    id === 'beepChatId' ? audio : id === 'beepPagId' ? pageAudio : null },
+    nativeNotificationAudio: new Map(),
     hasOpenChatPresence: () => open, console });
   functions('handleNativeChatPlay', 'syncNativeMessageHook', context);
   vm.runInContext('syncNativeChatAudio(); syncNativeChatAudio()', context);
   assert.equal(audio.muted, true);
-  assert.equal(listeners.length, 3);
+  assert.equal(pageAudio.muted, true);
+  assert.equal(listeners.length, 2);
   assert.equal(listeners[0][0], 'play');
   open = false;
   vm.runInContext('syncNativeChatAudio()', context);
   assert.equal(audio.muted, true);
-});
-
-test('ao terminar um som permitido, o player silencia antes da próxima mensagem', () => {
-  const listeners = new Map();
-  const audio = { id: 'beepChatId', paused: true, muted: false,
-    addEventListener: (name, handler) => listeners.set(name, handler),
-    removeEventListener() {} };
-  const context = vm.createContext({ document: { getElementById: () => audio },
-    nativeChatAudio: null, alertSoundQueue: 0, managedNativePlayback: false,
-    hasOpenChatPresence: () => false, console });
-  functions('handleNativeChatPlay', 'syncNativeMessageHook', context);
-  vm.runInContext('syncNativeChatAudio()', context);
-  audio.muted = false;
-  assert.equal(typeof listeners.get('ended'), 'function');
-  listeners.get('ended')({ target: audio });
-  assert.equal(audio.muted, true);
+  assert.equal(pageAudio.muted, true);
 });
 
 test('mensagem coberta não aumenta o contador exibido, mas outra mensagem aumenta', () => {

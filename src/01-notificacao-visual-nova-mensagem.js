@@ -30,11 +30,9 @@
   let lastPresenceWrite = 0;
   let recentNativeSender = '';
   let recentNativeSenderAt = 0;
-  let nativeChatAudio = null;
+  const nativeNotificationAudio = new Map();
   let hookedChatVue = null;
   let nativeChatHooked = false;
-  let alertSoundQueue = 0;
-  let managedNativePlayback = false;
   let openChatContent = null;
   let openChatSender = '';
   let knownChatRows = [];
@@ -158,71 +156,25 @@
 
   function handleNativeChatPlay(event) {
     const audio = event.target;
-    if (audio.id !== 'beepChatId') return;
-    if (managedNativePlayback && audio === nativeChatAudio) {
-      audio.muted = false;
-      return;
-    }
+    if (audio.id !== 'beepChatId' && audio.id !== 'beepPagId') return;
     audio.muted = true;
     audio.pause();
     try { audio.currentTime = 0; } catch (_) {}
   }
 
-  function handleAlertSoundFinished() {
-    if (nativeChatAudio) nativeChatAudio.muted = true;
-    managedNativePlayback = false;
-    if (alertSoundQueue > 0) return playNextAlertSound();
-  }
-
-  function handleAlertSoundPause() {
-    if (!managedNativePlayback || nativeChatAudio?.ended) return;
-    managedNativePlayback = false;
-    alertSoundQueue = 0;
-    if (nativeChatAudio) nativeChatAudio.muted = true;
-  }
-
-  function playNextAlertSound() {
-    if (managedNativePlayback || alertSoundQueue < 1 || !nativeChatAudio) return;
-    managedNativePlayback = true;
-    alertSoundQueue--;
-    nativeChatAudio.muted = false;
-    try { nativeChatAudio.currentTime = 0; } catch (_) {}
-    let playback;
-    try {
-      playback = nativeChatAudio.play();
-    } catch (error) {
-      managedNativePlayback = false;
-      nativeChatAudio.muted = true;
-      console.warn('[TM] Áudio nativo do chat bloqueado pelo navegador', error?.name || 'unknown');
-      return;
-    }
-    return Promise.resolve(playback).catch((error) => {
-      managedNativePlayback = false;
-      nativeChatAudio.muted = true;
-      console.warn('[TM] Áudio nativo do chat bloqueado pelo navegador', error?.name || 'unknown');
-    });
-  }
-
-  function queueAlertSound() {
-    syncNativeChatAudio();
-    if (!nativeChatAudio) return;
-    alertSoundQueue++;
-    return playNextAlertSound();
-  }
-
   function syncNativeChatAudio() {
-    const audio = document.getElementById('beepChatId');
-    if (!audio) return;
-    if (audio !== nativeChatAudio) {
-      nativeChatAudio?.removeEventListener('play', handleNativeChatPlay);
-      nativeChatAudio?.removeEventListener('pause', handleAlertSoundPause);
-      nativeChatAudio?.removeEventListener('ended', handleAlertSoundFinished);
-      nativeChatAudio = audio;
-      audio.addEventListener('play', handleNativeChatPlay);
-      audio.addEventListener('pause', handleAlertSoundPause);
-      audio.addEventListener('ended', handleAlertSoundFinished);
+    for (const id of ['beepChatId', 'beepPagId']) {
+      const audio = document.getElementById(id);
+      if (!audio) continue;
+      const previous = nativeNotificationAudio.get(id);
+      if (audio !== previous) {
+        previous?.removeEventListener('play', handleNativeChatPlay);
+        nativeNotificationAudio.set(id, audio);
+        audio.addEventListener('play', handleNativeChatPlay);
+      }
+      audio.muted = true;
+      if (!audio.paused) audio.pause();
     }
-    if (audio.paused) audio.muted = true;
   }
 
   function syncNativeMessageHook() {
@@ -284,7 +236,6 @@
       }
       GM_setValue(historyKey, Array.from(history));
       startBlink();
-      queueAlertSound();
     };
     if (isOwner()) return navigator.locks.request(`klingo-chat-owner-v1:${account}`, run)
       .catch(() => {});
@@ -369,11 +320,6 @@
       const sender = toastSender(toast);
       toast.style.display = 'none';
       toast.dataset.tmCovered = '1';
-      if (nativeChatAudio && !nativeChatAudio.paused) {
-        nativeChatAudio.muted = true;
-        nativeChatAudio.pause();
-        try { nativeChatAudio.currentTime = 0; } catch (_) {}
-      }
       closingToasts.add(toast);
       document.dispatchEvent(new CustomEvent('tm-chat-covered-message', { detail: { sender } }));
       findToastAction(toast, 'FECHAR')?.click();

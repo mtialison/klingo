@@ -23,4 +23,6 @@ Na versão de testes **1.52**, a aba eleita reutiliza o player nativo do Klingo 
 
 Na versão de testes **1.53**, heartbeats simultâneos de foco vindos de várias abas são descartados como um estado impossível. Isso impede que foco emulado ou inconsistente suprima o som e o título quando o usuário está fora do Klingo.
 
+Na versão de testes **1.54**, todo áudio de notificação foi desativado: o userscript não reproduz som e silencia os players nativos `beepChatId` e `beepPagId`. O aviso visual no título da aba permanece.
+
 Antes de promover, rode cada `tests/*.test.cjs` com Node, confirme `node --check klingo.user.js` e faça os testes visuais no Klingo. Aumente `@version` quando quiser disparar uma atualização automática. O arquivo de testes nunca deve ser copiado para `main`.
