@@ -17,4 +17,6 @@ O aviso personalizado (som e título piscando) para mensagens da conversa já ab
 
 Na versão de testes **1.50**, as abas coordenam o som nativo de cada novo aviso para que apenas uma o reproduza, inclusive quando a aba responsável muda ou é fechada. A regra que silencia mensagens de uma conversa aberta em outra aba continua ativa.
 
+Na versão de testes **1.51**, o vídeo nativo de aviso é silenciado em todas as abas. Uma aba por conta usa o arquivo `/notific.mp3` para som e título piscando juntos, somente quando nenhuma aba do Klingo está em foco. O disparo usa o ID da mensagem recebida pelo chat nativo; observação de toasts e da conversa serve apenas como alternativa se o componente nativo não estiver acessível. Toasts antigos não acionam alertas.
+
 Antes de promover, rode cada `tests/*.test.cjs` com Node, confirme `node --check klingo.user.js` e faça os testes visuais no Klingo. Aumente `@version` quando quiser disparar uma atualização automática. O arquivo de testes nunca deve ser copiado para `main`.

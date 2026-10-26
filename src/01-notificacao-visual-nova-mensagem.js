@@ -5,9 +5,13 @@
 (function(){
   const OWNER_KEY = 'klingo_message_alert_owner_v1';
   const DISMISS_KEY = 'klingo_message_alert_dismiss_v1';
+  const ALERT_EVENT_KEY = 'klingo_message_alert_event_v1';
+  const ALERT_HISTORY_KEY = 'klingo_message_alert_history_v1';
+  const ALERT_DEDUP_TTL = 2000;
+  const ALERT_ID_TTL = 300000;
   const OPEN_CHAT_PREFIX = 'klingo_chat_open_sender_v1:';
-  const AUDIO_CLAIM_KEY = 'klingo_native_chat_audio_claim_v1';
-  const AUDIO_CLAIM_TTL = 1200;
+  const FOCUS_PREFIX = 'klingo_tab_focus_v1:';
+  const FOCUS_TTL = 3000;
   const OWNER_TTL = 7000;
   const DISMISS_TTL = 30000;
   const OPEN_CHAT_TTL = 90000;
@@ -19,6 +23,7 @@
   let blinkInterval = null;
   let claimTimer = null;
   let dismissalSequence = 0;
+  let alertSequence = 0;
   let knownToastCounts = new Map();
   let pendingChatSender = '';
   let publishedSenderKey = '';
@@ -26,6 +31,13 @@
   let recentNativeSender = '';
   let recentNativeSenderAt = 0;
   let nativeChatAudio = null;
+  let hookedChatVue = null;
+  let nativeChatHooked = false;
+  let alertAudio = null;
+  let openChatContent = null;
+  let openChatSender = '';
+  let knownChatRows = [];
+  const knownToastElements = new WeakMap();
   const pendingDismissals = [];
   const closingToasts = new WeakSet();
 
@@ -79,7 +91,8 @@
         return;
       }
       if (senderKey !== publishedSenderKey || now - lastPresenceWrite >= 5000) {
-        localStorage.setItem(OPEN_CHAT_PREFIX + tabId, JSON.stringify({ senderKey, at: now }));
+        localStorage.setItem(OPEN_CHAT_PREFIX + tabId,
+          JSON.stringify({ senderKey, account: alertAccountId(), at: now }));
         publishedSenderKey = senderKey;
         lastPresenceWrite = now;
       }
@@ -97,7 +110,8 @@
         const key = localStorage.key(index);
         if (!key?.startsWith(OPEN_CHAT_PREFIX)) continue;
         const presence = JSON.parse(localStorage.getItem(key) || 'null');
-        if (presence?.senderKey === senderKey && Number.isFinite(presence.at) &&
+        if (presence?.senderKey === senderKey && presence.account === alertAccountId() &&
+            Number.isFinite(presence.at) &&
             Date.now() - presence.at >= 0 && Date.now() - presence.at < OPEN_CHAT_TTL) return true;
       }
     } catch (_) {
@@ -106,49 +120,44 @@
     return false;
   }
 
+  function alertAccountId() {
+    for (let node = document.querySelector('nav.navbar'); node; node = node.parentElement) {
+      const id = node.__vue__?.$store?.state?.user?.id_usuario;
+      if (id) return String(id);
+    }
+    const initials = document.querySelector('nav.navbar [data-initials]')
+      ?.getAttribute('data-initials')?.trim().toLocaleUpperCase('pt-BR');
+    return initials ? `avatar:${initials}` : '';
+  }
+
+  function syncGlobalFocus() {
+    try {
+      const key = FOCUS_PREFIX + tabId;
+      if (document.visibilityState === 'visible' && document.hasFocus()) {
+        localStorage.setItem(key, JSON.stringify({ at: Date.now() }));
+      } else localStorage.removeItem(key);
+    } catch (_) {}
+  }
+
+  function isAnyKlingoTabFocused() {
+    try {
+      for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (!key?.startsWith(FOCUS_PREFIX)) continue;
+        const state = JSON.parse(localStorage.getItem(key) || 'null');
+        if (Number.isFinite(state?.at) && Date.now() - state.at >= 0 &&
+            Date.now() - state.at < FOCUS_TTL) return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   function handleNativeChatPlay(event) {
     const audio = event.target;
     if (audio.id !== 'beepChatId') return;
     audio.muted = true;
-    // O Klingo pode iniciar o som antes de inserir o toast no DOM.
-    window.setTimeout(() => {
-      const latestToast = messageToasts().at(-1);
-      const currentSender = latestToast ? toastSender(latestToast) : '';
-      const sender = Date.now() - recentNativeSenderAt < 1000
-        ? recentNativeSender : currentSender;
-      if (sender && isChatOpen(sender)) {
-        audio.pause();
-        try { audio.currentTime = 0; } catch (_) {}
-        return;
-      }
-      const allow = () => {
-        try { audio.currentTime = 0; } catch (_) {}
-        audio.muted = false;
-      };
-      const suppress = () => {
-        audio.pause();
-        try { audio.currentTime = 0; } catch (_) {}
-      };
-      // O bloqueio do navegador serializa a escolha entre abas, inclusive durante
-      // troca de foco ou após o fechamento da antiga aba responsável.
-      if (typeof navigator !== 'undefined' && navigator.locks?.request) {
-        const key = latestToast
-          ? messageKey(normalizeToastText(latestToast)) : messageKey(sender || 'sem-remetente');
-        return navigator.locks.request('klingo-native-chat-audio-v1', () => {
-          const previous = GM_getValue(AUDIO_CLAIM_KEY, null);
-          if (previous?.key === key && Date.now() - previous.at >= 0 &&
-              Date.now() - previous.at < AUDIO_CLAIM_TTL) {
-            suppress();
-            return;
-          }
-          GM_setValue(AUDIO_CLAIM_KEY, { key, at: Date.now() });
-          allow();
-        }).catch(() => { if (isOwner()) allow(); else suppress(); });
-      }
-      // Fallback para navegadores sem Web Locks: mantenha uma única aba eleita.
-      if (isOwner()) allow();
-      else suppress();
-    }, 80);
+    audio.pause();
+    try { audio.currentTime = 0; } catch (_) {}
   }
 
   function syncNativeChatAudio() {
@@ -163,6 +172,148 @@
       audio.addEventListener('ended', prepareNextSound);
     }
     if (audio.paused) audio.muted = true;
+  }
+
+  function syncNativeMessageHook() {
+    let vue = null;
+    for (let node = document.getElementById('modalChat'); node; node = node.parentElement) {
+      if (typeof node.__vue__?.receberMensagem === 'function') {
+        vue = node.__vue__;
+        break;
+      }
+    }
+    nativeChatHooked = !!vue;
+    if (!vue || (hookedChatVue === vue && vue.receberMensagem.__tmAlertHook)) return;
+    if (vue.receberMensagem.__tmAlertHook) {
+      hookedChatVue = vue;
+      return;
+    }
+    const original = vue.receberMensagem;
+    const wrapped = function (message) {
+      const result = original.apply(this, arguments);
+      try {
+        const id = message?.id_chat_sala_mensagem;
+        const sender = normalizeSender(message?.from_name || message?.from);
+        if (id !== null && id !== undefined && id !== '') {
+          publishChatAlert({ sender, source: 'native', key: `id:${id}` });
+        } else if (sender) {
+          publishChatAlert({ sender, source: 'native',
+            key: `fallback:${messageKey(`${sender}\u0000${message?.text || ''}`)}` });
+        }
+      } catch (error) {
+        console.warn('[TM] Falha ao identificar mensagem recebida', error);
+      }
+      return result;
+    };
+    wrapped.__tmAlertHook = true;
+    vue.receberMensagem = wrapped;
+    hookedChatVue = vue;
+  }
+
+  function publishChatAlert(event) {
+    if (event.source === 'toast' && isChatOpen(event.sender)) return;
+    syncGlobalFocus();
+    if (isAnyKlingoTabFocused()) return;
+    const account = alertAccountId();
+    if (!account || typeof navigator === 'undefined' || !navigator.locks?.request) return;
+    const run = () => {
+      if (!isOwner() || isAnyKlingoTabFocused()) return;
+      const key = event.key || event.sender;
+      const origin = event.source === 'relay' ? event.origin : tabId;
+      const historyKey = `${ALERT_HISTORY_KEY}:${account}`;
+      const history = new Map(GM_getValue(historyKey, []) || []);
+      const previous = history.get(key);
+      const ttl = String(key).startsWith('id:') ? ALERT_ID_TTL : ALERT_DEDUP_TTL;
+      if (previous && (String(key).startsWith('id:') || previous.origin !== origin) &&
+          Date.now() - previous.at < ttl) return;
+      history.set(key, { origin, at: Date.now() });
+      for (const [oldKey, state] of history) {
+        const oldTtl = String(oldKey).startsWith('id:') ? ALERT_ID_TTL : ALERT_DEDUP_TTL;
+        if (Date.now() - state.at > oldTtl) history.delete(oldKey);
+      }
+      GM_setValue(historyKey, Array.from(history));
+      startBlink();
+      if (!alertAudio) alertAudio = new Audio('/notific.mp3');
+      alertAudio.pause();
+      try { alertAudio.currentTime = 0; } catch (_) {}
+      alertAudio.play().catch((error) => {
+        console.warn('[TM] Áudio do chat bloqueado pelo navegador', error?.name || 'unknown');
+      });
+    };
+    if (isOwner()) return navigator.locks.request(`klingo-chat-owner-v1:${account}`, run)
+      .catch(() => {});
+    const owner = readOwner();
+    if (owner && Date.now() - owner.updatedAt < OWNER_TTL) {
+      if (event.source !== 'relay') GM_setValue(ALERT_EVENT_KEY, {
+        id: `${tabId}:${++alertSequence}`, account, key: event.key || event.sender,
+        at: Date.now(), source: tabId
+      });
+      return;
+    }
+    return navigator.locks.request(`klingo-chat-owner-v1:${account}`, () => {
+      claimOwner();
+      if (isOwner()) run();
+      else if (event.source !== 'relay') GM_setValue(ALERT_EVENT_KEY, {
+        id: `${tabId}:${++alertSequence}`, account, key: event.key || event.sender,
+        at: Date.now(), source: tabId
+      });
+    }).catch(() => {});
+  }
+
+  function detectChatRows(content, sender, rows) {
+    if (content === openChatContent && sender === openChatSender) {
+      let overlap = Math.min(knownChatRows.length, rows.length);
+      while (overlap && !knownChatRows.slice(-overlap).every((oldRow, index) =>
+        oldRow.key === rows[index].key)) overlap--;
+      for (const row of rows.slice(overlap)) {
+        if (row.incoming) publishChatAlert({ sender, source: 'chat', key: messageKey(row.key) });
+      }
+    }
+    openChatContent = content;
+    openChatSender = sender;
+    knownChatRows = rows;
+  }
+
+  function scanOpenChatMessages() {
+    const textarea = Array.from(document.querySelectorAll(
+      '.modal.show .modal-footer.d-flex.flex-column textarea')).find((item) =>
+      item.closest('.modal-footer')?.querySelector('.fa-paper-plane'));
+    const content = textarea?.closest('.modal-content');
+    const sender = content ? directChatSender() : '';
+    if (!content || !sender) {
+      detectChatRows(null, '', []);
+      return;
+    }
+    const rows = Array.from(content.querySelectorAll('.modal-body li.list-group-item'))
+      .map((item) => {
+        const header = item.querySelector('.small')?.textContent || '';
+        const body = item.lastElementChild?.textContent || '';
+        return { item, incoming: item.classList.contains('list-group-item-secondary'),
+          key: `${header} ${body}`.replace(/\s+/g, ' ').trim() };
+      });
+    detectChatRows(content, sender, rows);
+  }
+
+  function detectNewToasts(toasts, baseline = false) {
+    const current = countMessageToasts(toasts);
+    for (const toast of toasts) {
+      const signature = normalizeToastText(toast);
+      if (knownToastElements.get(toast) === signature) continue;
+      knownToastElements.set(toast, signature);
+    }
+    if (!baseline) {
+      const seen = new Map();
+      for (const toast of toasts) {
+        const signature = normalizeToastText(toast);
+        const key = messageKey(signature);
+        const occurrence = (seen.get(key) || 0) + 1;
+        seen.set(key, occurrence);
+        if (occurrence <= (knownToastCounts.get(key) || 0)) continue;
+        const sender = toastSender(toast);
+        if (sender) publishChatAlert({ sender, source: 'toast', key });
+      }
+    }
+    knownToastCounts = current;
   }
 
   function dismissCoveredToasts(toasts) {
@@ -239,7 +390,8 @@
   }
 
   function readOwner() {
-    return GM_getValue(OWNER_KEY, null);
+    const account = alertAccountId();
+    return account ? GM_getValue(`${OWNER_KEY}:${account}`, null) : null;
   }
 
   function isOwner() {
@@ -248,26 +400,35 @@
   }
 
   function claimOwner(force = false) {
+    const account = alertAccountId();
+    if (!account) return;
     const owner = readOwner();
     if (!force && owner && Date.now() - owner.updatedAt < OWNER_TTL) return;
     // Ao assumir uma guia já aberta, não reapresente mensagens antigas.
     if (owner?.id !== tabId) knownToastCounts = countMessageToasts();
-    GM_setValue(OWNER_KEY, { id: tabId, updatedAt: Date.now() });
+    GM_setValue(`${OWNER_KEY}:${account}`, { id: tabId, updatedAt: Date.now() });
     tmRuntime.schedule(0);
   }
 
   function scheduleTakeover() {
-    if (claimTimer !== null || document.visibilityState !== 'visible') return;
+    if (claimTimer !== null) return;
     claimTimer = window.setTimeout(() => {
       claimTimer = null;
-      claimOwner();
+      const account = alertAccountId();
+      if (!account) return;
+      if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+        navigator.locks.request(`klingo-chat-owner-v1:${account}`, () => claimOwner())
+          .catch(() => claimOwner());
+      } else claimOwner();
     }, 150 + Math.random() * 350);
   }
 
   function maintainOwner() {
+    const account = alertAccountId();
+    if (!account) return;
     const owner = readOwner();
     if (owner?.id === tabId) {
-      GM_setValue(OWNER_KEY, { id: tabId, updatedAt: Date.now() });
+      GM_setValue(`${OWNER_KEY}:${account}`, { id: tabId, updatedAt: Date.now() });
     } else {
       stopBlink();
       if (!owner || Date.now() - owner.updatedAt >= OWNER_TTL) scheduleTakeover();
@@ -295,34 +456,21 @@
   function checkMessages() {
     try {
       if (!blinking) originalTitle = document.title;
+      syncGlobalFocus();
       syncOpenChat();
+      syncNativeMessageHook();
+      if (nativeChatHooked) {
+        openChatContent = null;
+        openChatSender = '';
+        knownChatRows = [];
+      } else scanOpenChatMessages();
       syncNativeChatAudio();
       applyPendingDismissals();
       const toasts = messageToasts();
+      detectNewToasts(toasts, nativeChatHooked);
       const currentCounts = countMessageToasts(toasts);
-      const newestToast = toasts.find((toast) => {
-        const key = messageKey(normalizeToastText(toast));
-        return currentCounts.get(key) > (knownToastCounts.get(key) || 0);
-      });
-      if (newestToast) {
-        recentNativeSender = toastSender(newestToast);
-        recentNativeSenderAt = Date.now();
-      }
       dismissCoveredToasts(toasts);
-      const activeToasts = toasts.filter((toast) => !closingToasts.has(toast) &&
-        !isChatOpen(toastSender(toast)));
-      const activeCounts = countMessageToasts(activeToasts);
-      if (!isOwner()) {
-        stopBlink();
-      } else {
-        activeCounts.forEach((count, key) => {
-          const newMessages = Math.max(0, count - (knownToastCounts.get(key) || 0));
-          if (newMessages) startBlink();
-        });
-        if (!activeCounts.size) {
-          stopBlink();
-        }
-      }
+      if (!isOwner() || isAnyKlingoTabFocused()) stopBlink();
       knownToastCounts = currentCounts;
     } catch (error) {
       console.error('[TM] Falha no alerta de mensagens', error);
@@ -330,6 +478,16 @@
   }
 
   const notificationObserver = new MutationObserver((mutations) => {
+    const changedChat = mutations.some((mutation) => {
+      const target = mutation.target.nodeType === Node.ELEMENT_NODE
+        ? mutation.target : mutation.target.parentElement;
+      return !!target?.closest?.('.modal.show .modal-body li.list-group-item') ||
+        Array.from(mutation.addedNodes || []).some((node) =>
+          node.nodeType === Node.ELEMENT_NODE &&
+          (node.matches?.('.modal.show .modal-body li.list-group-item') ||
+            node.querySelector?.('.modal.show .modal-body li.list-group-item')));
+    });
+    if (changedChat && !nativeChatHooked) scanOpenChatMessages();
     const changedToast = mutations.some((mutation) => {
       const target = mutation.target.nodeType === Node.ELEMENT_NODE
         ? mutation.target : mutation.target.parentElement;
@@ -426,29 +584,49 @@
     tmRuntime.schedule(0);
   });
 
+  GM_addValueChangeListener(ALERT_EVENT_KEY, (_key, _oldValue, event, remote) => {
+    if (!remote || !event || event.source === tabId ||
+        event.account !== alertAccountId() || !Number.isFinite(event.at) ||
+        Date.now() - event.at < 0 || Date.now() - event.at > 3000) return;
+    publishChatAlert({ sender: '', source: 'relay', origin: event.source, key: event.key });
+  });
+
   window.addEventListener('storage', (event) => {
     if (event.key?.startsWith(OPEN_CHAT_PREFIX)) checkMessages();
+    if (event.key?.startsWith(FOCUS_PREFIX) && isAnyKlingoTabFocused()) stopBlink();
   });
   window.addEventListener('pagehide', () => {
     try { localStorage.removeItem(OPEN_CHAT_PREFIX + tabId); } catch (_) {}
+    try { localStorage.removeItem(FOCUS_PREFIX + tabId); } catch (_) {}
+    const account = alertAccountId();
+    if (account && isOwner()) GM_setValue(`${OWNER_KEY}:${account}`, null);
   });
   window.setInterval(() => {
+    syncGlobalFocus();
     syncOpenChat();
     checkMessages();
   }, 2000);
 
   window.addEventListener('focus', () => {
+    syncGlobalFocus();
     stopBlink();
     claimOwner(true);
   });
   document.addEventListener('visibilitychange', () => {
+    syncGlobalFocus();
     if (document.visibilityState === 'visible' && document.hasFocus()) {
       stopBlink();
       claimOwner(true);
     }
   });
   window.setInterval(maintainOwner, 2000);
+  window.addEventListener('blur', syncGlobalFocus);
+  syncGlobalFocus();
+  syncNativeChatAudio();
+  syncNativeMessageHook();
   knownToastCounts = countMessageToasts();
+  detectNewToasts(messageToasts(), true);
+  if (!nativeChatHooked) scanOpenChatMessages();
   if (document.hasFocus()) claimOwner(true);
   else scheduleTakeover();
 

@@ -21,12 +21,367 @@ function storage() {
     get length() { return values.size; }, key: index => [...values.keys()][index] };
 }
 
+test('abas de contas diferentes não disputam o mesmo dono dos avisos', () => {
+  const values = new Map();
+  const make = (account) => {
+    const context = vm.createContext({ Date: { now: () => 1000 },
+      OWNER_KEY: 'owner', OWNER_TTL: 7000, tabId: `aba-${account}`,
+      alertAccountId: () => account,
+      GM_getValue: key => values.get(key) ?? null,
+      GM_setValue: (key, value) => values.set(key, value),
+      countMessageToasts: () => new Map(), knownToastCounts: new Map(),
+      tmRuntime: { schedule() {} } });
+    functions('readOwner', 'startBlink', context);
+    vm.runInContext('claimOwner(true)', context);
+    return context;
+  };
+  const sender = make('remetente');
+  const recipient = make('destinatario');
+  assert.equal(vm.runInContext('isOwner()', sender), true);
+  assert.equal(vm.runInContext('isOwner()', recipient), true);
+  assert.equal(values.size, 2);
+});
+
+test('identifica a conta pelo avatar quando o componente Vue não está acessível', () => {
+  const nav = { parentElement: null, __vue__: null };
+  const context = vm.createContext({ document: { querySelector: selector =>
+    selector === 'nav.navbar' ? nav : selector === 'nav.navbar [data-initials]'
+      ? { getAttribute: () => 'AM' } : null } });
+  functions('alertAccountId', 'syncGlobalFocus', context);
+  assert.equal(vm.runInContext('alertAccountId()', context), 'avatar:AM');
+});
+
+test('primeira mensagem em conversa vazia e chegadas em lote não se perdem', () => {
+  const arrivals = [];
+  const context = vm.createContext({ openChatContent: null, openChatSender: '',
+    knownChatRows: [], publishChatAlert: item => arrivals.push(item),
+    messageKey: text => text });
+  functions('detectChatRows', 'scanOpenChatMessages', context);
+  context.content = {};
+  context.rows = [];
+  vm.runInContext('detectChatRows(content, "TESTE", rows)', context);
+  context.rows = [{ key: 'primeira', incoming: true, item: {} }];
+  vm.runInContext('detectChatRows(content, "TESTE", rows)', context);
+  context.rows = [...context.rows,
+    { key: 'segunda', incoming: true, item: {} },
+    { key: 'minha', incoming: false, item: {} },
+    { key: 'terceira', incoming: true, item: {} }];
+  vm.runInContext('detectChatRows(content, "TESTE", rows)', context);
+  assert.equal(arrivals.length, 3);
+  assert.deepEqual(arrivals.map(item => item.key), ['primeira', 'segunda', 'terceira']);
+});
+
+test('toast histórico recriado não é confundido com mensagem nova', () => {
+  const arrivals = [];
+  const context = vm.createContext({ knownToastElements: new WeakMap(),
+    knownToastCounts: new Map(), toastSender: () => 'TESTE',
+    normalizeToastText: toast => toast.text, messageKey: text => text,
+    publishChatAlert: item => arrivals.push(item) });
+  functions('detectNewToasts', 'dismissCoveredToasts', context);
+  context.countMessageToasts = items => new Map([["De: TESTE >> oi", items.length]]);
+  context.toasts = [{ text: 'De: TESTE >> oi' }];
+  vm.runInContext('detectNewToasts(toasts, true)', context);
+  context.toasts = [{ text: 'De: TESTE >> oi' }];
+  vm.runInContext('detectNewToasts(toasts)', context);
+  assert.equal(arrivals.length, 0);
+  context.toasts.push({ text: 'De: TESTE >> oi' });
+  vm.runInContext('detectNewToasts(toasts)', context);
+  assert.equal(arrivals.length, 1);
+});
+
+test('chegada só na aba não proprietária é encaminhada à proprietária', async () => {
+  const forwarded = [];
+  const context = vm.createContext({
+    tabId: 'aba-chat', alertAccountId: () => 'destinatario',
+    ALERT_EVENT_KEY: 'alert-event', alertSequence: 0,
+    isOwner: () => false, readOwner: () => ({ id: 'aba-dona', updatedAt: 1000 }),
+    OWNER_TTL: 7000, Date: { now: () => 1000 },
+    syncGlobalFocus() {}, isAnyKlingoTabFocused: () => false,
+    isChatOpen: () => false, directChatSender: () => 'TESTE',
+    GM_setValue: (key, value) => forwarded.push({ key, value }),
+    navigator: { locks: { request: async () => {} } }
+  });
+  functions('publishChatAlert', 'detectChatRows', context);
+  await vm.runInContext('publishChatAlert({sender:"TESTE",source:"chat",key:"msg-1"})', context);
+  assert.equal(forwarded.length, 1);
+  assert.equal(forwarded[0].value.account, 'destinatario');
+  assert.equal(forwarded[0].value.key, 'msg-1');
+});
+
+test('mensagens idênticas sucessivas da mesma aba alertam; eco de outra aba não duplica', async () => {
+  const events = [];
+  const history = new Map();
+  const context = vm.createContext({ alertAudio: null, recentAlertKeys: new Map(),
+    tabId: 'aba-dona', alertAccountId: () => 'destinatario',
+    ALERT_HISTORY_KEY: 'history', ALERT_DEDUP_TTL: 2000, ALERT_ID_TTL: 300000,
+    GM_getValue: key => history.get(key) ?? [],
+    GM_setValue: (key, value) => history.set(key, value),
+    isOwner: () => true, isChatOpen: () => false,
+    syncGlobalFocus() {}, isAnyKlingoTabFocused: () => false,
+    navigator: { locks: { request: async (_name, callback) => callback() } },
+    startBlink() {}, Audio: function () { this.pause = () => {};
+      this.play = () => { events.push('som'); return Promise.resolve(); }; }, console });
+  functions('publishChatAlert', 'detectChatRows', context);
+  await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast",key:"igual"})', context);
+  await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast",key:"igual"})', context);
+  await vm.runInContext('publishChatAlert({sender:"",source:"relay",origin:"outra",key:"igual"})', context);
+  assert.equal(events.length, 2);
+});
+
+test('dona executa um único aviso de duas abas com toasts divergentes', async () => {
+  const sounds = [];
+  const history = new Map();
+  let listener;
+  const context = vm.createContext({ alertAudio: null, recentAlertKeys: new Map(),
+    tabId: 'aba-dona', ALERT_EVENT_KEY: 'alert-event',
+    ALERT_HISTORY_KEY: 'history', ALERT_DEDUP_TTL: 2000, ALERT_ID_TTL: 300000,
+    GM_getValue: key => history.get(key) ?? [],
+    GM_setValue: (key, value) => history.set(key, value),
+    alertAccountId: () => 'destinatario', isOwner: () => true,
+    isChatOpen: () => false, syncGlobalFocus() {},
+    isAnyKlingoTabFocused: () => false,
+    navigator: { locks: { request: async (_name, callback) => callback() } },
+    startBlink() {}, Audio: function () { this.pause = () => {};
+      this.play = () => { sounds.push('som'); return Promise.resolve(); }; },
+    GM_addValueChangeListener: (_key, callback) => { listener = callback; }, console });
+  functions('publishChatAlert', 'detectChatRows', context);
+  const start = source.indexOf('  GM_addValueChangeListener(ALERT_EVENT_KEY');
+  const end = source.indexOf("  window.addEventListener('storage'", start);
+  vm.runInContext(source.slice(start, end), context);
+  const event = (sourceTab, account, key) =>
+    ({ source: sourceTab, account, key, at: Date.now() });
+  listener('alert-event', null, event('aba-um', 'destinatario', 'mensagem-1'), true);
+  listener('alert-event', null, event('aba-dois', 'destinatario', 'mensagem-1'), true);
+  listener('alert-event', null, event('aba-remetente', 'remetente', 'mensagem-2'), true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(sounds.length, 1);
+  listener('alert-event', null, event('aba-um', 'destinatario', 'mensagem-2'), true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(sounds.length, 2);
+});
+
+test('eco atrasado e troca de aba dona não repetem o mesmo aviso', async () => {
+  let now = 1000;
+  const shared = new Map();
+  const sounds = [];
+  const makeOwner = id => {
+    const context = vm.createContext({ alertAudio: null, recentAlertKeys: new Map(),
+      tabId: id, alertAccountId: () => 'destinatario',
+      ALERT_HISTORY_KEY: 'history', ALERT_DEDUP_TTL: 2000, ALERT_ID_TTL: 300000,
+      Date: { now: () => now }, isOwner: () => true, isChatOpen: () => false,
+      syncGlobalFocus() {}, isAnyKlingoTabFocused: () => false,
+      navigator: { locks: { request: async (_name, callback) => callback() } },
+      GM_getValue: key => shared.get(key) ?? null,
+      GM_setValue: (key, value) => shared.set(key, value),
+      startBlink() {}, Audio: function () { this.pause = () => {};
+        this.play = () => { sounds.push(id); return Promise.resolve(); }; }, console });
+    functions('publishChatAlert', 'detectChatRows', context);
+    return context;
+  };
+  const first = makeOwner('dona-um');
+  await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast",key:"msg"})', first);
+  now += 1500;
+  const second = makeOwner('dona-dois');
+  await vm.runInContext('publishChatAlert({sender:"",source:"relay",origin:"outra",key:"msg"})', second);
+  assert.deepEqual(sounds, ['dona-um']);
+  now += 3500;
+  await vm.runInContext('publishChatAlert({sender:"TESTE",source:"native",key:"id:segunda"})', second);
+  assert.deepEqual(sounds, ['dona-um', 'dona-dois']);
+  await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast",key:"msg"})', second);
+  assert.deepEqual(sounds, ['dona-um', 'dona-dois', 'dona-dois']);
+});
+
+test('o mesmo id nativo não toca novamente mesmo após quinze segundos', async () => {
+  let now = 1000;
+  const shared = new Map();
+  const sounds = [];
+  const make = id => {
+    const context = vm.createContext({ tabId: id, alertAudio: null,
+      Date: { now: () => now }, alertAccountId: () => 'destinatario',
+      ALERT_HISTORY_KEY: 'history', ALERT_DEDUP_TTL: 2000, ALERT_ID_TTL: 300000,
+      GM_getValue: key => shared.get(key) ?? [],
+      GM_setValue: (key, value) => shared.set(key, value),
+      isOwner: () => true, isChatOpen: () => false,
+      syncGlobalFocus() {}, isAnyKlingoTabFocused: () => false,
+      navigator: { locks: { request: async (_name, callback) => callback() } },
+      startBlink() {}, Audio: function () { this.pause = () => {};
+        this.play = () => { sounds.push(id); return Promise.resolve(); }; }, console });
+    functions('publishChatAlert', 'detectChatRows', context);
+    return context;
+  };
+  const first = make('dona-um');
+  await vm.runInContext('publishChatAlert({sender:"TESTE",source:"native",key:"id:101"})', first);
+  await vm.runInContext('publishChatAlert({sender:"TESTE",source:"native",key:"id:101"})', first);
+  assert.deepEqual(sounds, ['dona-um']);
+  now += 15000;
+  await vm.runInContext('publishChatAlert({sender:"",source:"relay",origin:"outra",key:"id:101"})', make('dona-dois'));
+  assert.deepEqual(sounds, ['dona-um']);
+});
+
+test('gancho nativo usa id da mensagem e preserva o recebimento original', () => {
+  const alerts = [];
+  const received = [];
+  const vue = { receberMensagem(message) { received.push(message.id_chat_sala_mensagem); } };
+  const modal = { parentElement: { parentElement: null, __vue__: vue }, __vue__: null };
+  const context = vm.createContext({ document: { getElementById: () => modal },
+    hookedChatVue: null, nativeChatHooked: false,
+    normalizeSender: value => value.toUpperCase(),
+    publishChatAlert: event => alerts.push(event) });
+  functions('syncNativeMessageHook', 'publishChatAlert', context);
+  vm.runInContext('syncNativeMessageHook(); syncNativeMessageHook()', context);
+  vue.receberMensagem({ id_chat_sala_mensagem: 101, from_name: 'Teste', text: 'oi' });
+  vue.receberMensagem({ id_chat_sala_mensagem: 102, from_name: 'Teste', text: 'oi' });
+  assert.deepEqual(received, [101, 102]);
+  assert.deepEqual(alerts.map(event => event.key), ['id:101', 'id:102']);
+});
+
+test('sem Web Locks o fallback não arrisca áudio duplicado', () => {
+  const events = [];
+  const context = vm.createContext({ isOwner: () => true,
+    alertAccountId: () => 'destinatario',
+    syncGlobalFocus() {}, isAnyKlingoTabFocused: () => false,
+    directChatSender: () => '', isChatOpen: () => false,
+    startBlink: () => events.push('piscar'),
+    Audio: function () { this.play = () => { events.push('som'); return Promise.resolve(); }; },
+    navigator: {} });
+  functions('publishChatAlert', 'detectChatRows', context);
+  vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
+  assert.deepEqual(events, []);
+});
+
+test('foco em qualquer aba Klingo impede alerta e expira após fechamento', () => {
+  const localStorage = storage();
+  const context = vm.createContext({ Date: { now: () => 1000 },
+    FOCUS_PREFIX: 'focus:', FOCUS_TTL: 3000, tabId: 'aba-a', localStorage,
+    document: { visibilityState: 'visible', hasFocus: () => false } });
+  functions('syncGlobalFocus', 'handleNativeChatPlay', context);
+  localStorage.setItem('focus:aba-remetente', JSON.stringify({ at: 1000 }));
+  assert.equal(vm.runInContext('isAnyKlingoTabFocused()', context), true);
+  context.Date.now = () => 4001;
+  assert.equal(vm.runInContext('isAnyKlingoTabFocused()', context), false);
+});
+
+test('aba oculta pode assumir avisos quando não existe responsável', () => {
+  const timers = [];
+  const context = vm.createContext({ claimTimer: null,
+    document: { visibilityState: 'hidden' },
+    window: { setTimeout: callback => { timers.push(callback); return 1; } },
+    Math, alertAccountId: () => 'destinatario', claimOwner: () => {},
+    navigator: { locks: { request: (_name, callback) => callback() } } });
+  functions('scheduleTakeover', 'maintainOwner', context);
+  vm.runInContext('scheduleTakeover()', context);
+  assert.equal(timers.length, 1);
+});
+
+test('vídeo nativo do Klingo permanece mudo até para remetente sem conversa aberta', () => {
+  const audio = { id: 'beepChatId', muted: false, currentTime: 1,
+    pauses: 0, pause() { this.pauses++; } };
+  const context = vm.createContext({ window: { setTimeout() {} },
+    isOwner: () => true, isChatOpen: () => false });
+  functions('handleNativeChatPlay', 'syncNativeChatAudio', context);
+  vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
+  assert.equal(audio.muted, true);
+  assert.equal(audio.pauses, 1);
+});
+
+test('chat aberto detecta nova linha recebida e ignora envio próprio e rerenderização', () => {
+  const arrivals = [];
+  const context = vm.createContext({ openChatContent: null, openChatSender: '',
+    knownChatRows: [], publishChatAlert: item => arrivals.push(item), messageKey: text => text });
+  functions('detectChatRows', 'scanOpenChatMessages', context);
+  const content = {};
+  const old = { key: '12:00|anterior', incoming: true, item: {} };
+  const incoming = { key: '12:01|nova', incoming: true, item: {} };
+  const sent = { key: '12:02|minha', incoming: false, item: {} };
+  context.content = content;
+  context.rows = [old];
+  vm.runInContext('detectChatRows(content, "TESTE", rows)', context);
+  context.rows = [old, incoming];
+  vm.runInContext('detectChatRows(content, "TESTE", rows)', context);
+  vm.runInContext('detectChatRows(content, "TESTE", rows)', context);
+  context.rows = [old, incoming, sent];
+  vm.runInContext('detectChatRows(content, "TESTE", rows)', context);
+  assert.equal(arrivals.length, 1);
+});
+
+test('dois toasts idênticos novos são dois eventos, mas os antigos são baseline', () => {
+  const arrivals = [];
+  const context = vm.createContext({ knownToastElements: new WeakMap(),
+    knownToastCounts: new Map(), messageKey: text => text,
+    toastSender: () => 'TESTE', normalizeToastText: toast => toast.text,
+    publishChatAlert: item => arrivals.push(item) });
+  functions('detectNewToasts', 'countMessageToasts', context);
+  context.countMessageToasts = items => new Map([["De: TESTE >> oi", items.length]]);
+  const old = { text: 'De: TESTE >> oi' };
+  const one = { text: 'De: TESTE >> oi' };
+  const two = { text: 'De: TESTE >> oi' };
+  context.toasts = [old];
+  vm.runInContext('detectNewToasts(toasts, true)', context);
+  context.toasts = [old, one];
+  vm.runInContext('detectNewToasts(toasts)', context);
+  context.toasts = [old, one, two];
+  vm.runInContext('detectNewToasts(toasts)', context);
+  assert.equal(arrivals.length, 2);
+});
+
+test('som e título são acionados juntos só no dono em segundo plano', async () => {
+  const events = [];
+  const context = vm.createContext({ alertAudio: null, isOwner: () => true,
+    alertAccountId: () => 'destinatario', recentAlertKeys: new Map(),
+    ALERT_HISTORY_KEY: 'history', ALERT_DEDUP_TTL: 2000, ALERT_ID_TTL: 300000,
+    GM_getValue: () => [],
+    isChatOpen: () => false,
+    navigator: { locks: { request: async (_name, callback) => callback() } },
+    ALERT_EVENT_KEY: 'alert-event', tabId: 'aba-dona', alertSequence: 0,
+    GM_setValue() {},
+    readOwner: () => ({ updatedAt: Date.now() }), OWNER_TTL: 7000,
+    isAnyKlingoTabFocused: () => false, syncGlobalFocus() {},
+    directChatSender: () => '', startBlink: () => events.push('piscar'),
+    Audio: function (src) { this.pause = () => {}; this.play = () => {
+      events.push(`som:${src}`); return Promise.resolve(); }; },
+    console });
+  functions('publishChatAlert', 'detectChatRows', context);
+  await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
+  assert.deepEqual(events, ['piscar', 'som:/notific.mp3']);
+  events.length = 0;
+  context.isAnyKlingoTabFocused = () => true;
+  await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
+  assert.deepEqual(events, []);
+  context.isAnyKlingoTabFocused = () => false;
+  context.isOwner = () => false;
+  await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
+  assert.deepEqual(events, []);
+});
+
+test('chegada durante troca de responsável não perde o alerta', async () => {
+  const events = [];
+  let owner = false;
+  const context = vm.createContext({ alertAudio: null, recentAlertKeys: new Map(),
+    tabId: 'aba-chat',
+    ALERT_HISTORY_KEY: 'history', ALERT_DEDUP_TTL: 2000, ALERT_ID_TTL: 300000,
+    GM_getValue: () => [], GM_setValue() {},
+    isChatOpen: () => false,
+    isOwner: () => owner, readOwner: () => null,
+    alertAccountId: () => 'destinatario',
+    claimOwner: () => { owner = true; },
+    isAnyKlingoTabFocused: () => false, syncGlobalFocus() {},
+    directChatSender: () => '', startBlink: () => events.push('piscar'),
+    navigator: { locks: { request: (_name, callback) => Promise.resolve(callback()) } },
+    Audio: function () { this.pause = () => {}; this.play = () => {
+      events.push('som'); return Promise.resolve(); }; }, console });
+  functions('publishChatAlert', 'detectChatRows', context);
+  await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
+  assert.deepEqual(events, ['piscar', 'som']);
+});
+
 test('verificação de avisos não inicia alerta personalizado da conversa aberta', () => {
   let customScans = 0;
   const context = vm.createContext({
     document: { title: 'klingo' }, blinking: false, backgroundChatAlert: false,
+    nativeChatHooked: false, syncNativeMessageHook() {},
+    syncGlobalFocus() {}, isAnyKlingoTabFocused: () => false,
     syncOpenChat() {}, scanOpenChatMessages: () => customScans++,
-    syncNativeChatAudio() {}, applyPendingDismissals() {},
+    syncNativeChatAudio() {}, applyPendingDismissals() {}, detectNewToasts() {},
     messageToasts: () => [], countMessageToasts: () => new Map(),
     knownToastCounts: new Map(), dismissCoveredToasts() {},
     closingToasts: new WeakSet(), isOwner: () => false, stopBlink() {},
@@ -37,7 +392,7 @@ test('verificação de avisos não inicia alerta personalizado da conversa abert
   assert.ok(start >= 0 && end > start);
   vm.runInContext(source.slice(start, end), context);
   vm.runInContext('checkMessages()', context);
-  assert.equal(customScans, 0);
+  assert.equal(customScans, 1);
 });
 
 test('conversa aberta em outra aba suprime só o remetente correspondente e expira', () => {
@@ -46,15 +401,20 @@ test('conversa aberta em outra aba suprime só o remetente correspondente e expi
   const context = vm.createContext({ localStorage, Date: { now: () => now },
     OPEN_CHAT_PREFIX: 'klingo_chat_open_sender_v1:', OPEN_CHAT_TTL: 90000,
     tabId: 'aba-a', publishedSenderKey: '', lastPresenceWrite: 0,
+    alertAccountId: () => 'destinatario',
     pendingChatSender: 'ANA', document: { querySelectorAll: () => [{
       closest: selector => selector === '.modal-footer' ? { querySelector: () => ({}) } :
         selector === '.modal-content' ? { querySelector: inner =>
           inner === '.modal-header .modal-title' ? { textContent: 'Ana' } : null } : null
     }] } });
   functions('messageKey', 'findToastAction', context);
+  context.alertAccountId = () => 'destinatario';
   assert.equal(vm.runInContext('directChatSender()', context), 'ANA');
   vm.runInContext('syncOpenChat()', context);
   assert.equal(vm.runInContext('isChatOpen("ANA")', context), true);
+  context.alertAccountId = () => 'outra-conta';
+  assert.equal(vm.runInContext('isChatOpen("ANA")', context), false);
+  context.alertAccountId = () => 'destinatario';
   assert.equal(vm.runInContext('isChatOpen("BRUNO")', context), false);
   assert.equal(localStorage.values.size, 1);
 
@@ -123,14 +483,16 @@ test('aviso coberto interrompe áudio já tocando sem novo evento play', () => {
   assert.equal(audio.stops, 1);
 });
 
-test('toast coberto não pisca; outro remetente continua com aviso visual, sem som próprio', () => {
+test('checagem periódica não dispara alerta a partir de toasts antigos', () => {
   const seen = [];
   const toasts = [{ sender: 'ANA', key: '1' }, { sender: 'BRUNO', key: '2' }];
   const closingToasts = new WeakSet();
   const context = vm.createContext({ blinking: false, originalTitle: 'klingo',
     document: { title: 'klingo' }, knownToastCounts: new Map(), closingToasts,
+    nativeChatHooked: false, syncNativeMessageHook() {},
+    syncGlobalFocus() {}, isAnyKlingoTabFocused: () => false,
     syncOpenChat() {}, scanOpenChatMessages() {}, backgroundChatAlert: false,
-    applyPendingDismissals() {}, messageToasts: () => toasts,
+    applyPendingDismissals() {}, detectNewToasts() {}, messageToasts: () => toasts,
     syncNativeChatAudio() {},
     countMessageToasts: items => new Map(items.map(item => [item.key, 1])),
     dismissCoveredToasts: items => items.forEach(item => {
@@ -147,163 +509,11 @@ test('toast coberto não pisca; outro remetente continua com aviso visual, sem s
   const end = source.indexOf('  const notificationObserver = new MutationObserver(', start);
   vm.runInContext(source.slice(start, end), context);
   vm.runInContext('checkMessages()', context);
-  assert.deepEqual(seen, ['piscar']);
+  assert.deepEqual(seen, []);
   seen.length = 0;
   toasts.splice(1);
   vm.runInContext('checkMessages()', context);
-  assert.deepEqual(seen, ['parar']);
-});
-
-test('áudio nativo do chat é interrompido para remetente aberto em outra aba', () => {
-  const callbacks = [];
-  const audio = { id: 'beepChatId', muted: false, currentTime: 1,
-    paused: 0, pause() { this.paused++; }, play() { throw Error('não deve tocar'); } };
-  const context = vm.createContext({ Date: { now: () => 1000 },
-    window: { setTimeout: callback => callbacks.push(callback) },
-    hasOpenChatPresence: () => true,
-    isChatOpen: sender => sender === 'ANA', isOwner: () => true, recentNativeSender: 'ANA',
-    recentNativeSenderAt: 1000, nativePlaybackAllowedUntil: 0,
-    messageToasts: () => [], toastSender: () => '' });
-  functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
-  vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
-  callbacks.shift()();
-  assert.equal(audio.paused, 1);
-  assert.equal(audio.currentTime, 0);
-  assert.equal(audio.muted, true);
-});
-
-test('áudio começa silenciado mesmo se a presença oscilar antes do aviso chegar', () => {
-  const callbacks = [];
-  let presence = false;
-  const audio = { id: 'beepChatId', muted: false, currentTime: 0,
-    pauses: 0, pause() { this.pauses++; } };
-  const context = vm.createContext({ Date: { now: () => 1000 },
-    window: { setTimeout: callback => callbacks.push(callback) },
-    hasOpenChatPresence: () => presence,
-    isChatOpen: sender => presence && sender === 'ANA', isOwner: () => true,
-    recentNativeSender: '', recentNativeSenderAt: 0,
-    messageToasts: () => [{ sender: 'ANA' }], toastSender: toast => toast.sender });
-  functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
-  vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
-  assert.equal(audio.muted, true);
-  assert.equal(callbacks.length, 1);
-  presence = true;
-  callbacks.shift()();
-  assert.equal(audio.pauses, 1);
-  assert.equal(audio.muted, true);
-});
-
-test('áudio nativo continua para remetente diferente e sons de outras áreas não são afetados', () => {
-  const callbacks = [];
-  const chat = { id: 'beepChatId', muted: true, currentTime: 1,
-    pause() {}, plays: 0, play() { this.plays++; return Promise.resolve(); } };
-  const other = { id: 'beepPagId', muted: false };
-  const context = vm.createContext({ Date: { now: () => 1000 },
-    window: { setTimeout: callback => callbacks.push(callback) },
-    hasOpenChatPresence: () => true,
-    isChatOpen: sender => sender === 'ANA', isOwner: () => true, recentNativeSender: 'BRUNO',
-    recentNativeSenderAt: 1000, nativePlaybackAllowedUntil: 0,
-    messageToasts: () => [], toastSender: () => '' });
-  functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
-  vm.runInContext('handleNativeChatPlay({target: other}); handleNativeChatPlay({target: chat})',
-    Object.assign(context, { other, chat }));
-  assert.equal(other.muted, false);
-  callbacks.shift()();
-  assert.equal(chat.muted, false);
-  assert.equal(chat.plays, 0);
-  assert.equal(chat.currentTime, 0);
-});
-
-test('som nativo de uma mensagem toca em apenas uma das duas abas', () => {
-  const tab = (owner) => {
-    const callbacks = [];
-    const audio = { id: 'beepChatId', muted: false, currentTime: 1,
-      pauses: 0, pause() { this.pauses++; } };
-    const context = vm.createContext({ Date: { now: () => 1000 },
-      window: { setTimeout: callback => callbacks.push(callback) },
-      isOwner: () => owner, isChatOpen: () => false,
-      recentNativeSender: 'BRUNO', recentNativeSenderAt: 1000,
-      messageToasts: () => [], toastSender: () => '' });
-    functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
-    vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
-    callbacks.shift()();
-    return audio;
-  };
-  const ownerAudio = tab(true);
-  const otherAudio = tab(false);
-  assert.equal(ownerAudio.muted, false);
-  assert.equal(otherAudio.muted, true);
-  assert.equal(otherAudio.pauses, 1);
-});
-
-test('troca de aba durante o aviso não duplica o som nativo', async () => {
-  const claims = new Map();
-  let lockQueue = Promise.resolve();
-  const locks = { request(_name, callback) {
-    const next = lockQueue.then(callback);
-    lockQueue = next.catch(() => {});
-    return next;
-  } };
-  let owner = 'aba-a';
-  const makeTab = (id) => {
-    const callbacks = [];
-    const audio = { id: 'beepChatId', muted: false, currentTime: 1,
-      pauses: 0, pause() { this.pauses++; } };
-    const context = vm.createContext({ Date: { now: () => 1000 },
-      window: { setTimeout: callback => callbacks.push(callback) },
-      navigator: { locks }, tabId: id,
-      GM_getValue: key => claims.get(key) ?? null,
-      GM_setValue: (key, value) => claims.set(key, value),
-      isOwner: () => owner === id, isChatOpen: () => false,
-      recentNativeSender: 'BRUNO', recentNativeSenderAt: 1000,
-      messageToasts: () => [{ text: 'De: Bruno >> Olá' }],
-      normalizeToastText: toast => toast.text,
-      toastSender: () => 'BRUNO', messageKey: text => text,
-      countMessageToasts: () => new Map([['De: Bruno >> Olá', 1]]),
-      AUDIO_CLAIM_KEY: 'audio-claim', AUDIO_CLAIM_TTL: 1200 });
-    functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
-    vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
-    return { audio, run: () => callbacks.shift()() };
-  };
-  const a = makeTab('aba-a');
-  const b = makeTab('aba-b');
-  const first = a.run();
-  owner = 'aba-b';
-  const second = b.run();
-  await Promise.all([first, second]);
-  assert.equal([a.audio, b.audio].filter(audio => !audio.muted).length, 1);
-});
-
-test('som toca uma vez mesmo se a aba responsável foi fechada', async () => {
-  const claims = new Map();
-  let lockQueue = Promise.resolve();
-  const locks = { request(_name, callback) {
-    const next = lockQueue.then(callback);
-    lockQueue = next.catch(() => {});
-    return next;
-  } };
-  const callbacks = [];
-  const audios = ['aba-b', 'aba-c'].map(id => {
-    const audio = { id: 'beepChatId', muted: false, currentTime: 1,
-      pauses: 0, pause() { this.pauses++; } };
-    const context = vm.createContext({ Date: { now: () => 1000 },
-      window: { setTimeout: callback => callbacks.push(callback) },
-      navigator: { locks }, tabId: id,
-      GM_getValue: key => claims.get(key) ?? null,
-      GM_setValue: (key, value) => claims.set(key, value),
-      isOwner: () => false, isChatOpen: () => false,
-      recentNativeSender: 'BRUNO', recentNativeSenderAt: 1000,
-      messageToasts: () => [{ text: 'De: Bruno >> Olá' }],
-      normalizeToastText: toast => toast.text,
-      toastSender: () => 'BRUNO', messageKey: text => text,
-      countMessageToasts: () => new Map([['De: Bruno >> Olá', 1]]),
-      AUDIO_CLAIM_KEY: 'audio-claim', AUDIO_CLAIM_TTL: 1200 });
-    functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
-    vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
-    return audio;
-  });
-  await Promise.all(callbacks.map(callback => callback()));
-  assert.equal(audios.filter(audio => !audio.muted).length, 1);
+  assert.deepEqual(seen, []);
 });
 
 test('som do chat nativo permanece preparado mesmo sem presença compartilhada', () => {
@@ -339,28 +549,6 @@ test('ao terminar um som permitido, o player silencia antes da próxima mensagem
   assert.equal(typeof listeners.get('ended'), 'function');
   listeners.get('ended')({ target: audio });
   assert.equal(audio.muted, true);
-});
-
-test('mensagem coberta logo após outra mensagem ainda bloqueia o segundo som', () => {
-  const callbacks = [];
-  let now = 1000;
-  const audio = { id: 'beepChatId', muted: false, currentTime: 0,
-    pauses: 0, pause() { this.pauses++; }, play() { return Promise.resolve(); } };
-  const context = vm.createContext({ Date: { now: () => now },
-    window: { setTimeout: callback => callbacks.push(callback) },
-    hasOpenChatPresence: () => true, isChatOpen: sender => sender === 'ANA', isOwner: () => true,
-    recentNativeSender: 'BRUNO', recentNativeSenderAt: 1000,
-    nativePlaybackAllowedUntil: 0, messageToasts: () => [] });
-  functions('handleNativeChatPlay', 'dismissCoveredToasts', context);
-  vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
-  callbacks.shift()();
-  now = 1100;
-  context.recentNativeSender = 'ANA';
-  context.recentNativeSenderAt = 1100;
-  vm.runInContext('handleNativeChatPlay({target: audio})', context);
-  assert.equal(callbacks.length, 1);
-  callbacks.shift()();
-  assert.equal(audio.pauses, 1);
 });
 
 test('mensagem coberta não aumenta o contador exibido, mas outra mensagem aumenta', () => {
