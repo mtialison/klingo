@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.51
+// @version      1.52
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -1252,7 +1252,8 @@ function setDateCalculatorOpen(isOpen) {
   let nativeChatAudio = null;
   let hookedChatVue = null;
   let nativeChatHooked = false;
-  let alertAudio = null;
+  let alertSoundQueue = 0;
+  let managedNativePlayback = false;
   let openChatContent = null;
   let openChatSender = '';
   let knownChatRows = [];
@@ -1374,9 +1375,55 @@ function setDateCalculatorOpen(isOpen) {
   function handleNativeChatPlay(event) {
     const audio = event.target;
     if (audio.id !== 'beepChatId') return;
+    if (managedNativePlayback && audio === nativeChatAudio) {
+      audio.muted = false;
+      return;
+    }
     audio.muted = true;
     audio.pause();
     try { audio.currentTime = 0; } catch (_) {}
+  }
+
+  function handleAlertSoundFinished() {
+    if (nativeChatAudio) nativeChatAudio.muted = true;
+    managedNativePlayback = false;
+    if (alertSoundQueue > 0) return playNextAlertSound();
+  }
+
+  function handleAlertSoundPause() {
+    if (!managedNativePlayback || nativeChatAudio?.ended) return;
+    managedNativePlayback = false;
+    alertSoundQueue = 0;
+    if (nativeChatAudio) nativeChatAudio.muted = true;
+  }
+
+  function playNextAlertSound() {
+    if (managedNativePlayback || alertSoundQueue < 1 || !nativeChatAudio) return;
+    managedNativePlayback = true;
+    alertSoundQueue--;
+    nativeChatAudio.muted = false;
+    try { nativeChatAudio.currentTime = 0; } catch (_) {}
+    let playback;
+    try {
+      playback = nativeChatAudio.play();
+    } catch (error) {
+      managedNativePlayback = false;
+      nativeChatAudio.muted = true;
+      console.warn('[TM] Áudio nativo do chat bloqueado pelo navegador', error?.name || 'unknown');
+      return;
+    }
+    return Promise.resolve(playback).catch((error) => {
+      managedNativePlayback = false;
+      nativeChatAudio.muted = true;
+      console.warn('[TM] Áudio nativo do chat bloqueado pelo navegador', error?.name || 'unknown');
+    });
+  }
+
+  function queueAlertSound() {
+    syncNativeChatAudio();
+    if (!nativeChatAudio) return;
+    alertSoundQueue++;
+    return playNextAlertSound();
   }
 
   function syncNativeChatAudio() {
@@ -1384,11 +1431,12 @@ function setDateCalculatorOpen(isOpen) {
     if (!audio) return;
     if (audio !== nativeChatAudio) {
       nativeChatAudio?.removeEventListener('play', handleNativeChatPlay);
+      nativeChatAudio?.removeEventListener('pause', handleAlertSoundPause);
+      nativeChatAudio?.removeEventListener('ended', handleAlertSoundFinished);
       nativeChatAudio = audio;
       audio.addEventListener('play', handleNativeChatPlay);
-      const prepareNextSound = () => { audio.muted = true; };
-      audio.addEventListener('pause', prepareNextSound);
-      audio.addEventListener('ended', prepareNextSound);
+      audio.addEventListener('pause', handleAlertSoundPause);
+      audio.addEventListener('ended', handleAlertSoundFinished);
     }
     if (audio.paused) audio.muted = true;
   }
@@ -1452,12 +1500,7 @@ function setDateCalculatorOpen(isOpen) {
       }
       GM_setValue(historyKey, Array.from(history));
       startBlink();
-      if (!alertAudio) alertAudio = new Audio('/notific.mp3');
-      alertAudio.pause();
-      try { alertAudio.currentTime = 0; } catch (_) {}
-      alertAudio.play().catch((error) => {
-        console.warn('[TM] Áudio do chat bloqueado pelo navegador', error?.name || 'unknown');
-      });
+      queueAlertSound();
     };
     if (isOwner()) return navigator.locks.request(`klingo-chat-owner-v1:${account}`, run)
       .catch(() => {});

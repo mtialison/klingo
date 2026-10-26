@@ -119,8 +119,7 @@ test('mensagens idênticas sucessivas da mesma aba alertam; eco de outra aba nã
     isOwner: () => true, isChatOpen: () => false,
     syncGlobalFocus() {}, isAnyKlingoTabFocused: () => false,
     navigator: { locks: { request: async (_name, callback) => callback() } },
-    startBlink() {}, Audio: function () { this.pause = () => {};
-      this.play = () => { events.push('som'); return Promise.resolve(); }; }, console });
+    startBlink() {}, queueAlertSound: () => events.push('som'), console });
   functions('publishChatAlert', 'detectChatRows', context);
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast",key:"igual"})', context);
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast",key:"igual"})', context);
@@ -141,8 +140,7 @@ test('dona executa um único aviso de duas abas com toasts divergentes', async (
     isChatOpen: () => false, syncGlobalFocus() {},
     isAnyKlingoTabFocused: () => false,
     navigator: { locks: { request: async (_name, callback) => callback() } },
-    startBlink() {}, Audio: function () { this.pause = () => {};
-      this.play = () => { sounds.push('som'); return Promise.resolve(); }; },
+    startBlink() {}, queueAlertSound: () => sounds.push('som'),
     GM_addValueChangeListener: (_key, callback) => { listener = callback; }, console });
   functions('publishChatAlert', 'detectChatRows', context);
   const start = source.indexOf('  GM_addValueChangeListener(ALERT_EVENT_KEY');
@@ -173,8 +171,7 @@ test('eco atrasado e troca de aba dona não repetem o mesmo aviso', async () => 
       navigator: { locks: { request: async (_name, callback) => callback() } },
       GM_getValue: key => shared.get(key) ?? null,
       GM_setValue: (key, value) => shared.set(key, value),
-      startBlink() {}, Audio: function () { this.pause = () => {};
-        this.play = () => { sounds.push(id); return Promise.resolve(); }; }, console });
+      startBlink() {}, queueAlertSound: () => sounds.push(id), console });
     functions('publishChatAlert', 'detectChatRows', context);
     return context;
   };
@@ -204,8 +201,7 @@ test('o mesmo id nativo não toca novamente mesmo após quinze segundos', async 
       isOwner: () => true, isChatOpen: () => false,
       syncGlobalFocus() {}, isAnyKlingoTabFocused: () => false,
       navigator: { locks: { request: async (_name, callback) => callback() } },
-      startBlink() {}, Audio: function () { this.pause = () => {};
-        this.play = () => { sounds.push(id); return Promise.resolve(); }; }, console });
+      startBlink() {}, queueAlertSound: () => sounds.push(id), console });
     functions('publishChatAlert', 'detectChatRows', context);
     return context;
   };
@@ -277,6 +273,7 @@ test('vídeo nativo do Klingo permanece mudo até para remetente sem conversa ab
   const audio = { id: 'beepChatId', muted: false, currentTime: 1,
     pauses: 0, pause() { this.pauses++; } };
   const context = vm.createContext({ window: { setTimeout() {} },
+    managedNativePlayback: false, nativeChatAudio: null,
     isOwner: () => true, isChatOpen: () => false });
   functions('handleNativeChatPlay', 'syncNativeChatAudio', context);
   vm.runInContext('handleNativeChatPlay({target: audio})', Object.assign(context, { audio }));
@@ -337,12 +334,11 @@ test('som e título são acionados juntos só no dono em segundo plano', async (
     readOwner: () => ({ updatedAt: Date.now() }), OWNER_TTL: 7000,
     isAnyKlingoTabFocused: () => false, syncGlobalFocus() {},
     directChatSender: () => '', startBlink: () => events.push('piscar'),
-    Audio: function (src) { this.pause = () => {}; this.play = () => {
-      events.push(`som:${src}`); return Promise.resolve(); }; },
+    queueAlertSound: () => events.push('som-nativo'),
     console });
   functions('publishChatAlert', 'detectChatRows', context);
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
-  assert.deepEqual(events, ['piscar', 'som:/notific.mp3']);
+  assert.deepEqual(events, ['piscar', 'som-nativo']);
   events.length = 0;
   context.isAnyKlingoTabFocused = () => true;
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
@@ -351,6 +347,26 @@ test('som e título são acionados juntos só no dono em segundo plano', async (
   context.isOwner = () => false;
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
   assert.deepEqual(events, []);
+});
+
+test('mensagens rápidas usam o player nativo e aguardam o som anterior terminar', async () => {
+  const events = [];
+  const audio = {
+    id: 'beepChatId', muted: true, paused: true, currentTime: 0,
+    play() { this.paused = false; events.push('som-nativo'); return Promise.resolve(); },
+    pause() { this.paused = true; }
+  };
+  const context = vm.createContext({ document: { getElementById: () => audio },
+    nativeChatAudio: audio, alertSoundQueue: 0,
+    managedNativePlayback: false, console });
+  functions('handleNativeChatPlay', 'syncNativeMessageHook', context);
+  await vm.runInContext('queueAlertSound(); queueAlertSound()', context);
+  assert.deepEqual(events, ['som-nativo']);
+  assert.equal(context.alertSoundQueue, 1);
+  audio.paused = true;
+  await vm.runInContext('handleAlertSoundFinished()', context);
+  assert.deepEqual(events, ['som-nativo', 'som-nativo']);
+  assert.equal(context.alertSoundQueue, 0);
 });
 
 test('chegada durante troca de responsável não perde o alerta', async () => {
@@ -366,9 +382,9 @@ test('chegada durante troca de responsável não perde o alerta', async () => {
     claimOwner: () => { owner = true; },
     isAnyKlingoTabFocused: () => false, syncGlobalFocus() {},
     directChatSender: () => '', startBlink: () => events.push('piscar'),
+    queueAlertSound: () => events.push('som'),
     navigator: { locks: { request: (_name, callback) => Promise.resolve(callback()) } },
-    Audio: function () { this.pause = () => {}; this.play = () => {
-      events.push('som'); return Promise.resolve(); }; }, console });
+    console });
   functions('publishChatAlert', 'detectChatRows', context);
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
   assert.deepEqual(events, ['piscar', 'som']);
@@ -523,9 +539,9 @@ test('som do chat nativo permanece preparado mesmo sem presença compartilhada',
     removeEventListener() {} };
   let open = true;
   const context = vm.createContext({ document: { getElementById: () => audio },
-    nativeChatAudio: null, hasOpenChatPresence: () => open,
-    handleNativeChatPlay() {} });
-  functions('syncNativeChatAudio', 'dismissCoveredToasts', context);
+    nativeChatAudio: null, alertSoundQueue: 0, managedNativePlayback: false,
+    hasOpenChatPresence: () => open, console });
+  functions('handleNativeChatPlay', 'syncNativeMessageHook', context);
   vm.runInContext('syncNativeChatAudio(); syncNativeChatAudio()', context);
   assert.equal(audio.muted, true);
   assert.equal(listeners.length, 3);
@@ -541,9 +557,9 @@ test('ao terminar um som permitido, o player silencia antes da próxima mensagem
     addEventListener: (name, handler) => listeners.set(name, handler),
     removeEventListener() {} };
   const context = vm.createContext({ document: { getElementById: () => audio },
-    nativeChatAudio: null, hasOpenChatPresence: () => false,
-    handleNativeChatPlay() {} });
-  functions('syncNativeChatAudio', 'dismissCoveredToasts', context);
+    nativeChatAudio: null, alertSoundQueue: 0, managedNativePlayback: false,
+    hasOpenChatPresence: () => false, console });
+  functions('handleNativeChatPlay', 'syncNativeMessageHook', context);
   vm.runInContext('syncNativeChatAudio()', context);
   audio.muted = false;
   assert.equal(typeof listeners.get('ended'), 'function');

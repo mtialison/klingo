@@ -19,4 +19,6 @@ Na versão de testes **1.50**, as abas coordenam o som nativo de cada novo aviso
 
 Na versão de testes **1.51**, o vídeo nativo de aviso é silenciado em todas as abas. Uma aba por conta usa o arquivo `/notific.mp3` para som e título piscando juntos, somente quando nenhuma aba do Klingo está em foco. O disparo usa o ID da mensagem recebida pelo chat nativo; observação de toasts e da conversa serve apenas como alternativa se o componente nativo não estiver acessível. Toasts antigos não acionam alertas.
 
+Na versão de testes **1.52**, a aba eleita reutiliza o player nativo do Klingo em vez de criar áudio no contexto da extensão, que o Chrome bloqueava em segundo plano com `NotAllowedError`. Mensagens que chegam rapidamente entram em uma fila e cada som termina antes do próximo começar, sem reiniciar o alerta anterior.
+
 Antes de promover, rode cada `tests/*.test.cjs` com Node, confirme `node --check klingo.user.js` e faça os testes visuais no Klingo. Aumente `@version` quando quiser disparar uma atualização automática. O arquivo de testes nunca deve ser copiado para `main`.
