@@ -29,4 +29,6 @@ Na versão de testes **1.55**, o userscript cria um toque próprio com Web Audio
 
 Na versão de testes **1.56**, a aba Autorizações oferece **Aberto + Enviado** acima de Aberto. A combinação mantém os demais filtros e a ordem do servidor, lê todas as páginas dos status ativos e apresenta somente os status 0 e 6, com paginação recalculada e até duas consultas simultâneas. Períodos extensos podem demorar mais. As opções de edição de status e o filtro inicial Aberto permanecem nativos.
 
+Na versão de testes **1.57**, o botão 🐵 à direita da versão no cabeçalho abre em outra aba o userscript da branch `main`, como atalho para atualização manual pelo Tampermonkey.
+
 Antes de promover, rode cada `tests/*.test.cjs` com Node, confirme `node --check klingo.user.js` e faça os testes visuais no Klingo. Aumente `@version` quando quiser disparar uma atualização automática. O arquivo de testes nunca deve ser copiado para `main`.

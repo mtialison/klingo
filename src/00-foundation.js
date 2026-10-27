@@ -893,6 +893,32 @@ function setDateCalculatorOpen(isOpen) {
     return typeof GM_info !== 'undefined' && GM_info.script?.version || '26';
   }
 
+  function ensureScriptUpdateLink(navbar) {
+    let link = navbar.querySelector('#tm-script-update-link');
+    if (!link) {
+      link = document.createElement('a');
+      link.id = 'tm-script-update-link';
+      link.className = 'nav-link tm-datecalc-header-trigger';
+      link.href = 'https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.title = 'Atualizar o script';
+      link.setAttribute('aria-label', 'Atualizar o script');
+      const icon = document.createElement('span');
+      icon.className = 'tm-datecalc-trigger-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = '🐵';
+      link.appendChild(icon);
+      link.style.setProperty('position', 'absolute', 'important');
+      link.style.setProperty('left', 'calc(50% + 36px)', 'important');
+      link.style.setProperty('top', '50%', 'important');
+      link.style.setProperty('transform', 'translateY(-50%)', 'important');
+      link.style.setProperty('margin', '0', 'important');
+      link.style.setProperty('z-index', '5', 'important');
+      navbar.appendChild(link);
+    }
+  }
+
   function ensureScriptVersionIndicator() {
     const navbar = document.querySelector('nav.navbar');
     if (!navbar) return;
@@ -938,6 +964,7 @@ function setDateCalculatorOpen(isOpen) {
     if (indicator.parentElement !== navbar) {
       navbar.appendChild(indicator);
     }
+    ensureScriptUpdateLink(navbar);
   }
 
   function startHeaderToolsInitialRenderSafe() {
