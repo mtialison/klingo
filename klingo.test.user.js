@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.57
+// @version      1.58
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -680,6 +680,10 @@ function tmParseDateInput(rawValue) {
         font-size: 20px !important;
         filter: drop-shadow(0 1px 1px rgba(0,0,0,0.22)) !important;
         transition: transform 0.16s ease, filter 0.16s ease !important;
+      }
+
+      #tm-script-update-link .tm-datecalc-trigger-icon {
+        font-size: 24px !important;
       }
 
       .tm-datecalc-header-trigger:hover,

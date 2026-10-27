@@ -682,6 +682,10 @@ function tmParseDateInput(rawValue) {
         transition: transform 0.16s ease, filter 0.16s ease !important;
       }
 
+      #tm-script-update-link .tm-datecalc-trigger-icon {
+        font-size: 24px !important;
+      }
+
       .tm-datecalc-header-trigger:hover,
       .tm-datecalc-header-trigger:focus {
         color: #ffffff !important;
