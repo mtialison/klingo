@@ -148,5 +148,13 @@
     });
   }
 
+  document.addEventListener('tm-reception-authorization-updated', event => {
+    const id = String(event.detail?.id || '');
+    if (id && activeState) {
+      activeState.cache.delete(id);
+      tmRuntime.schedule(0);
+    }
+  });
+
   tmRuntime.register('status de autorização na Recepção', ensureReceptionAuthorization, ['#/recepcao']);
 })();
