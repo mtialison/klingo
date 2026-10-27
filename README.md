@@ -27,4 +27,6 @@ Na versão de testes **1.54**, todo áudio de notificação foi desativado: o us
 
 Na versão de testes **1.55**, o userscript cria um toque próprio com Web Audio para cada mensagem, na mesma aba responsável pelo título piscando. Toques rápidos são enfileirados. Os players nativos seguem silenciados. O Chrome exige uma interação prévia com o Klingo para liberar áudio; alertas bloqueados não são reproduzidos com atraso ao voltar à aba.
 
+Na versão de testes **1.56**, a aba Autorizações oferece **Aberto + Enviado** acima de Aberto. A combinação mantém os demais filtros e a ordem do servidor, lê todas as páginas dos status ativos e apresenta somente os status 0 e 6, com paginação recalculada e até duas consultas simultâneas. Períodos extensos podem demorar mais. As opções de edição de status e o filtro inicial Aberto permanecem nativos.
+
 Antes de promover, rode cada `tests/*.test.cjs` com Node, confirme `node --check klingo.user.js` e faça os testes visuais no Klingo. Aumente `@version` quando quiser disparar uma atualização automática. O arquivo de testes nunca deve ser copiado para `main`.
