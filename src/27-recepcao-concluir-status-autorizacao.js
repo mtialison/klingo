@@ -148,7 +148,8 @@
     const appointment = workflow.marcacao;
     const visit = firstVisits.get(workflow);
     if (!visit || visit.consumed || visit.appointmentId !== positiveId(appointment?.id_marcacao) ||
-        hasCompletedStep(appointment, [8]) || Number(workflow.etapa) !== 8 || workflow.$refs.listaguias !== guide ||
+        // O Klingo já marca e8 ao entrar nas guias; a visita inicial foi validada antes de abrir.
+        Number(workflow.etapa) !== 8 || workflow.$refs.listaguias !== guide ||
         !Array.isArray(guide.lista) || !guide.lista.length ||
         positiveId(guide.marcacao?.id_marcacao) !== positiveId(appointment?.id_marcacao)) return null;
     const context = { appointmentId: positiveId(appointment?.id_marcacao),
@@ -173,8 +174,10 @@
   }
 
   async function verifyFirstVisit(axios, id) {
+    // No agendamento de hoje, abrir é automático e ainda não existe atendimento.
+    // Pedir para_atendimento/guia_tiss aqui faz o serviço nativo retornar HTTP 500.
     const response = await axios.post('/aql?a=marcacoes.show', { q: [{ name: 'marcacoes.show',
-      id: 'item', parms: { id, para_atendimento: true, guia_tiss: true } }] });
+      id: 'item', parms: { id } }] });
     if (response.data?.item?.status !== 200) throw new Error('Não foi possível verificar o histórico da recepção.');
     const appointment = response.data.item.data;
     return positiveId(appointment?.id_marcacao) === id && isFirstVisit(appointment);

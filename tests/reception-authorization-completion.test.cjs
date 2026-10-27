@@ -162,9 +162,25 @@ test('procedimento excluído do atendimento não sofre alteração de status', a
   assert.equal(f.stores[1].js_secundarios[0].in_status, 11);
 });
 
-async function runHookIntegration({ stale = false } = {}) {
+async function runHookIntegration({ stale = false, automatic = false, guideStageMarked = false } = {}) {
   const f = fixture();
   const localAppointment = structuredClone(f.appointment);
+  if (automatic) {
+    delete localAppointment.id_atendimento;
+    delete localAppointment.atendimento;
+    delete f.appointment.id_atendimento;
+    delete f.appointment.atendimento;
+    const post = f.axios.post;
+    f.axios.post = (...args) => {
+      const q = args[1].q[0];
+      if (q.name === 'marcacoes.show' && !f.appointment.id_atendimento &&
+          (q.parms.guia_tiss || q.parms.para_atendimento)) {
+        // O interceptor nativo resolve o erro HTTP como Error sem data.
+        return Promise.resolve(new Error('Request failed with status code 500'));
+      }
+      return post(...args);
+    };
+  }
   if (stale) f.appointment.item_status.etapas.e1 = true;
   let register, locks = 0, invalidations = 0;
   const messages = [];
@@ -184,6 +200,21 @@ async function runHookIntegration({ stale = false } = {}) {
     CustomEvent: class {}, tmRuntime: { register(_name, job) { register = job; } } });
   register();
   workflow.abrir(localAppointment, 1);
+  if (automatic) {
+    for (const appointment of [f.appointment, localAppointment]) {
+      appointment.id_atendimento = 10;
+      appointment.atendimento = { id_atendimento: 10,
+        atendimento_procedimentos: [{ id_procedimento: 100, fl_ativo: true }] };
+    }
+  }
+  if (guideStageMarked) {
+    for (const appointment of [f.appointment, localAppointment]) {
+      appointment.item_status.etapas = { e1: true, e2: true, e8: true };
+      appointment.atendimento.progresso_atendimentos = [
+        { id_etapa_atendimento: 8, dt_inicio: '2026-10-27 17:38:59',
+          dt_conclusao: '2026-10-27 17:38:59', fl_ativo: true }];
+    }
+  }
   guide.print(false, 'iniciarAtendimentoModal');
   guide.print(false, 'iniciarAtendimentoModal');
   await new Promise(resolve => setImmediate(resolve));
@@ -203,6 +234,20 @@ test('histórico consultado no servidor impede armar a partir de uma lista desat
   assert.equal(locks, 0);
   assert.equal(invalidations, 0);
   assert.equal(f.stores.length, 0);
+});
+
+test('agendamento da Recepção abre automaticamente antes de existir atendimento e só consulta dados básicos', async () => {
+  const { f, locks, messages } = await runHookIntegration({ automatic: true });
+  assert.equal(locks, 1);
+  assert.deepEqual(f.stores.map(x => x.in_status), [6, 10]);
+  assert.equal(messages[0].severity, 'success');
+});
+
+test('primeira passagem continua válida quando o Klingo marca a guia concluída ao entrar na terceira aba', async () => {
+  const { f, locks } = await runHookIntegration({ automatic: true, guideStageMarked: true });
+  assert.equal(locks, 1);
+  assert.deepEqual(f.stores.map(x => x.in_status), [6, 10]);
+  assert.ok(f.record().dt_envio);
 });
 
 function hookFixture() {

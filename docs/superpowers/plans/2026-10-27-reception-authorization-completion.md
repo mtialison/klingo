@@ -23,3 +23,11 @@
 - [x] Executar suíte completa (219 testes), build, sintaxe, diff e revisão independente. Formato real de `marcacoes.show` confirmado com histórico/etapas do TESTE concluído.
 - [ ] Publicar 1.63 em testes-codex e confirmar remoto.
 - Validação real confirmou a ação nativa de envio e a preservação dos metadados após Em Sessão. Um novo fluxo completo com a versão 1.63 e o relatório ficam para a validação manual do usuário; não reiniciar o atendimento TESTE já concluído.
+
+## Correção 1.64 — abertura automática da Recepção
+
+- [x] Inspecionar o token da visita no DevTools: validação rejeitada e visita não consumida no TESTE informado; constatar vínculo correto e autorização ainda Aberto.
+- [x] Comparar somente em leitura as consultas em agendamento sem atendimento: consulta com guias falha HTTP 500, básica retorna 200 e histórico inicial válido.
+- [x] Confirmar que a guia já tinha conclusão registrada na entrada da terceira aba, antes do Concluir; criar dois testes de integração inicialmente falhos e corrigir as guardas.
+- [ ] Build, suíte completa, sintaxe, revisão e publicação 1.64 em testes-codex.
+- Teste completo e Relatórios ficam com o usuário, conforme preferência expressa. Nenhum novo agendamento ou conclusão de TESTE nesta tarefa.
