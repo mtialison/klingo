@@ -35,4 +35,6 @@ Na versão de testes **1.59**, agendamentos da Recepção vinculados a uma solic
 
 Na versão de testes **1.60**, autofill e cliques na página deixam de disparar login. A tentativa automática usa exclusivamente `navigator.credentials.get({password: true, mediation: 'silent'})`: o navegador só fornece uma credencial sem escolha quando existe uma única opção elegível e a entrada silenciosa está permitida. Sem essa confirmação (inclusive com várias contas), o usuário escolhe a conta e usa Entrar/Enter. Interações manuais cancelam tentativas pendentes. Referência: [guia do Chrome](https://web.dev/articles/security-credential-management-retrieve-credentials).
 
+Na versão de testes **1.61**, a pesquisa de pacientes no cabeçalho inclui cadastros **Primeira Vez** em qualquer módulo. Apenas o parâmetro de contexto dessa busca passa a usar `/call-center`, que permite os cadastros temporários no servidor; a rota atual e a abertura nativa dos resultados permanecem intactas. O cache do autocomplete é invalidado ao aplicar a correção para não reaproveitar resultados incompletos.
+
 Antes de promover, rode cada `tests/*.test.cjs` com Node, confirme `node --check klingo.user.js` e faça os testes visuais no Klingo. Aumente `@version` quando quiser disparar uma atualização automática. O arquivo de testes nunca deve ser copiado para `main`.
