@@ -25,4 +25,6 @@ Na versão de testes **1.53**, heartbeats simultâneos de foco vindos de várias
 
 Na versão de testes **1.54**, todo áudio de notificação foi desativado: o userscript não reproduz som e silencia os players nativos `beepChatId` e `beepPagId`. O aviso visual no título da aba permanece.
 
+Na versão de testes **1.55**, o userscript cria um toque próprio com Web Audio para cada mensagem, na mesma aba responsável pelo título piscando. Toques rápidos são enfileirados. Os players nativos seguem silenciados. O Chrome exige uma interação prévia com o Klingo para liberar áudio; alertas bloqueados não são reproduzidos com atraso ao voltar à aba.
+
 Antes de promover, rode cada `tests/*.test.cjs` com Node, confirme `node --check klingo.user.js` e faça os testes visuais no Klingo. Aumente `@version` quando quiser disparar uma atualização automática. O arquivo de testes nunca deve ser copiado para `main`.

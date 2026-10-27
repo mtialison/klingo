@@ -1,5 +1,5 @@
 /* =========================
-   NOTIFICAÇÃO VISUAL - NOVA MENSAGEM
+   NOTIFICAÇÃO VISUAL E SONORA - NOVA MENSAGEM
    alertas nativos de mensagens e coordenação entre abas
 ========================= */
 (function(){
@@ -31,6 +31,8 @@
   let recentNativeSender = '';
   let recentNativeSenderAt = 0;
   const nativeNotificationAudio = new Map();
+  let notificationAudioContext = null;
+  let nextAlertToneAt = 0;
   let hookedChatVue = null;
   let nativeChatHooked = false;
   let openChatContent = null;
@@ -154,6 +156,41 @@
     return focusedTabs === 1;
   }
 
+  function armScriptAudio() {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    try {
+      notificationAudioContext ||= new AudioContextClass();
+      if (notificationAudioContext.state === 'suspended') {
+        notificationAudioContext.resume().catch(() => {});
+      }
+    } catch (_) {}
+  }
+
+  function playScriptAlert() {
+    // O Chrome exige uma interação prévia com o site para liberar Web Audio.
+    // Não guarde alertas bloqueados para tocar somente ao voltar à aba.
+    if (notificationAudioContext?.state !== 'running') return;
+    try {
+      const context = notificationAudioContext;
+      const start = Math.max(context.currentTime, nextAlertToneAt);
+      const oscillator = context.createOscillator();
+      const volume = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 880;
+      volume.gain.setValueAtTime(0.0001, start);
+      volume.gain.exponentialRampToValueAtTime(0.12, start + 0.015);
+      volume.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
+      oscillator.connect(volume);
+      volume.connect(context.destination);
+      oscillator.start(start);
+      oscillator.stop(start + 0.18);
+      nextAlertToneAt = start + 0.24;
+    } catch (error) {
+      console.warn('[TM] Falha no som de mensagem do userscript', error);
+    }
+  }
+
   function handleNativeChatPlay(event) {
     const audio = event.target;
     if (audio.id !== 'beepChatId' && audio.id !== 'beepPagId') return;
@@ -236,6 +273,7 @@
       }
       GM_setValue(historyKey, Array.from(history));
       startBlink();
+      playScriptAlert();
     };
     if (isOwner()) return navigator.locks.request(`klingo-chat-owner-v1:${account}`, run)
       .catch(() => {});
@@ -613,6 +651,8 @@
   });
   window.setInterval(maintainOwner, 2000);
   window.addEventListener('blur', syncGlobalFocus);
+  window.addEventListener('pointerdown', armScriptAudio, { capture: true });
+  window.addEventListener('keydown', armScriptAudio, { capture: true });
   syncGlobalFocus();
   syncNativeChatAudio();
   syncNativeMessageHook();

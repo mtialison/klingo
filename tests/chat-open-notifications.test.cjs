@@ -119,12 +119,47 @@ test('mensagens idênticas sucessivas da mesma aba alertam; eco de outra aba nã
     isOwner: () => true, isChatOpen: () => false,
     syncGlobalFocus() {}, isAnyKlingoTabFocused: () => false,
     navigator: { locks: { request: async (_name, callback) => callback() } },
-    startBlink: () => events.push('visual'), console });
+    startBlink: () => events.push('visual'),
+    playScriptAlert: () => events.push('som'), console });
   functions('publishChatAlert', 'detectChatRows', context);
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast",key:"igual"})', context);
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast",key:"igual"})', context);
   await vm.runInContext('publishChatAlert({sender:"",source:"relay",origin:"outra",key:"igual"})', context);
-  assert.equal(events.length, 2);
+  assert.deepEqual(events, ['visual', 'som', 'visual', 'som']);
+});
+
+test('som próprio agenda um toque distinto por mensagem rápida na aba proprietária', () => {
+  const tones = [];
+  const audio = { state: 'running', currentTime: 10,
+    destination: {}, createOscillator() {
+      const tone = { frequency: { value: 0 }, connect() {},
+        start(at) { this.at = at; }, stop(at) { this.end = at; } };
+      tones.push(tone); return tone;
+    }, createGain() { return { gain: { setValueAtTime() {},
+      exponentialRampToValueAtTime() {} }, connect() {} }; } };
+  const context = vm.createContext({
+    notificationAudioContext: audio, nextAlertToneAt: 0,
+    window: {}, console
+  });
+  functions('playScriptAlert', 'handleNativeChatPlay', context);
+  vm.runInContext('playScriptAlert(); playScriptAlert(); playScriptAlert()', context);
+  assert.equal(tones.length, 3);
+  assert.ok(tones[0].at < tones[1].at && tones[1].at < tones[2].at);
+  assert.ok(tones[0].end <= tones[1].at && tones[1].end <= tones[2].at);
+});
+
+test('áudio bloqueado pelo Chrome não toca atrasado quando a aba volta ao foco', () => {
+  let created = 0;
+  const context = vm.createContext({ notificationAudioContext: null,
+    nextAlertToneAt: 0, window: { AudioContext: class {
+      constructor() { created++; this.state = 'suspended'; }
+      resume() { this.state = 'running'; return Promise.resolve(); }
+    } }, console });
+  functions('armScriptAudio', 'handleNativeChatPlay', context);
+  vm.runInContext('playScriptAlert()', context);
+  assert.equal(created, 0);
+  vm.runInContext('armScriptAudio()', context);
+  assert.equal(created, 1);
 });
 
 test('dona executa um único aviso de duas abas com toasts divergentes', async () => {
@@ -332,7 +367,7 @@ test('dois toasts idênticos novos são dois eventos, mas os antigos são baseli
   assert.equal(arrivals.length, 2);
 });
 
-test('título pisca só no dono em segundo plano, sem reproduzir som', async () => {
+test('título e som acontecem só no dono em segundo plano', async () => {
   const events = [];
   const context = vm.createContext({ alertAudio: null, isOwner: () => true,
     alertAccountId: () => 'destinatario', recentAlertKeys: new Map(),
@@ -345,10 +380,11 @@ test('título pisca só no dono em segundo plano, sem reproduzir som', async () 
     readOwner: () => ({ updatedAt: Date.now() }), OWNER_TTL: 7000,
     isAnyKlingoTabFocused: () => false, syncGlobalFocus() {},
     directChatSender: () => '', startBlink: () => events.push('piscar'),
+    playScriptAlert: () => events.push('som'),
     console });
   functions('publishChatAlert', 'detectChatRows', context);
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
-  assert.deepEqual(events, ['piscar']);
+  assert.deepEqual(events, ['piscar', 'som']);
   events.length = 0;
   context.isAnyKlingoTabFocused = () => true;
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
@@ -372,11 +408,12 @@ test('chegada durante troca de responsável não perde o alerta', async () => {
     claimOwner: () => { owner = true; },
     isAnyKlingoTabFocused: () => false, syncGlobalFocus() {},
     directChatSender: () => '', startBlink: () => events.push('piscar'),
+    playScriptAlert: () => events.push('som'),
     navigator: { locks: { request: (_name, callback) => Promise.resolve(callback()) } },
     console });
   functions('publishChatAlert', 'detectChatRows', context);
   await vm.runInContext('publishChatAlert({sender:"TESTE",source:"toast"})', context);
-  assert.deepEqual(events, ['piscar']);
+  assert.deepEqual(events, ['piscar', 'som']);
 });
 
 test('verificação de avisos não inicia alerta personalizado da conversa aberta', () => {
