@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.62
+// @version      1.63
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -11737,6 +11737,7 @@ const tmConfirmationCalendarAdapter = (() => {
   'use strict';
   const ELIGIBLE = new Set(['0', '2', '11']);
   const completionIntents = new WeakMap();
+  const firstVisits = new WeakMap();
   const pending = new Map();
 
   function positiveId(value) {
@@ -11805,6 +11806,23 @@ const tmConfirmationCalendarAdapter = (() => {
     }
   }
 
+  function hasRecordedSend(record) {
+    return /^\d{4}-\d{2}-\d{2}/.test(record.dt_envio || '') &&
+      !String(record.dt_envio).startsWith('0000-') && !!positiveId(record.id_usuario_envio);
+  }
+
+  async function registerSend(axios, record) {
+    const response = await axios.post('/aql?a=solicitacao_autorizacoes.marcar_envio', {
+      q: [{ name: 'solicitacao_autorizacoes.marcar_envio', id: 'atualizar', parms: {
+        id_solicitacao_autorizacao: record.id_solicitacao_autorizacao,
+        st_observacao_envio: record.st_observacao_envio, envio: true
+      } }]
+    });
+    if (![200, 290].includes(response.data?.atualizar?.status)) {
+      throw new Error('O Klingo não confirmou o registro nativo do envio.');
+    }
+  }
+
   async function transitionAuthorization(axios, context, options = {}) {
     let sentStored = false, sessionStored = false;
     try {
@@ -11818,18 +11836,38 @@ const tmConfirmationCalendarAdapter = (() => {
       const targets = authorizationItems(record, ids).filter(item => ELIGIBLE.has(String(item.in_status)))
         .map(item => positiveId(item.id_procedimento));
       if (!targets.length) return { changed: false };
+      const checkSendScope = current => {
+        if (!hasRecordedSend(current) && !targets.includes(positiveId(current.id_procedimento)) &&
+            String(current.in_status) !== '6') {
+          const error = new Error('Registre o envio desta autorização compartilhada no módulo Autorizações; o envio nativo também altera o procedimento principal.');
+          error.code = 'SHARED_SEND_REQUIRED';
+          throw error;
+        }
+      };
+      checkSendScope(record);
       options.beforeStore?.();
       await storeAuthorization(axios, statusDraft(record, targets, 6, ELIGIBLE));
-      sentStored = true;
+      const beforeSend = await readAuthorization(axios, context.authorizationId);
+      statusDraft(beforeSend, targets, 6, new Set(['6']));
+      checkSendScope(beforeSend);
+      if (!hasRecordedSend(beforeSend)) {
+        options.beforeStore?.();
+        await registerSend(axios, beforeSend);
+      }
       options.onStored?.();
       const sent = await readAuthorization(axios, context.authorizationId);
+      if (!hasRecordedSend(sent)) throw new Error('Data e usuário de envio não foram persistidos.');
+      sentStored = true;
+      const draft = statusDraft(sent, targets, 10, new Set(['6']));
       options.beforeStore?.();
-      await storeAuthorization(axios, statusDraft(sent, targets, 10, new Set(['6'])));
+      await storeAuthorization(axios, draft);
       sessionStored = true;
       options.onStored?.();
       const final = await readAuthorization(axios, context.authorizationId);
       const finalItems = authorizationItems(final, targets);
-      if (finalItems.length !== targets.length || finalItems.some(item => String(item.in_status) !== '10')) {
+      if (finalItems.length !== targets.length || finalItems.some(item => String(item.in_status) !== '10') ||
+          !hasRecordedSend(final) || final.dt_envio !== sent.dt_envio ||
+          positiveId(final.id_usuario_envio) !== positiveId(sent.id_usuario_envio)) {
         throw new Error('Não foi possível confirmar o status final Em Sessão.');
       }
       return { changed: true, procedureIds: targets };
@@ -11842,7 +11880,9 @@ const tmConfirmationCalendarAdapter = (() => {
 
   function completionContext(workflow, guide) {
     const appointment = workflow.marcacao;
-    if (Number(workflow.etapa) !== 8 || workflow.$refs.listaguias !== guide ||
+    const visit = firstVisits.get(workflow);
+    if (!visit || visit.consumed || visit.appointmentId !== positiveId(appointment?.id_marcacao) ||
+        hasCompletedStep(appointment, [8]) || Number(workflow.etapa) !== 8 || workflow.$refs.listaguias !== guide ||
         !Array.isArray(guide.lista) || !guide.lista.length ||
         positiveId(guide.marcacao?.id_marcacao) !== positiveId(appointment?.id_marcacao)) return null;
     const context = { appointmentId: positiveId(appointment?.id_marcacao),
@@ -11851,7 +11891,51 @@ const tmConfirmationCalendarAdapter = (() => {
     return Object.values(context).every(Boolean) ? context : null;
   }
 
+  function hasCompletedStep(appointment, steps) {
+    return steps.some(step => [true, 1, '1'].includes(appointment?.item_status?.etapas?.[`e${step}`])) ||
+      (appointment?.atendimento?.progresso_atendimentos || []).some(item =>
+        steps.includes(Number(item.id_etapa_atendimento)) && !!item.dt_conclusao &&
+        ![false, 0, '0'].includes(item.fl_ativo));
+  }
+
+  function isFirstVisit(appointment) {
+    const stages = appointment?.item_status?.etapas;
+    return !!positiveId(appointment?.id_marcacao) && !!stages &&
+      [1, 2, 8].every(n => [false, 0, '0'].includes(stages[`e${n}`])) &&
+      !appointment.item_status.finalizado && appointment.item_status.valor !== 'cancelado' &&
+      !hasCompletedStep(appointment, [1, 2, 8]);
+  }
+
+  async function verifyFirstVisit(axios, id) {
+    const response = await axios.post('/aql?a=marcacoes.show', { q: [{ name: 'marcacoes.show',
+      id: 'item', parms: { id, para_atendimento: true, guia_tiss: true } }] });
+    if (response.data?.item?.status !== 200) throw new Error('Não foi possível verificar o histórico da recepção.');
+    const appointment = response.data.item.data;
+    return positiveId(appointment?.id_marcacao) === id && isFirstVisit(appointment);
+  }
+
+  function installFirstVisitHook(workflow) {
+    if (typeof workflow.abrir !== 'function' || workflow.abrir.__tmReceptionAuthorizationCompletion) return;
+    const open = workflow.abrir;
+    const wrapped = function (appointment, step = 1, local, callback) {
+      // ir_para_etapa(1) chama abrir novamente com callback; não é uma nova abertura do usuário.
+      if (typeof callback !== 'function') {
+        firstVisits.delete(this);
+        if (Number(step) === 1 && isFirstVisit(appointment)) {
+          const id = positiveId(appointment.id_marcacao);
+          // Consultar antes de abrir impede que uma lista antiga rearme atendimento já iniciado.
+          const validation = verifyFirstVisit(this.axios, id).then(allowed => ({ allowed }), error => ({ error }));
+          firstVisits.set(this, { appointmentId: id, consumed: false, validation });
+        }
+      }
+      return open.apply(this, arguments);
+    };
+    wrapped.__tmReceptionAuthorizationCompletion = true;
+    workflow.abrir = wrapped;
+  }
+
   function installCompletionHook(workflow) {
+    installFirstVisitHook(workflow);
     const util = workflow.$util;
     if (!util || typeof util.atualizar !== 'function') return;
     if (!util.atualizar.__tmReceptionAuthorizationCompletion) {
@@ -11863,7 +11947,12 @@ const tmConfirmationCalendarAdapter = (() => {
         const callback = config.callback;
         return originalUpdate.call(this, component, { ...config, callback: function (...args) {
           try { return callback?.apply(this, args); }
-          finally { queueCompletion(intent.context, intent.workflow); }
+          finally {
+            if (!intent.visit.consumed) {
+              intent.visit.consumed = true;
+              queueCompletion(intent.context, intent.workflow, intent.visit);
+            }
+          }
         } });
       };
       wrappedUpdate.__tmReceptionAuthorizationCompletion = true;
@@ -11875,7 +11964,7 @@ const tmConfirmationCalendarAdapter = (() => {
     const wrappedPrint = function (...args) {
       const context = args[0] === false && args[1] === 'iniciarAtendimentoModal'
         ? completionContext(workflow, this) : null;
-      if (context) completionIntents.set(this, { context, workflow });
+      if (context) completionIntents.set(this, { context, workflow, visit: firstVisits.get(workflow) });
       try { return originalPrint.apply(this, args); }
       finally { completionIntents.delete(this); }
     };
@@ -11891,7 +11980,7 @@ const tmConfirmationCalendarAdapter = (() => {
     return null;
   }
 
-  function queueCompletion(context, workflow) {
+  function queueCompletion(context, workflow, visit) {
     const account = positiveId(workflow.$store.state.user?.id_usuario);
     const key = `${account}:${context.appointmentId}:${context.attendanceId}`;
     if (pending.has(key)) return;
@@ -11899,7 +11988,10 @@ const tmConfirmationCalendarAdapter = (() => {
       summary: 'Autorização', detail, life: severity === 'error' ? 10000 : 5000 });
     const updated = () => document.dispatchEvent(new CustomEvent('tm-reception-authorization-updated',
       { detail: { id: context.authorizationId } }));
-    const job = Promise.resolve().then(() => {
+    const job = Promise.resolve().then(async () => {
+      const verification = await visit.validation;
+      if (verification.error) throw verification.error;
+      if (!verification.allowed) return { changed: false };
       if (!account || !navigator.locks?.request) throw new Error('Coordenação entre abas indisponível.');
       return navigator.locks.request(`klingo-reception-authorization:${account}:${context.authorizationId}`, () =>
         transitionAuthorization(workflow.axios, context, { onStored: updated, beforeStore: () => {
@@ -11908,7 +12000,7 @@ const tmConfirmationCalendarAdapter = (() => {
     }).then(result => {
       if (result.changed) notify('success', 'Procedimentos deste agendamento: Enviado → Em Sessão.');
     }).catch(error => {
-      const detail = error.sessionStored
+      const detail = error.code === 'SHARED_SEND_REQUIRED' ? error.message : error.sessionStored
         ? 'Atualização enviada, mas o estado final não pôde ser confirmado. Revise a autorização.'
         : error.sentStored
           ? 'Enviado foi registrado, mas Em Sessão não foi confirmado. Revise a autorização.'

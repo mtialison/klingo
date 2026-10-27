@@ -2,8 +2,11 @@
 
 - Após o sucesso nativo de Concluir na etapa de guias (etapa 8), atualizar somente os procedimentos do atendimento deste agendamento. Escopo confirmado pelo usuário em 2026-10-27.
 - Para cada item em Aberto (0), Em análise (2) ou Pendente (11), gravar Enviado (6) e aguardar sucesso antes de gravar Em Sessão (10).
-- Usar a consulta de edição e o serviço `solicitacao_autorizacoes.store` utilizados pelo modal nativo. Preservar todos os demais campos e itens.
+- Usar a consulta de edição e `solicitacao_autorizacoes.store` para os status por procedimento; usar também a ação nativa `solicitacao_autorizacoes.marcar_envio` para registrar data e usuário do envio. Só avançar para Em Sessão após reler e confirmar esses metadados; preservar envio já existente.
+- Armar apenas na abertura por Iniciar (etapa 1), com cadastro, procedimentos e guia ainda não concluídos. Consultar esse histórico no servidor antes da abertura nativa, além de verificar a lista local; consumir a visita após o primeiro callback de sucesso. Reabrir pelos ícones ou manipular etapas concluídas não rearma a automação.
+- O envio nativo altera também o status principal da solicitação. Se só secundários forem alvo, sem envio previamente registrado e com principal fora de Enviado, interromper antes de gravar qualquer item e orientar revisão no módulo Autorizações. Não simular suporte atômico do backend nem arriscar alterar o principal alheio ao agendamento.
 - Não acionar ao fechar o modal, imprimir, voltar, falhar a conclusão ou não haver vínculo de autorização.
 - Consultar novamente entre gravações, serializar por autorização entre abas e impedir atualização de itens cujo estado tenha mudado. Não tentar adivinhar itens duplicados com o mesmo ID de procedimento.
 - Falhas devem informar que a recepção foi concluída, mas a autorização precisa de revisão; não refazer a recepção nem esconder uma gravação parcial.
 - Testes reais com gravação dependem de autorização específica para o registro TESTE; nenhum paciente real deve ser alterado durante a validação.
+- Em 2026-10-27, usuário autorizou teste adicional somente na autorização TESTE #26040. A ação nativa gravou `dt_envio` e `id_usuario_envio`; o store posterior confirmou Em Sessão com ambos preservados. Não acessar nem testar Relatórios; validação final do relatório fica com o usuário.
