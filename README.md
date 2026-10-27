@@ -31,4 +31,6 @@ Na versão de testes **1.56**, a aba Autorizações oferece **Aberto + Enviado**
 
 Na versão de testes **1.57**, o botão 🐵 à direita da versão no cabeçalho abre em outra aba o userscript da branch `main`, como atalho para atualização manual pelo Tampermonkey.
 
+Na versão de testes **1.59**, agendamentos da Recepção vinculados a uma solicitação exibem uma badge clicável entre horário e paciente. O texto e a cor vêm do status nativo da autorização; o clique abre o modal nativo disponível na própria Recepção. Consultas de leitura são agrupadas por ID, deduplicadas e limitadas a duas simultâneas; a atualização da listagem invalida o cache.
+
 Antes de promover, rode cada `tests/*.test.cjs` com Node, confirme `node --check klingo.user.js` e faça os testes visuais no Klingo. Aumente `@version` quando quiser disparar uma atualização automática. O arquivo de testes nunca deve ser copiado para `main`.
