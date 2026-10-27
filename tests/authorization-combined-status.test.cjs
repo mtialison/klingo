@@ -102,16 +102,19 @@ test('opção fica acima de Aberto apenas no filtro, sem alterar lista compartil
   const vue = { filtros: {}, load() {} };
   const parent = { __vue__: vue };
   const select = { __vue__: input, parentElement: parent,
-    options: ['Todos os Status Ativos...', 'Aberto', 'Enviado'].map(textContent => ({ textContent })) };
+    options: ['', '0', '6'].map((value, i) => ({ value,
+      textContent: ['Todos os Status Ativos...', 'Aberto', 'Enviado'][i] })),
+    insertBefore(option, before) { this.options.splice(this.options.indexOf(before), 0, option); } };
   const source = fs.readFileSync(filename, 'utf8');
   let ensure;
   vm.runInNewContext(source, { document: {
+    createElement: () => ({}),
     querySelector: () => ({ textContent: 'Autorizações' }),
     getElementById: () => ({ closest: () => ({ querySelectorAll: () => [select] }) })
   }, tmRuntime: { register(_name, callback) { ensure = callback; } } });
   ensure(); ensure();
-  assert.equal(input.listaJson.length, 3);
-  assert.equal(input.listaJson[0].search, 'Aberto + Enviado');
-  assert.equal(input.listaJson[1].search, 'Aberto');
+  assert.equal(select.options.length, 4);
+  assert.equal(select.options[1].textContent, 'Aberto + Enviado');
+  assert.equal(select.options[2].textContent, 'Aberto');
   assert.equal(original.length, 2);
 });

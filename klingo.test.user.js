@@ -11468,22 +11468,27 @@ const tmConfirmationCalendarAdapter = (() => {
       return labels.includes('Todos os Status Ativos...') && labels.includes('Aberto') && labels.includes('Enviado');
     });
     if (!select) return;
-    let input = null, vue = null;
+    let vue = null;
     for (let node = select; node; node = node.parentElement) {
-      if (!input && Array.isArray(node.__vue__?.listaJson)) input = node.__vue__;
       if (node.__vue__?.filtros && typeof node.__vue__.load === 'function') {
         vue = node.__vue__;
         break;
       }
     }
-    if (!input || !vue) return;
+    if (!vue) return;
     hookAuthorizationLoad(vue);
-    if (input.listaJson.some(option => option.id === COMBINED_STATUS)) return;
-    const options = input.listaJson.slice();
-    const index = options.findIndex(option => String(option.id) === '0');
-    if (index < 0) return;
-    options.splice(index, 0, { id: COMBINED_STATUS, search: 'Aberto + Enviado' });
-    input.listaJson = options;
+    if (!Array.from(select.options).some(option => option.value === COMBINED_STATUS)) {
+      const open = Array.from(select.options).find(option => option.value === '0');
+      if (!open) return;
+      const option = document.createElement('option');
+      option.value = COMBINED_STATUS;
+      option.textContent = 'Aberto + Enviado';
+      select.insertBefore(option, open);
+    }
+    // O Vue pode remontar o select após outro filtro mudar.
+    if (vue.filtros.status === COMBINED_STATUS && select.value !== COMBINED_STATUS) {
+      select.value = COMBINED_STATUS;
+    }
   }
 
   tmRuntime.register('autorizações Aberto + Enviado', ensureCombinedStatus, ['#/autorizacoes']);
