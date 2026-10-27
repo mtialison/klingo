@@ -277,24 +277,6 @@ function tmParseDateInput(rawValue) {
     }
   }
 
-  function tryAutoLoginAfterAutofill() {
-    autoLoginTask = null;
-    if (autoLoginAttempted || manualLoginEntry || hasPendingAutoAttempt() ||
-        GM_getValue(AUTO_LOGIN_LOGOUT_KEY, false) || document.readyState !== 'complete') return;
-
-    const controls = getLoginControls();
-    if (!controls) return;
-    const { username, password, submit } = controls;
-    if (!username.value.trim() || !password.value ||
-        !isBrowserAutofilled(username) || !isBrowserAutofilled(password) ||
-        username.disabled || password.disabled || username.readOnly || password.readOnly ||
-        submit.disabled || submit.getAttribute('aria-disabled') === 'true') return;
-
-    if (!markAutoAttemptPending()) return;
-    autoLoginAttempted = true;
-    submit.click();
-  }
-
   function tryAutoLoginWithSavedCredential() {
     if (silentCredentialRequested || autoLoginAttempted || manualLoginEntry || hasPendingAutoAttempt() ||
         GM_getValue(AUTO_LOGIN_LOGOUT_KEY, false) || document.readyState !== 'complete' ||
@@ -305,10 +287,13 @@ function tmParseDateInput(rawValue) {
         !controls.username.getClientRects().length || !controls.password.getClientRects().length ||
         controls.username.disabled || controls.password.disabled ||
         controls.username.readOnly || controls.password.readOnly ||
-        controls.username.value || controls.password.value) return;
+        (controls.username.value && !isBrowserAutofilled(controls.username)) ||
+        (controls.password.value && !isBrowserAutofilled(controls.password))) return;
     silentCredentialRequested = true;
 
-    // A senha permanece apenas na memória durante esta tentativa; nunca vai para GM/localStorage ou logs.
+    // O navegador só permite a resposta silenciosa com uma credencial elegível.
+    // Null/erro significa entrada manual; autofill não comprova que exista só uma conta.
+    // A senha permanece apenas na memória; nunca vai para GM/localStorage ou logs.
     let credentialRequest;
     try {
       credentialRequest = navigator.credentials.get({ password: true, mediation: 'silent' });
@@ -322,7 +307,9 @@ function tmParseDateInput(rawValue) {
 
       const current = getLoginControls();
       if (!current || current.username !== controls.username || current.password !== controls.password ||
-          document.querySelector('nav.navbar') || current.username.value || current.password.value ||
+          document.querySelector('nav.navbar') ||
+          (current.username.value && current.username.value !== credential.id) ||
+          (current.password.value && current.password.value !== credential.password) ||
           current.username.disabled || current.password.disabled ||
           current.username.readOnly || current.password.readOnly) return;
 
@@ -336,7 +323,8 @@ function tmParseDateInput(rawValue) {
       current.password.dispatchEvent(new Event('change', { bubbles: true }));
 
       // Permite que os handlers do formulário atualizem o estado antes do envio.
-      window.setTimeout(() => {
+      autoLoginTask = window.setTimeout(() => {
+        autoLoginTask = null;
         const latest = getLoginControls();
         if (!latest || latest.username !== current.username || latest.password !== current.password ||
             latest.submit !== current.submit || latest.username.value !== credential.id ||
@@ -349,7 +337,7 @@ function tmParseDateInput(rawValue) {
         latest.submit.click();
       }, 0);
     }).catch(() => {
-      // Sem credencial silenciosa, permanece o fluxo já existente de autofill/manual.
+      // Sem confirmação do navegador, o usuário escolhe a conta e clica em Entrar.
     });
   }
 
@@ -391,11 +379,21 @@ function tmParseDateInput(rawValue) {
     setManualLoginPending(true);
   }
 
+  function cancelAutoLoginOnInteraction() {
+    if (!getLoginControls()) return;
+    manualLoginEntry = true;
+    cancelAutoLoginTask();
+  }
+
+  document.addEventListener('pointerdown', (event) => {
+    if (event.isTrusted) cancelAutoLoginOnInteraction();
+  }, true);
+
   document.addEventListener('keydown', (event) => {
     if (!event.isTrusted || !event.target?.matches?.(
       'input[name="login-username"], input[name="login-userpassword"]')) return;
     if (event.key === 'Enter') markManualLoginSubmission();
-    else if (event.key?.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
+    else {
       manualLoginEntry = true;
       cancelAutoLoginTask();
     }
@@ -409,18 +407,19 @@ function tmParseDateInput(rawValue) {
     }
   }, true);
 
-  // O navegador emite input ao preencher as credenciais. O próximo turno do event loop
-  // deixa os manipuladores do Klingo processarem o valor antes da tentativa de login.
+  // Preenchimento automático nunca dispara envio: não informa quantas contas existem.
   document.addEventListener('input', (event) => {
     if (event.isTrusted && event.target?.matches?.(
       'input[name="login-username"][type="text"], input[name="login-userpassword"][type="password"]') &&
-        !autoLoginAttempted && !manualLoginEntry && autoLoginTask === null) {
-      autoLoginTask = window.setTimeout(tryAutoLoginAfterAutofill, 0);
+        !isBrowserAutofilled(event.target)) {
+      manualLoginEntry = true;
+      cancelAutoLoginTask();
     }
   }, true);
 
   document.addEventListener('click', (event) => {
     if (!event.isTrusted) return;
+    cancelAutoLoginOnInteraction();
     const target = event.target?.nodeType === 1 ? event.target : event.target?.parentElement;
     const logout = target?.closest?.('a.dropdown-item.ddip-card.d-flex.justify-content-between[href="#"]');
     if (logout?.firstElementChild?.textContent.trim().toLocaleUpperCase('pt-BR') === 'SAIR') {

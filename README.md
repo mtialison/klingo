@@ -33,4 +33,6 @@ Na versão de testes **1.57**, o botão 🐵 à direita da versão no cabeçalho
 
 Na versão de testes **1.59**, agendamentos da Recepção vinculados a uma solicitação exibem uma badge clicável entre horário e paciente. O texto e a cor vêm do status nativo da autorização; o clique abre o modal nativo disponível na própria Recepção. Consultas de leitura são agrupadas por ID, deduplicadas e limitadas a duas simultâneas; a atualização da listagem invalida o cache.
 
+Na versão de testes **1.60**, autofill e cliques na página deixam de disparar login. A tentativa automática usa exclusivamente `navigator.credentials.get({password: true, mediation: 'silent'})`: o navegador só fornece uma credencial sem escolha quando existe uma única opção elegível e a entrada silenciosa está permitida. Sem essa confirmação (inclusive com várias contas), o usuário escolhe a conta e usa Entrar/Enter. Interações manuais cancelam tentativas pendentes. Referência: [guia do Chrome](https://web.dev/articles/security-credential-management-retrieve-credentials).
+
 Antes de promover, rode cada `tests/*.test.cjs` com Node, confirme `node --check klingo.user.js` e faça os testes visuais no Klingo. Aumente `@version` quando quiser disparar uma atualização automática. O arquivo de testes nunca deve ser copiado para `main`.
