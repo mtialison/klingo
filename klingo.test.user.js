@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.65
+// @version      1.66
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -11657,7 +11657,7 @@ const tmConfirmationCalendarAdapter = (() => {
     const button = slot.firstElementChild;
     const cached = state.cache.get(id);
     const status = nativeAuthorizationStatus(appointment.autorizacao?.status_solicitacao) || cached?.status;
-    const text = status?.msg || (cached ? 'Ver autorização' : 'Autorização…');
+    const text = status?.msg || (cached ? 'Ver autorização' : '...');
     const classes = `badge badge-${status?.color || 'secondary'} tm-reception-authorization-button`;
     if (button.className !== classes) button.className = classes;
     if (button.textContent !== text) button.textContent = text;

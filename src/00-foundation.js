@@ -905,12 +905,12 @@ function setDateCalculatorOpen(isOpen) {
       link.href = 'https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js';
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
-      link.title = 'Atualizar o script';
-      link.setAttribute('aria-label', 'Atualizar o script');
+      link.title = 'Atualizar script';
+      link.setAttribute('aria-label', 'Atualizar script');
       const icon = document.createElement('span');
       icon.className = 'tm-datecalc-trigger-icon';
       icon.setAttribute('aria-hidden', 'true');
-      icon.textContent = '🐵';
+      icon.textContent = '🐒';
       link.appendChild(icon);
       link.style.setProperty('position', 'absolute', 'important');
       link.style.setProperty('left', 'calc(50% + 36px)', 'important');

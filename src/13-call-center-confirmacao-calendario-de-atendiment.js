@@ -280,7 +280,7 @@
       button.type = 'button'; button.className = `btn btn-outline-secondary ${BUTTON_CLASS}`;
       button.innerHTML = '<i class="fas fa-calendar-alt" aria-hidden="true"></i>';
       button.setAttribute('aria-label', index ? 'Abrir calendário da data final' : 'Abrir calendário da data inicial');
-      button.title = index ? 'Selecionar data final' : 'Calendário de atendimentos e bloqueios';
+      button.title = index ? 'Selecionar data final' : 'Calendário de atendimentos';
       if (!index) {
         button.addEventListener('pointerenter', preload);
         button.addEventListener('focus', preload);

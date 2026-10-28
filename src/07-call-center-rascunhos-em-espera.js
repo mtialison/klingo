@@ -665,7 +665,7 @@
     toggle.type = 'button';
     toggle.className = 'tm-draft-trigger';
     toggle.dataset.action = 'toggle';
-    toggle.title = `Em espera (${drafts.length})`;
+    toggle.title = `Em espera`;
     toggle.setAttribute('aria-label', `Em espera (${drafts.length})`);
     toggle.setAttribute('aria-expanded', String(open));
     const icon = document.createElement('span');

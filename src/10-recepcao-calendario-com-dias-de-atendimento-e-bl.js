@@ -998,7 +998,7 @@ let tmAppointmentCalendarCore;
       button.className = 'btn btn-outline-secondary';
       button.innerHTML = '<i class="fas fa-calendar-alt" aria-hidden="true"></i>';
       button.setAttribute('aria-label', 'Abrir calendário de atendimentos');
-      button.title = 'Calendário de atendimentos e bloqueios';
+      button.title = 'Calendário de atendimentos';
       button.addEventListener('pointerenter', () => prefetchSelectedMonth(true));
       button.addEventListener('focus', () => prefetchSelectedMonth(true));
       button.addEventListener('click', (event) => {

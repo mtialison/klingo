@@ -131,7 +131,7 @@
     const button = slot.firstElementChild;
     const cached = state.cache.get(id);
     const status = nativeAuthorizationStatus(appointment.autorizacao?.status_solicitacao) || cached?.status;
-    const text = status?.msg || (cached ? 'Ver autorização' : 'Autorização…');
+    const text = status?.msg || (cached ? 'Ver autorização' : '...');
     const classes = `badge badge-${status?.color || 'secondary'} tm-reception-authorization-button`;
     if (button.className !== classes) button.className = classes;
     if (button.textContent !== text) button.textContent = text;
