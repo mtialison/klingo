@@ -905,12 +905,12 @@ function setDateCalculatorOpen(isOpen) {
       link.href = 'https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js';
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
-      link.title = 'Atualizar o script';
-      link.setAttribute('aria-label', 'Atualizar o script');
+      link.title = 'Atualizar script';
+      link.setAttribute('aria-label', 'Atualizar script');
       const icon = document.createElement('span');
       icon.className = 'tm-datecalc-trigger-icon';
       icon.setAttribute('aria-hidden', 'true');
-      icon.textContent = '🐵';
+      icon.textContent = '🐒';
       link.appendChild(icon);
       link.style.setProperty('position', 'absolute', 'important');
       link.style.setProperty('left', 'calc(50% + 36px)', 'important');
@@ -6783,7 +6783,7 @@ const tmBookingModalWatch = (() => {
     toggle.type = 'button';
     toggle.className = 'tm-draft-trigger';
     toggle.dataset.action = 'toggle';
-    toggle.title = `Em espera (${drafts.length})`;
+    toggle.title = `Em espera`;
     toggle.setAttribute('aria-label', `Em espera (${drafts.length})`);
     toggle.setAttribute('aria-expanded', String(open));
     const icon = document.createElement('span');
@@ -9150,7 +9150,7 @@ let tmAppointmentCalendarCore;
       button.className = 'btn btn-outline-secondary';
       button.innerHTML = '<i class="fas fa-calendar-alt" aria-hidden="true"></i>';
       button.setAttribute('aria-label', 'Abrir calendário de atendimentos');
-      button.title = 'Calendário de atendimentos e bloqueios';
+      button.title = 'Calendário de atendimentos';
       button.addEventListener('pointerenter', () => prefetchSelectedMonth(true));
       button.addEventListener('focus', () => prefetchSelectedMonth(true));
       button.addEventListener('click', (event) => {
@@ -9584,7 +9584,7 @@ const tmConfirmationCalendarAdapter = (() => {
       button.type = 'button'; button.className = `btn btn-outline-secondary ${BUTTON_CLASS}`;
       button.innerHTML = '<i class="fas fa-calendar-alt" aria-hidden="true"></i>';
       button.setAttribute('aria-label', index ? 'Abrir calendário da data final' : 'Abrir calendário da data inicial');
-      button.title = index ? 'Selecionar data final' : 'Calendário de atendimentos e bloqueios';
+      button.title = index ? 'Selecionar data final' : 'Calendário de atendimentos';
       if (!index) {
         button.addEventListener('pointerenter', preload);
         button.addEventListener('focus', preload);
