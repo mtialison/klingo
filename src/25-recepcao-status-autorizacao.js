@@ -12,6 +12,36 @@
     return /^\d+$/.test(String(id)) && Number(id) > 0 ? String(id) : '';
   }
 
+  function authorizationPolicy(queues) {
+    // O vínculo histórico permanece no agendamento. As filas nativas podem excluir
+    // sua operadora atual mesmo quando show ainda retorna a solicitação como Aberto.
+    const active = queues.filter(queue => [true, 1, '1'].includes(queue.fl_ativo));
+    const exclusions = active.map(queue => new Set((queue.filtros || []).filter(rule =>
+      ![true, 1, '1'].includes(rule.excluido) && [false, 0, '0'].includes(rule.fl_regra) &&
+      String(rule.model_type).split('\\').pop().toLowerCase() === 'operadora')
+      .map(rule => String(rule.model_id))));
+    // Não ocultar uma autorização que ainda pode pertencer a outra fila ativa.
+    return { excludedOperators: new Set(exclusions.length
+      ? [...exclusions[0]].filter(id => exclusions.every(set => set.has(id))) : []) };
+  }
+
+  async function fetchAuthorizationPolicy(axios, cancelToken) {
+    const response = await axios.post('/aql?a=fila_autorizacoes.index', {
+      q: [{ name: 'fila_autorizacoes.index', id: 'rules', parms: {} }]
+    }, { cancelToken });
+    const result = response.data?.rules;
+    if (result?.status !== 200 || !Array.isArray(result.data)) throw new Error('Regras de autorização indisponíveis.');
+    return authorizationPolicy(result.data);
+  }
+
+  function authorizationApplies(appointment, policy) {
+    if (!policy || !authorizationId(appointment)) return false;
+    const plan = appointment.plano;
+    if (appointment.id_plano && plan?.id_plano && String(appointment.id_plano) !== String(plan.id_plano)) return false;
+    const operator = plan?.id_operadora ?? plan?.operadora?.id_operadora;
+    return !policy.excludedOperators.has(String(operator));
+  }
+
   function nativeAuthorizationStatus(status) {
     if (!status || typeof status.msg !== 'string' || !status.msg.trim()) return null;
     const color = String(status.color || '').toLowerCase();
@@ -84,7 +114,7 @@
     const appointment = cell?.__vue__?.hor?.marcacao;
     const id = authorizationId(appointment);
     let slot = row?.querySelector(':scope > .tm-reception-authorization-slot');
-    if (!time || !id) {
+    if (!time || !authorizationApplies(appointment, state.policy)) {
       slot?.remove();
       time?.classList.remove('tm-reception-authorization-time');
       return '';
@@ -123,15 +153,32 @@
       return;
     }
     injectStyle();
-    const scope = `${vue.referencia}:${vue.unidade_operacao}:${vue.$store.state.user?.id_usuario || ''}`;
+    const account = String(vue.$store.state.user?.id_usuario || '');
+    const scope = `${vue.referencia}:${vue.unidade_operacao}:${account}`;
     if (!activeState || activeState.vue !== vue || activeState.source !== vue.marcacoes || activeState.scope !== scope) {
+      const policy = activeState?.account === account ? activeState.policy : null;
       activeState?.token.cancel('Listagem alterada');
-      activeState = { vue, source: vue.marcacoes, scope,
+      activeState = { vue, source: vue.marcacoes, scope, account, policy,
         token: vue.axios.CancelToken.source(), cache: new Map(), loading: false };
     }
     const state = activeState;
     const ids = [...new Set(Array.from(document.querySelectorAll(CARD_SELECTOR),
       card => renderCard(card, vue, state)).filter(Boolean))];
+    if ((!state.policy || Date.now() - state.policy.at >= CACHE_TTL) && !state.loading) {
+      state.loading = true;
+      fetchAuthorizationPolicy(vue.axios, state.token.token).then(policy => {
+        if (activeState === state) state.policy = { ...policy, at: Date.now() };
+      }).catch(error => {
+        if (activeState !== state || vue.axios.isCancel?.(error)) return;
+        // Falha de permissão/rede não pode ocultar autorizações válidas nem travar a lista.
+        state.policy = { ...(state.policy || authorizationPolicy([])), at: Date.now() };
+        console.warn('[TM] Não foi possível consultar as regras de autorização:', error.message);
+      }).finally(() => {
+        state.loading = false;
+        if (activeState === state) tmRuntime.schedule(0);
+      });
+      return;
+    }
     if (!ids.length || state.loading) return;
     state.loading = true;
     fetchAuthorizationStatuses(vue.axios, ids, state.token.token).then(statuses => {
