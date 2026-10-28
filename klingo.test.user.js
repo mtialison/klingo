@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.66
+// @version      1.67
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -11648,8 +11648,8 @@ const tmConfirmationCalendarAdapter = (() => {
     if (!slot) {
       slot = document.createElement('div');
       slot.className = 'col col-12 col-md-1 tm-reception-authorization-slot';
-      const button = document.createElement('button');
-      button.type = 'button';
+      const button = document.createElement('a');
+      button.href = '#';
       slot.appendChild(button);
       row.insertBefore(slot, time.nextElementSibling);
     }

@@ -122,8 +122,8 @@
     if (!slot) {
       slot = document.createElement('div');
       slot.className = 'col col-12 col-md-1 tm-reception-authorization-slot';
-      const button = document.createElement('button');
-      button.type = 'button';
+      const button = document.createElement('a');
+      button.href = '#';
       slot.appendChild(button);
       row.insertBefore(slot, time.nextElementSibling);
     }
