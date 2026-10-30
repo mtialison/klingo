@@ -98,6 +98,7 @@
       #${POPOVER_ID} .tm-cal-day { height: 34px; border: 1px solid transparent; border-radius: 5px;
         background: #f5f7fa; color: #344054; }
       #${POPOVER_ID} .tm-cal-day:hover { background: #e2e6ea; }
+      #${POPOVER_ID} .tm-cal-day:focus:not(:focus-visible):not([data-today="true"]):not([data-selected="true"]) { outline: none; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"] { background: #198754; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"] { background: #dc3545; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #0d6efd; color: #fff; font-weight: 700; }

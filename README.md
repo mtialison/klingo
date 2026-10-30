@@ -50,3 +50,5 @@ Na versão de testes **1.71**, os calendários da Recepção e Confirmação des
 Na versão de testes **1.72**, hoje usa #F6339A e a seleção usa #2B7FFF. Quando a seleção coincide com hoje, aparece apenas o contorno azul da seleção, com a mesma espessura de 3 px.
 
 Na versão de testes **1.73**, as cores foram invertidas: hoje #2B7FFF e seleção #F6339A. Ao selecionar hoje, aparece somente o contorno rosa da seleção.
+
+Na versão de testes **1.74**, o clique do mouse nas datas comuns deixa de exibir o contorno nativo preto. Os destaques coloridos de hoje/seleção e o indicador de foco por teclado permanecem.
