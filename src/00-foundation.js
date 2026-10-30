@@ -1006,7 +1006,9 @@ function setDateCalculatorOpen(isOpen) {
 
     if (host.querySelector('[data-tm-datecalc-header-trigger="1"]')) return;
 
-    const patientItem = host.querySelector('li');
+    // O dock pode aparecer antes da calculadora; preserve a mesma ordem nos dois casos.
+    const draftDock = host.querySelector('#tm-callcenter-drafts');
+    const patientItem = draftDock ? draftDock.nextElementSibling : host.querySelector('li');
     const triggerLi = document.createElement('li');
     triggerLi.className = 'nav-item tm-datecalc-header-trigger-item';
 
