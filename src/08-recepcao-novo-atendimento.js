@@ -842,7 +842,7 @@
 
     const query = { q: [{ name: 'marcacoes.campos_customizados', id: 'campos_custom', parms: {} }] };
     originLastAttempt = Date.now();
-    originRequest = component.axios.post('/aql?a=marcacoes.campos_customizados', query)
+    originRequest = component.axios.post('/aql?a=marcacoes.campos_customizados', query, { tmFeature: 'reception-origin' })
       .then((response) => {
         const result = response?.data?.campos_custom;
         if (result?.status !== 200 || !hasOriginField(result.data)) {

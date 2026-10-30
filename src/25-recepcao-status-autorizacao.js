@@ -29,7 +29,7 @@
   async function fetchAuthorizationPolicy(axios, cancelToken) {
     const response = await axios.post('/aql?a=fila_autorizacoes.index', {
       q: [{ name: 'fila_autorizacoes.index', id: 'rules', parms: {} }]
-    }, { cancelToken });
+    }, { cancelToken, tmFeature: 'reception-authorization-badge' });
     const result = response.data?.rules;
     if (result?.status !== 200 || !Array.isArray(result.data)) throw new Error('Regras de autorização indisponíveis.');
     return authorizationPolicy(result.data);
@@ -61,7 +61,8 @@
         const batch = batches[next++];
         const q = batch.map((id, i) => ({ name: 'solicitacao_autorizacoes.show',
           id: `authorization_${i}`, parms: { id, para_agendar: true } }));
-        const response = await axios.post('/aql?a=solicitacao_autorizacoes.show', { q }, { cancelToken });
+        const response = await axios.post('/aql?a=solicitacao_autorizacoes.show', { q },
+          { cancelToken, tmFeature: 'reception-authorization-badge' });
         batch.forEach((id, i) => {
           const result = response.data?.[`authorization_${i}`];
           if (result?.status !== 200 || String(result.data?.id_solicitacao_autorizacao) !== id) return;

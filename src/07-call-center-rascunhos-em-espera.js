@@ -285,7 +285,7 @@
     if (!(Number(id) > 0)) return;
     const response = await vue.axios.post('/aql?a=pacientes.show', {
       q: [{ name: 'pacientes.show', id: 'paciente', parms: { id } }]
-    });
+    }, { tmFeature: 'callcenter-drafts' });
     if (response?.data?.paciente?.status !== 200 || !response.data.paciente.data) {
       throw new Error('Não foi possível confirmar o cadastro do paciente.');
     }

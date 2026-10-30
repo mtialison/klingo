@@ -12,7 +12,8 @@
 
   async function readAppointment(axios, context) {
     const response = await axios.post('/aql?a=marcacoes.show', { q: [{ name: 'marcacoes.show',
-      id: 'item', parms: { id: context.appointmentId, para_atendimento: true, guia_tiss: true } }] });
+      id: 'item', parms: { id: context.appointmentId, para_atendimento: true, guia_tiss: true } }] },
+      { tmFeature: 'reception-authorization-completion' });
     const result = response.data?.item;
     const appointment = result?.data;
     if (result?.status !== 200 || positiveId(appointment?.id_marcacao) !== context.appointmentId ||
@@ -28,7 +29,7 @@
     const response = await axios.post('/aql?a=solicitacao_autorizacoes.index', {
       q: [{ name: 'solicitacao_autorizacoes.index', id: 'lista',
         parms: { id_solicitacao_autorizacao: id, autorizar: true } }]
-    });
+    }, { tmFeature: 'reception-authorization-completion' });
     const result = response.data?.lista;
     if (result?.status !== 200 || !Array.isArray(result.data) || result.data.length !== 1 ||
         positiveId(result.data[0]?.id_solicitacao_autorizacao) !== id) {
@@ -66,7 +67,7 @@
   async function storeAuthorization(axios, draft) {
     const response = await axios.post('/aql?a=solicitacao_autorizacoes.store', {
       q: [{ name: 'solicitacao_autorizacoes.store', id: 'atualizar', parms: draft }]
-    });
+    }, { tmFeature: 'reception-authorization-completion' });
     if (![200, 290].includes(response.data?.atualizar?.status)) {
       throw new Error('O Klingo não confirmou a gravação do status da autorização.');
     }
@@ -83,7 +84,7 @@
         id_solicitacao_autorizacao: record.id_solicitacao_autorizacao,
         st_observacao_envio: record.st_observacao_envio, envio: true
       } }]
-    });
+    }, { tmFeature: 'reception-authorization-completion' });
     if (![200, 290].includes(response.data?.atualizar?.status)) {
       throw new Error('O Klingo não confirmou o registro nativo do envio.');
     }
@@ -177,7 +178,7 @@
     // No agendamento de hoje, abrir é automático e ainda não existe atendimento.
     // Pedir para_atendimento/guia_tiss aqui faz o serviço nativo retornar HTTP 500.
     const response = await axios.post('/aql?a=marcacoes.show', { q: [{ name: 'marcacoes.show',
-      id: 'item', parms: { id } }] });
+      id: 'item', parms: { id } }] }, { tmFeature: 'reception-authorization-completion' });
     if (response.data?.item?.status !== 200) throw new Error('Não foi possível verificar o histórico da recepção.');
     const appointment = response.data.item.data;
     return positiveId(appointment?.id_marcacao) === id && isFirstVisit(appointment);

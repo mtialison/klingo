@@ -10,7 +10,7 @@
         q: [{ name: 'solicitacao_autorizacoes.index', id: 'lista',
           parms: { ...filters, status: '', page, size },
           configs: ['solic-aut-block-incluir-agenda-direto'] }]
-      }, { cancelToken });
+      }, { cancelToken, tmFeature: 'authorization-combined-status' });
       const payload = response.data;
       if (payload?.lista?.status !== 200 || !Array.isArray(payload.lista.data?.data)) {
         throw new Error('Não foi possível consultar as autorizações.');
