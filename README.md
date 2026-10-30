@@ -48,3 +48,5 @@ Na versão de testes **1.69**, a Recepção também revisa cards de horários li
 Na versão de testes **1.71**, os calendários da Recepção e Confirmação destacam hoje em amarelo e a seleção em azul, com contorno de 3 px e separação branca; os dois destaques coexistem quando a seleção é hoje. O hover escurece o fundo sem criar borda. Tooltips aparecem somente para bloqueios e feriados, preservando as descrições acessíveis nas demais datas. 235 testes passaram.
 
 Na versão de testes **1.72**, hoje usa #F6339A e a seleção usa #2B7FFF. Quando a seleção coincide com hoje, aparece apenas o contorno azul da seleção, com a mesma espessura de 3 px.
+
+Na versão de testes **1.73**, as cores foram invertidas: hoje #2B7FFF e seleção #F6339A. Ao selecionar hoje, aparece somente o contorno rosa da seleção.

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.72
+// @version      1.73
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -8932,10 +8932,10 @@ let tmAppointmentCalendarCore;
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"]:hover { background: #0b5ed7; }
       #${POPOVER_ID} .tm-cal-day[data-today="true"],
       #${POPOVER_ID} .tm-cal-day[data-selected="true"] {
-        outline: 3px solid #F6339A; outline-offset: 1px;
+        outline: 3px solid #2B7FFF; outline-offset: 1px;
         box-shadow: 0 0 0 1px #fff; position: relative; z-index: 1;
       }
-      #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline-color: #2B7FFF; }
+      #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline-color: #F6339A; }
       #${POPOVER_ID} .tm-cal-day[data-outside="true"] { opacity: .45; }
       #${POPOVER_ID} .tm-cal-footer { display: flex; align-items: center;
         justify-content: flex-start; gap: 10px; margin-top: 10px; }
@@ -9433,10 +9433,10 @@ const tmConfirmationCalendarAdapter = (() => {
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"]:hover { background: #0b5ed7; }
       #${POPOVER_ID} .tm-cal-day[data-today="true"],
       #${POPOVER_ID} .tm-cal-day[data-selected="true"] {
-        outline: 3px solid #F6339A; outline-offset: 1px;
+        outline: 3px solid #2B7FFF; outline-offset: 1px;
         box-shadow: 0 0 0 1px #fff; position: relative; z-index: 1;
       }
-      #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline-color: #2B7FFF; }
+      #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline-color: #F6339A; }
       #${POPOVER_ID} .tm-cal-day[data-outside="true"] { opacity: .45; }
       #${POPOVER_ID} .tm-cal-footer { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
       #${POPOVER_ID} .tm-cal-status { color: #667085; }
