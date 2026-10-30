@@ -148,7 +148,9 @@
   function ensureReceptionAuthorization() {
     const vue = receptionVue();
     if (!vue) {
-      activeState?.token.cancel('Saiu da Recepção');
+      // O interceptor global mostra a mensagem de cancelamento antes do catch local.
+      // #BC# é o código nativo de cancelamento silencioso, também durante remontagens.
+      activeState?.token.cancel('#BC#');
       activeState = null;
       return;
     }
@@ -157,7 +159,7 @@
     const scope = `${vue.referencia}:${vue.unidade_operacao}:${account}`;
     if (!activeState || activeState.vue !== vue || activeState.source !== vue.marcacoes || activeState.scope !== scope) {
       const policy = activeState?.account === account ? activeState.policy : null;
-      activeState?.token.cancel('Listagem alterada');
+      activeState?.token.cancel('#BC#');
       activeState = { vue, source: vue.marcacoes, scope, account, policy,
         token: vue.axios.CancelToken.source(), cache: new Map(), loading: false };
     }

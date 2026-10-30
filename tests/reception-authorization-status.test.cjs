@@ -268,3 +268,101 @@ test('card reaproveitado como horário livre remove badge e vínculo mesmo com r
   run();
   assert.equal(f.slot().firstElementChild.textContent, 'Aberto');
 });
+
+// Reproduz o interceptor nativo: cancelamentos também passam por handleError;
+// apenas a mensagem #BC# é silenciosa, e o interceptor resolve o próprio Error.
+function cancellationFixture(withCards = false) {
+  const cards = Array.from({ length: Number(withCards) }, (_, i) => {
+    const f = cardFixture(); f.appointment.id_solicitacao_autorizacao = 47 + i; return f;
+  });
+  const notices = [], cancellations = [], requests = [], warnings = [];
+  let run, rootAvailable = true;
+  const location = { hash: '#/recepcao' };
+  const axios = {
+    isCancel: error => !!error?.__CANCEL__,
+    CancelToken: { source() {
+      let cancelled;
+      const token = { promise: new Promise(resolve => { cancelled = resolve; }) };
+      return { token, cancel(message) {
+        if (token.reason) return;
+        cancellations.push(message);
+        token.reason = Object.assign(new Error(message), { __CANCEL__: true });
+        cancelled(token.reason);
+      } };
+    } },
+    post(_url, body, { cancelToken }) {
+      return new Promise(resolve => {
+        let settled = false;
+        const request = { body,
+          success(data) { if (!settled) { settled = true; resolve({ data }); } },
+          fail(error) {
+            if (settled) return;
+            settled = true;
+            if (error.message !== '#BC#') notices.push(error.message);
+            resolve(error); // retorno real do interceptor do Klingo
+          }
+        };
+        requests.push(request);
+        if (cancelToken.reason) request.fail(cancelToken.reason);
+        else cancelToken.promise.then(request.fail);
+      });
+    }
+  };
+  const vue = { lista: [], marcacoes: [], referencia: '2026-10-21', unidade_operacao: 5,
+    $store: { state: { user: { id_usuario: 7 } } }, $refs: { ver_autorizacao: {} },
+    ver_autorizacao() {}, axios };
+  const document = {
+    getElementById: id => id === 'refresh-button' ? (rootAvailable ? { __vue__: vue } : null) : {},
+    querySelectorAll: () => cards.map(f => f.card), createElement: cards[0]?.create, addEventListener() {}
+  };
+  vm.runInNewContext(fs.readFileSync(filename, 'utf8'), { document,
+    console: { warn: (...args) => warnings.push(args) }, window: { location },
+    tmRuntime: { register(_name, job) { run = job; }, schedule() {} } });
+  return { vue, notices, cancellations, requests, warnings, run: () => run(),
+    root(value) { rootAvailable = value; },
+    leave() { location.hash = '#/call-center/confirmacao'; run(); },
+    flush: () => new Promise(resolve => setImmediate(resolve)) };
+}
+
+test('remontagem temporária da Recepção cancela a consulta sem toast de saída', async () => {
+  const f = cancellationFixture(); f.run();
+  f.root(false); f.run(); await f.flush();
+  f.root(true); f.run(); assert.equal(f.requests.length, 2);
+  f.leave(); await f.flush();
+  assert.deepEqual(f.notices, []);
+  assert.equal(f.cancellations.length, 2);
+});
+
+test('trocas de data e recarga da lista cancelam buscas antigas silenciosamente', async () => {
+  const f = cancellationFixture(); f.run();
+  for (const date of ['2026-10-22', '2026-10-23', '2026-10-23']) {
+    f.vue.referencia = date; f.vue.marcacoes = []; f.run();
+  }
+  assert.equal(f.requests.length, 4);
+  f.leave(); await f.flush();
+  assert.deepEqual(f.notices, []);
+  assert.equal(f.cancellations.length, 4);
+});
+
+test('sair do módulo com consulta pendente não exibe um erro de atendimento', async () => {
+  const f = cancellationFixture(); f.run(); f.leave(); await f.flush();
+  assert.deepEqual(f.notices, []);
+});
+
+test('cancelar consultas paralelas de status também é silencioso', async () => {
+  const f = cancellationFixture(11); f.run();
+  f.requests[0].success({ rules: { status: 200, data: [queue()] } }); await f.flush();
+  f.run(); assert.equal(f.requests.length, 3); // política + dois lotes simultâneos de status
+  assert.equal(f.requests[1].body.q.length, 10); assert.equal(f.requests[2].body.q.length, 1);
+  f.root(false); f.run(); await f.flush();
+  assert.deepEqual(f.notices, []);
+});
+
+test('falhas reais continuam passando pelo aviso nativo e fallback da badge', async () => {
+  const f = cancellationFixture(); f.run();
+  f.requests[0].fail(new Error('Falha de rede simulada')); await f.flush();
+  assert.deepEqual(f.notices, ['Falha de rede simulada']);
+  assert.equal(f.warnings.length, 1);
+  f.leave(); await f.flush();
+  assert.deepEqual(f.notices, ['Falha de rede simulada']);
+});
