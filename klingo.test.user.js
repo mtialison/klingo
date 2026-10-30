@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.69
+// @version      1.70
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -8930,6 +8930,7 @@ let tmAppointmentCalendarCore;
       #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline: 2px solid #0d6efd; outline-offset: 1px; }
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"][data-selected="true"] { outline-color: #084298; }
       #${POPOVER_ID} .tm-cal-day[data-outside="true"] { opacity: .45; }
+      #${POPOVER_ID} .tm-cal-day[data-today="true"] { border: 2px solid #212529; }
       #${POPOVER_ID} .tm-cal-footer { display: flex; align-items: center;
         justify-content: flex-start; gap: 10px; margin-top: 10px; }
       #${POPOVER_ID} .tm-cal-footer button { border: 0; background: transparent;
@@ -8986,6 +8987,7 @@ let tmAppointmentCalendarCore;
       grid.appendChild(weekday);
     });
     const selected = document.querySelector('#ref-data')?.value;
+    const todayIso = iso(new Date());
     for (const dateKey of calendarDates(state.month)) {
       const detail = state.days.get(dateKey);
       const day = document.createElement('button');
@@ -8993,6 +8995,8 @@ let tmAppointmentCalendarCore;
       day.className = 'tm-cal-day';
       day.dataset.date = dateKey;
       day.dataset.kind = detail?.kind || '';
+      day.dataset.today = String(dateKey === todayIso);
+      if (dateKey === todayIso) day.setAttribute('aria-current', 'date');
       day.dataset.selected = String(dateKey === selected);
       day.dataset.outside = String(Number(dateKey.slice(5, 7)) !== state.month.getMonth() + 1);
       day.textContent = String(Number(dateKey.slice(8, 10)));
@@ -9419,6 +9423,7 @@ const tmConfirmationCalendarAdapter = (() => {
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #0d6efd; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline: 2px solid #0d6efd; outline-offset: 1px; }
       #${POPOVER_ID} .tm-cal-day[data-outside="true"] { opacity: .45; }
+      #${POPOVER_ID} .tm-cal-day[data-today="true"] { border: 2px solid #212529; }
       #${POPOVER_ID} .tm-cal-footer { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
       #${POPOVER_ID} .tm-cal-status { color: #667085; }
       #${POPOVER_ID} .tm-cal-footer button { border: 0; background: transparent; color: #007bff;
@@ -9477,9 +9482,12 @@ const tmConfirmationCalendarAdapter = (() => {
       const weekday = document.createElement('div');
       weekday.className = 'tm-cal-weekday'; weekday.textContent = label; grid.appendChild(weekday);
     });
+    const todayIso = iso(new Date());
     for (const dateKey of calendarDates(state.month)) {
       const day = document.createElement('button');
       day.type = 'button'; day.className = 'tm-cal-day'; day.dataset.date = dateKey;
+      day.dataset.today = String(dateKey === todayIso);
+      if (dateKey === todayIso) day.setAttribute('aria-current', 'date');
       day.dataset.selected = String(dateKey === state.input?.value);
       day.dataset.outside = String(Number(dateKey.slice(5, 7)) !== state.month.getMonth() + 1);
       day.textContent = String(Number(dateKey.slice(8, 10)));

@@ -103,6 +103,7 @@
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #0d6efd; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline: 2px solid #0d6efd; outline-offset: 1px; }
       #${POPOVER_ID} .tm-cal-day[data-outside="true"] { opacity: .45; }
+      #${POPOVER_ID} .tm-cal-day[data-today="true"] { border: 2px solid #212529; }
       #${POPOVER_ID} .tm-cal-footer { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
       #${POPOVER_ID} .tm-cal-status { color: #667085; }
       #${POPOVER_ID} .tm-cal-footer button { border: 0; background: transparent; color: #007bff;
@@ -161,9 +162,12 @@
       const weekday = document.createElement('div');
       weekday.className = 'tm-cal-weekday'; weekday.textContent = label; grid.appendChild(weekday);
     });
+    const todayIso = iso(new Date());
     for (const dateKey of calendarDates(state.month)) {
       const day = document.createElement('button');
       day.type = 'button'; day.className = 'tm-cal-day'; day.dataset.date = dateKey;
+      day.dataset.today = String(dateKey === todayIso);
+      if (dateKey === todayIso) day.setAttribute('aria-current', 'date');
       day.dataset.selected = String(dateKey === state.input?.value);
       day.dataset.outside = String(Number(dateKey.slice(5, 7)) !== state.month.getMonth() + 1);
       day.textContent = String(Number(dateKey.slice(8, 10)));
