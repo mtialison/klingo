@@ -1,0 +1,11 @@
+# Aberto + Enviado: carregamento e padrão de entrada
+
+- Pedido: investigar lentidão do combinado e torná-lo o padrão ao entrar em Autorizações.
+- Causa confirmada: módulo24 consultava status vazio e todas as páginas, só depois filtrava0/6. Na tela atual:459 registros,5 páginas para mostrar6. Array de status foi testado em leitura e ignorado pelo backend; não usar.
+- Consultar0 e6 em um único lote AQL com páginas1 e100 itens. Somar totais e carregar de cada sequência somente o prefixo necessário à página global solicitada, no máximo dois lotes HTTP simultâneos. Não usar cache persistente nem armazenar pacientes.
+- Ordenação verificada na API: Padrão/ref_dataG por marcacao.dt_inicio ascendente (ignora direção); DS por dt_solicitacao, NS por ID, PC por paciente/cadastro_temporario.st_nome. Conservar direção onde aplicável. O desempate nativo não foi consistente por ID/data: usar ID ascendente como desempate estável. Antes de paginar, estender cada sequência até passar da chave primária na fronteira da página ou esgotá-la, evitando perder IDs menores após o prefixo inicial.
+- Caso a ordem de uma sequência divirja, haja IDs duplicados/mudança concorrente ou prefixo insuficiente, usar consulta anterior para preservar a listagem. Outros tipos de referência com Padrão e modos desconhecidos também mantêm compatibilidade anterior; a otimização principal cobre o padrão Data de Agendamento e os três modos explícitos.
+- Cancelar silenciosamente#BC# e verificar cancelamento antes de novas chamadas. Erro de um status não pode virar listagem parcial completa. Preservar filtros, configuração nativa, links, total e resposta tardia descartada.
+- Módulo18 passa a escolher tm-open-sent por padrão. A guarda existente aguarda a opção inserida pelo24 antes de disparar mudanças; escolhas posteriores do usuário continuam preservadas.
+- Evidência inicial de leitura: lote0/6 retornou6/0 em610ms, sem alterar filtros da tela. O tempo não é garantia de latência em outros períodos.
+- Validação inclui prefixo incompleto por sequência e fechamento de empates em ambas as direções, além de paginação, status vazio, erro parcial e cancelamento. Publicar1.79 apenas em testes-codex após suíte completa, sintaxe/build/diff e revisão. Main e alterações manuais preservadas; nenhuma autorização gravada e nenhum acesso a Relatórios.

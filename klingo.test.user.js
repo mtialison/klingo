@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.78
+// @version      1.79
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -10589,7 +10589,7 @@ const tmConfirmationCalendarAdapter = (() => {
   function getDefaultFilters(cardBody) {
     const { period, status, dateKind, authorizationQueue } = getAuthorizationControls(cardBody);
     const periodValue = selectValueForLabel(period, 'Semana');
-    const statusValue = selectValueForLabel(status, 'Aberto');
+    const statusValue = 'tm-open-sent';
     const dateKindValue = selectValueForLabel(dateKind, 'Data de Agendamento');
     const authorizationQueueValue = selectValueForLabel(authorizationQueue, 'Exames');
 
@@ -11577,8 +11577,121 @@ const tmConfirmationCalendarAdapter = (() => {
   const COMBINED_STATUS = 'tm-open-sent';
 
   async function fetchCombinedStatusPage(axios, filters, cancelToken) {
+    const compare = combinedComparator(filters);
+    if (!compare) return fetchAllStatusesPage(axios, filters, cancelToken);
+    const size = Math.max(1, Math.trunc(Number(filters.size) || 100));
+    const request = async jobs => {
+      cancelToken?.throwIfRequested?.();
+      const response = await axios.post('/aql?a=solicitacao_autorizacoes.index', {
+        q: jobs.map(job => ({ name: 'solicitacao_autorizacoes.index', id: job.id,
+          parms: { ...filters, status: job.status, page: job.page, size },
+          configs: ['solic-aut-block-incluir-agenda-direto'] }))
+      }, { cancelToken, tmFeature: 'authorization-combined-status' });
+      const payload = response.data;
+      const results = jobs.map(job => {
+        const result = payload?.[job.id], page = result?.data;
+        if (result?.status !== 200 || !Array.isArray(page?.data) ||
+            !Number.isFinite(Number(page.total)) || Number(page.total) < page.data.length ||
+            page.data.some(row => String(row.in_status) !== job.status)) {
+          throw new Error('Não foi possível consultar as autorizações por status.');
+        }
+        return { ...job, data: page.data, meta: page };
+      });
+      return { results, configs: payload.configs_lista || payload.configs_sent };
+    };
+    const first = await request([{ id: 'lista', status: '0', page: 1 }, { id: 'sent', status: '6', page: 1 }]);
+    const total = first.results.reduce((sum, part) => sum + Number(part.meta.total), 0);
+    const current = Math.min(Math.max(1, Math.ceil(total / size)), Math.max(1, Math.trunc(Number(filters.page) || 1)));
+    const parts = first.results.map(part => ({ ...part, pages: [part.data] }));
+    const jobs = [];
+    parts.forEach((part, stream) => {
+      const last = Math.min(current, Math.max(1, Math.ceil(Number(part.meta.total) / size)));
+      for (let page = 2; page <= last; page++) jobs.push({ id: `status_${part.status}_${page}`, status: part.status, page, stream });
+    });
+    let next = 0;
+    const worker = async () => {
+      while (next < jobs.length) {
+        const batch = jobs.slice(next, next += 2);
+        const response = await request(batch);
+        response.results.forEach(part => { parts[part.stream].pages[part.page - 1] = part.data; });
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(2, Math.ceil(jobs.length / 2)) }, worker));
+    while (true) {
+      const streams = parts.map(part => part.pages.flat());
+      // Validar cada sequência: linhas de um status não compensam um prefixo incompleto do outro.
+      // A API pode ordenar empates arbitrariamente; validar apenas sua chave primária.
+      if (streams.some((rows, index) => rows.length !== Math.min(Number(parts[index].meta.total), parts[index].pages.length * size) ||
+          rows.some((row, i) => i && compare.primary(rows[i - 1], row) > 0))) {
+        return fetchAllStatusesPage(axios, filters, cancelToken);
+      }
+      const rows = streams.flat();
+      const ids = rows.map(row => String(row.id_solicitacao_autorizacao));
+      if (new Set(ids).size !== ids.length) return fetchAllStatusesPage(axios, filters, cancelToken);
+      rows.sort(compare);
+      const boundary = rows[Math.min(total, current * size) - 1];
+      const extensions = parts.flatMap((part, stream) => {
+        const records = streams[stream];
+        return boundary && records.length < Number(part.meta.total) &&
+          compare.primary(records[records.length - 1], boundary) <= 0
+          ? [{ id: `status_${part.status}_${part.pages.length + 1}`, status: part.status,
+            page: part.pages.length + 1, stream }] : [];
+      });
+      if (!extensions.length) {
+        return { configs: first.configs, page: combinedPagination(rows, total, filters, first.results[0].meta) };
+      }
+      // Fechar empates na fronteira evita perder IDs menores em páginas ainda não consultadas.
+      const extra = await request(extensions);
+      if (extra.results.some(part => Number(part.meta.total) !== Number(parts[part.stream].meta.total))) {
+        return fetchAllStatusesPage(axios, filters, cancelToken);
+      }
+      extra.results.forEach(part => { parts[part.stream].pages[part.page - 1] = part.data; });
+    }
+  }
+
+  function combinedComparator(filters) {
+    const type = filters.tipo_ordem || '';
+    const direction = filters.ordem_dir === 'D' ? -1 : 1;
+    let primary;
+    if (type === 'NS') primary = (a, b) => direction * (Number(a.id_solicitacao_autorizacao) - Number(b.id_solicitacao_autorizacao));
+    else if (type === 'PC') {
+      const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
+      const name = row => row.paciente?.st_nome || row.cadastro_temporario?.st_nome || '';
+      primary = (a, b) => direction * collator.compare(name(a), name(b));
+    } else {
+      let value, multiplier = direction;
+      if (type === 'DS') value = row => row.dt_solicitacao || '';
+      else if (!type && filters.ref_data === 'G') {
+        value = row => row.marcacao?.dt_inicio || '';
+        multiplier = 1; // O modo Padrão ignora ordem_dir na API nativa.
+      } else return null;
+      primary = (a, b) => multiplier * (value(a) < value(b) ? -1 : value(a) > value(b) ? 1 : 0);
+    }
+    const compare = (a, b) => primary(a, b) || Number(a.id_solicitacao_autorizacao) - Number(b.id_solicitacao_autorizacao);
+    compare.primary = primary;
+    return compare;
+  }
+
+  function combinedPagination(rows, total, filters, first) {
+    const size = Math.max(1, Math.trunc(Number(filters.size) || 100));
+    const last = Math.max(1, Math.ceil(total / size));
+    const current = Math.min(last, Math.max(1, Math.trunc(Number(filters.page) || 1)));
+    const from = (current - 1) * size;
+    const url = page => page ? `${first.path || ''}?page=${page}` : null;
+    return { ...first, data: rows.slice(from, from + size), total, per_page: size,
+      current_page: current, last_page: last,
+      from: total ? from + 1 : null, to: total ? Math.min(from + size, total) : null,
+      first_page_url: url(1), last_page_url: url(last),
+      prev_page_url: url(current > 1 ? current - 1 : null), next_page_url: url(current < last ? current + 1 : null),
+      links: [{ url: url(current > 1 ? current - 1 : null), label: '&laquo; Previous', active: false },
+        ...Array.from({ length: last }, (_, i) => ({ url: url(i + 1), label: String(i + 1), active: current === i + 1 })),
+        { url: url(current < last ? current + 1 : null), label: 'Next &raquo;', active: false }] };
+  }
+
+  async function fetchAllStatusesPage(axios, filters, cancelToken) {
     const size = Number(filters.size) || 100;
     const request = async (page) => {
+      cancelToken?.throwIfRequested?.();
       const response = await axios.post('/aql?a=solicitacao_autorizacoes.index', {
         q: [{ name: 'solicitacao_autorizacoes.index', id: 'lista',
           parms: { ...filters, status: '', page, size },
@@ -11603,22 +11716,7 @@ const tmConfirmationCalendarAdapter = (() => {
     await Promise.all(Array.from({ length: Math.min(2, count - 1) }, worker));
     // Ler todas as páginas antes de filtrar preserva a ordenação do servidor.
     const rows = pages.flat().filter(row => ['0', '6'].includes(String(row.in_status)));
-    const total = rows.length;
-    const last = Math.max(1, Math.ceil(total / size));
-    const current = Math.min(last, Math.max(1, Number(filters.page) || 1));
-    const from = (current - 1) * size;
-    const url = page => page ? `${first.page.path || ''}?page=${page}` : null;
-    return { configs: first.configs, page: { ...first.page,
-      data: rows.slice(from, from + size), total, per_page: size,
-      current_page: current, last_page: last,
-      from: total ? from + 1 : null, to: total ? Math.min(from + size, total) : null,
-      first_page_url: url(1), last_page_url: url(last),
-      prev_page_url: url(current > 1 ? current - 1 : null),
-      next_page_url: url(current < last ? current + 1 : null),
-      links: [ { url: url(current > 1 ? current - 1 : null), label: '&laquo; Previous', active: false },
-        ...Array.from({ length: last }, (_, i) => ({ url: url(i + 1), label: String(i + 1), active: current === i + 1 })),
-        { url: url(current < last ? current + 1 : null), label: 'Next &raquo;', active: false } ]
-    } };
+    return { configs: first.configs, page: combinedPagination(rows, rows.length, filters, first.page) };
   }
 
   function hookAuthorizationLoad(vue) {

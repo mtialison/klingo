@@ -125,7 +125,7 @@
   function getDefaultFilters(cardBody) {
     const { period, status, dateKind, authorizationQueue } = getAuthorizationControls(cardBody);
     const periodValue = selectValueForLabel(period, 'Semana');
-    const statusValue = selectValueForLabel(status, 'Aberto');
+    const statusValue = 'tm-open-sent';
     const dateKindValue = selectValueForLabel(dateKind, 'Data de Agendamento');
     const authorizationQueueValue = selectValueForLabel(authorizationQueue, 'Exames');
 

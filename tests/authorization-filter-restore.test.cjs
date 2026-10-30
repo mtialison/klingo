@@ -27,7 +27,9 @@ test('restauração aguarda opção combinada remontada e preserva o estado salv
   const context = vm.createContext({ HTMLSelectElement: Select, HTMLInputElement: Input,
     Event: class { constructor(type) { this.type = type; } }, document: { addEventListener() {} },
     tmRuntime: { register() {} } });
-  vm.runInContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.applyFilterState = applyFilterState;})();'), context);
+  vm.runInContext(source.replace(/\}\)\(\);\s*$/,
+    'globalThis.applyFilterState = applyFilterState;globalThis.getDefaultFilters=getDefaultFilters;})();'), context);
+  assert.equal(context.getDefaultFilters(card).status, 'tm-open-sent');
   const saved = { period: 'week', status: 'tm-open-sent', dateKind: 'book', authorizationQueue: '1',
     range: '2026-W44', rangeType: 'week' };
   assert.equal(context.applyFilterState(card, saved).ready, false);
