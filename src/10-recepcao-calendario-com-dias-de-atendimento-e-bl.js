@@ -769,8 +769,8 @@ let tmAppointmentCalendarCore;
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"]:hover { background: #0b5ed7; }
       #${POPOVER_ID} .tm-cal-day[data-today="true"],
       #${POPOVER_ID} .tm-cal-day[data-selected="true"] {
-        outline: 3px solid #2B7FFF; outline-offset: 1px;
-        box-shadow: 0 0 0 1px #fff; position: relative; z-index: 1;
+        outline: 3px solid #2B7FFF; outline-offset: -3px;
+        box-shadow: none; position: relative; z-index: 1;
       }
       #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline-color: #F6339A; }
       #${POPOVER_ID} .tm-cal-day[data-outside="true"] { opacity: .45; }
