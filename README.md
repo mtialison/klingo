@@ -46,3 +46,5 @@ Na versão de testes **1.68**, a retomada de rascunhos protege também remarcaç
 Na versão de testes **1.69**, a Recepção também revisa cards de horários livres para remover badges de autorização deixadas quando o Vue reaproveita um card antes ocupado. A limpeza restaura a largura do horário e impede que respostas atrasadas recriem a badge sem agendamento vinculado. O teste reproduz a transição ocupado → livre → ocupado; 233 testes passaram.
 
 Na versão de testes **1.71**, os calendários da Recepção e Confirmação destacam hoje em amarelo e a seleção em azul, com contorno de 3 px e separação branca; os dois destaques coexistem quando a seleção é hoje. O hover escurece o fundo sem criar borda. Tooltips aparecem somente para bloqueios e feriados, preservando as descrições acessíveis nas demais datas. 235 testes passaram.
+
+Na versão de testes **1.72**, hoje usa #F6339A e a seleção usa #2B7FFF. Quando a seleção coincide com hoje, aparece apenas o contorno azul da seleção, com a mesma espessura de 3 px.
