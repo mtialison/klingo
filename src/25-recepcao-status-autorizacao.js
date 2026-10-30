@@ -3,7 +3,8 @@
   'use strict';
   const BATCH_SIZE = 10;
   const CACHE_TTL = 30000;
-  const CARD_SELECTOR = '.dashcard.my-2[class*="atendimento-"]';
+  // O Vue reaproveita cards ocupados como livres; ambos precisam passar pela limpeza.
+  const CARD_SELECTOR = '.dashcard.my-2';
   const buttonBindings = new WeakMap();
   let activeState = null;
 

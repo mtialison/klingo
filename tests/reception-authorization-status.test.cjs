@@ -207,3 +207,64 @@ test('status consultado prevalece sobre incorporado e invalidação exige nova c
   f.state.cache.delete('47');
   assert.equal(f.render(), '47');
 });
+
+test('card reaproveitado como horário livre remove badge e vínculo mesmo com resposta atrasada', async () => {
+  const f = cardFixture();
+  f.card.className = 'dashcard my-2 atendimento-primary bg-white';
+  let appointment = f.appointment;
+  const freeTime = { classList: { add: name => f.timeClasses.add(name),
+    remove: name => f.timeClasses.delete(name) },
+    querySelector: () => ({ __vue__: { hor: { marcacao: appointment } } }) };
+  const originalRow = f.card.querySelector();
+  const nativeQuery = originalRow.querySelector;
+  originalRow.querySelector = selector => selector.includes('tm-reception-authorization-slot')
+    ? nativeQuery(selector) : freeTime;
+  let run, finishStatus, statusCalls = 0;
+  const axios = { CancelToken: { source: () => ({ token: {}, cancel() {} }) },
+    post: async (_url, body) => {
+      if (body.q[0].name === 'fila_autorizacoes.index') {
+        return { data: { rules: { status: 200, data: [queue()] } } };
+      }
+      statusCalls++;
+      return new Promise(resolve => { finishStatus = () => resolve({ data: {
+        authorization_0: { status: 200, data: { id_solicitacao_autorizacao: 47,
+          status_solicitacao: { msg: 'Aberto', color: 'primary' } } }
+      } }); });
+    }
+  };
+  const vue = { lista: [f.appointment], marcacoes: [], referencia: '2026-10-30', unidade_operacao: 5,
+    $store: { state: { user: { id_usuario: 7 } } }, $refs: { ver_autorizacao: {} },
+    ver_autorizacao() { assert.fail('Horário livre não pode abrir autorização antiga.'); }, axios };
+  const document = {
+    getElementById: id => id === 'refresh-button' ? { __vue__: vue } : {},
+    querySelectorAll: selector => {
+      // Reproduz o seletor real: a classe atendimento-* some quando o card vira livre.
+      if (!f.card.className.includes('dashcard')) return [];
+      return selector.includes('[class*="atendimento-"]') && !f.card.className.includes('atendimento-')
+        ? [] : [f.card];
+    },
+    createElement: f.create, addEventListener() {}
+  };
+  vm.runInNewContext(fs.readFileSync(filename, 'utf8'), { console, document,
+    window: { location: { hash: '#/recepcao' } },
+    tmRuntime: { register(_name, job) { run = job; }, schedule() {} } });
+  run(); await new Promise(resolve => setImmediate(resolve));
+  run();
+  assert.ok(f.slot());
+  assert.equal(statusCalls, 1);
+  // Vue recicla o mesmo DOM; a div adicionada pelo userscript permanece.
+  f.card.className = 'dashcard my-2 bg-white';
+  appointment = null;
+  run();
+  assert.equal(f.slot(), undefined);
+  assert.equal(f.timeClasses.has('tm-reception-authorization-time'), false);
+  finishStatus(); await new Promise(resolve => setImmediate(resolve));
+  run();
+  assert.equal(f.slot(), undefined);
+  assert.equal(statusCalls, 1);
+  // O mesmo card pode voltar a representar um agendamento válido depois.
+  appointment = f.appointment;
+  f.card.className = 'dashcard my-2 atendimento-primary bg-white';
+  run();
+  assert.equal(f.slot().firstElementChild.textContent, 'Aberto');
+});
