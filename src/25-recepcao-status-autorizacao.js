@@ -130,7 +130,7 @@
     time.classList.add('tm-reception-authorization-time');
     const button = slot.firstElementChild;
     const cached = state.cache.get(id);
-    const status = nativeAuthorizationStatus(appointment.autorizacao?.status_solicitacao) || cached?.status;
+    const status = cached?.status || nativeAuthorizationStatus(appointment.autorizacao?.status_solicitacao);
     const text = status?.msg || (cached ? 'Ver autorização' : '...');
     const classes = `badge badge-${status?.color || 'secondary'} tm-reception-authorization-button`;
     if (button.className !== classes) button.className = classes;
@@ -141,7 +141,6 @@
       button.setAttribute('aria-label', title);
     }
     bindAuthorizationButton(button, vue, appointment);
-    if (appointment.autorizacao?.status_solicitacao) return '';
     return !cached || Date.now() - cached.at >= CACHE_TTL ? id : '';
   }
 

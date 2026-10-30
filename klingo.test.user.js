@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.67
+// @version      1.68
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -1282,6 +1282,7 @@ function setDateCalculatorOpen(isOpen) {
   const nativeNotificationAudio = new Map();
   let notificationAudioContext = null;
   let nextAlertToneAt = 0;
+  const pendingAlertTones = new Set();
   let hookedChatVue = null;
   let nativeChatHooked = false;
   let openChatContent = null;
@@ -1432,6 +1433,12 @@ function setDateCalculatorOpen(isOpen) {
       volume.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
       oscillator.connect(volume);
       volume.connect(context.destination);
+      pendingAlertTones.add(oscillator);
+      oscillator.onended = () => {
+        pendingAlertTones.delete(oscillator);
+        oscillator.disconnect();
+        volume.disconnect();
+      };
       oscillator.start(start);
       oscillator.stop(start + 0.18);
       nextAlertToneAt = start + 0.24;
@@ -1725,6 +1732,11 @@ function setDateCalculatorOpen(isOpen) {
   }
 
   function stopBlink() {
+    for (const tone of pendingAlertTones) {
+      try { tone.stop(); } catch (_) {}
+    }
+    pendingAlertTones.clear();
+    nextAlertToneAt = 0;
     if (!blinking) return;
     blinking = false;
     clearInterval(blinkInterval);
@@ -6592,7 +6604,7 @@ const tmBookingModalWatch = (() => {
       return;
     }
     if (!checkOwner(vue) || draft.user !== owner) return notify('Este rascunho pertence a outra sessão.');
-    if (safeFlow(vue) && hasWork(vue)) {
+    if (hasWork(vue) && (safeFlow(vue) || vue.remarcacao || vue.orcamento || vue.id_infusao)) {
       return notify('Guarde ou reinicie a marcação atual antes de retomar outra.');
     }
     pendingResume = null;
@@ -10469,6 +10481,10 @@ const tmConfirmationCalendarAdapter = (() => {
 
     if (!period || !status || !dateKind || !authorizationQueue || !filters) return { ready: false, changed: false };
 
+    if (filters.status === 'tm-open-sent' &&
+        !Array.from(status.options).some(option => option.value === filters.status)) {
+      return { ready: false, changed: false };
+    }
     const changedElements = [];
     const selects = Array.from(cardBody.querySelectorAll('select'));
 
@@ -11656,7 +11672,7 @@ const tmConfirmationCalendarAdapter = (() => {
     time.classList.add('tm-reception-authorization-time');
     const button = slot.firstElementChild;
     const cached = state.cache.get(id);
-    const status = nativeAuthorizationStatus(appointment.autorizacao?.status_solicitacao) || cached?.status;
+    const status = cached?.status || nativeAuthorizationStatus(appointment.autorizacao?.status_solicitacao);
     const text = status?.msg || (cached ? 'Ver autorização' : '...');
     const classes = `badge badge-${status?.color || 'secondary'} tm-reception-authorization-button`;
     if (button.className !== classes) button.className = classes;
@@ -11667,7 +11683,6 @@ const tmConfirmationCalendarAdapter = (() => {
       button.setAttribute('aria-label', title);
     }
     bindAuthorizationButton(button, vue, appointment);
-    if (appointment.autorizacao?.status_solicitacao) return '';
     return !cached || Date.now() - cached.at >= CACHE_TTL ? id : '';
   }
 

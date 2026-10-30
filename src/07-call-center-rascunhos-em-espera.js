@@ -474,7 +474,7 @@
       return;
     }
     if (!checkOwner(vue) || draft.user !== owner) return notify('Este rascunho pertence a outra sessão.');
-    if (safeFlow(vue) && hasWork(vue)) {
+    if (hasWork(vue) && (safeFlow(vue) || vue.remarcacao || vue.orcamento || vue.id_infusao)) {
       return notify('Guarde ou reinicie a marcação atual antes de retomar outra.');
     }
     pendingResume = null;

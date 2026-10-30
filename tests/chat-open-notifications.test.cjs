@@ -138,7 +138,7 @@ test('som próprio agenda um toque distinto por mensagem rápida na aba propriet
     }, createGain() { return { gain: { setValueAtTime() {},
       exponentialRampToValueAtTime() {} }, connect() {} }; } };
   const context = vm.createContext({
-    notificationAudioContext: audio, nextAlertToneAt: 0,
+    notificationAudioContext: audio, nextAlertToneAt: 0, pendingAlertTones: new Set(),
     window: {}, console
   });
   functions('playScriptAlert', 'handleNativeChatPlay', context);
@@ -150,7 +150,7 @@ test('som próprio agenda um toque distinto por mensagem rápida na aba propriet
 
 test('áudio bloqueado pelo Chrome não toca atrasado quando a aba volta ao foco', () => {
   let created = 0;
-  const context = vm.createContext({ notificationAudioContext: null,
+  const context = vm.createContext({ notificationAudioContext: null, pendingAlertTones: new Set(),
     nextAlertToneAt: 0, window: { AudioContext: class {
       constructor() { created++; this.state = 'suspended'; }
       resume() { this.state = 'running'; return Promise.resolve(); }
@@ -607,3 +607,33 @@ test('toast coberto não é recontado como mensagem nova', () => {
   const senders = vm.runInContext('Array.from(toastMessages().values(), item => item.sender)', context);
   assert.deepEqual(Array.from(senders), ['BRUNO']);
 });
+
+for (const blinking of [true, false]) {
+  test(`parar aviso cancela a rajada sonora mesmo com título piscando=${blinking}`, () => {
+    const tones = [];
+    let disconnected = 0;
+    const audio = { state: 'running', currentTime: 10, destination: {},
+      createOscillator() {
+        const tone = { frequency: {}, connect() {}, disconnect() { disconnected++; },
+          start(at) { this.at = at; }, stop(at = audio.currentTime) { this.end = at; } };
+        tones.push(tone); return tone;
+      },
+      createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+        connect() {}, disconnect() { disconnected++; } }; }
+    };
+    const context = vm.createContext({ notificationAudioContext: audio, nextAlertToneAt: 0, pendingAlertTones: new Set(),
+      blinking, blinkInterval: 1, originalTitle: 'klingo',
+      document: { title: 'Nova mensagem' }, clearInterval() {}, console });
+    functions('playScriptAlert', 'handleNativeChatPlay', context);
+    functions('stopBlink', 'checkMessages', context);
+    for (let i = 0; i < 10; i++) context.playScriptAlert();
+    audio.currentTime = 10.1;
+    context.stopBlink();
+    assert.ok(tones.every(tone => tone.end <= 10.1));
+    for (const tone of tones) tone.onended();
+    assert.equal(disconnected, 20);
+    audio.currentTime = 10.2;
+    context.playScriptAlert();
+    assert.equal(tones[10].at, 10.2);
+  });
+}

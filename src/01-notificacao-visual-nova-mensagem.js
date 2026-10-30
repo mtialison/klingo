@@ -33,6 +33,7 @@
   const nativeNotificationAudio = new Map();
   let notificationAudioContext = null;
   let nextAlertToneAt = 0;
+  const pendingAlertTones = new Set();
   let hookedChatVue = null;
   let nativeChatHooked = false;
   let openChatContent = null;
@@ -183,6 +184,12 @@
       volume.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
       oscillator.connect(volume);
       volume.connect(context.destination);
+      pendingAlertTones.add(oscillator);
+      oscillator.onended = () => {
+        pendingAlertTones.delete(oscillator);
+        oscillator.disconnect();
+        volume.disconnect();
+      };
       oscillator.start(start);
       oscillator.stop(start + 0.18);
       nextAlertToneAt = start + 0.24;
@@ -476,6 +483,11 @@
   }
 
   function stopBlink() {
+    for (const tone of pendingAlertTones) {
+      try { tone.stop(); } catch (_) {}
+    }
+    pendingAlertTones.clear();
+    nextAlertToneAt = 0;
     if (!blinking) return;
     blinking = false;
     clearInterval(blinkInterval);

@@ -197,3 +197,13 @@ test('runtime reutiliza política após edição e resposta antiga não recria b
   assert.equal(policyCalls, 1);
   assert.equal(statusCalls, 1);
 });
+
+test('status consultado prevalece sobre incorporado e invalidação exige nova consulta', () => {
+  const f = cardFixture();
+  f.appointment.autorizacao = { status_solicitacao: { msg: 'Aberto', color: 'primary' } };
+  f.state.cache.set('47', { status: { msg: 'Em Sessão', color: 'success' }, at: Date.now() });
+  assert.equal(f.render(), '');
+  assert.equal(f.slot().firstElementChild.textContent, 'Em Sessão');
+  f.state.cache.delete('47');
+  assert.equal(f.render(), '47');
+});

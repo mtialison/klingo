@@ -610,3 +610,21 @@ test('retomar em outro módulo navega ao Call Center antes de restaurar', async 
   assert.equal(vm.runInContext('pendingResume', context), 1);
   assert.equal(vm.runInContext('drafts.length', context), 1);
 });
+
+for (const flow of ['remarcacao', 'orcamento']) {
+  test(`retomar rascunho preserva trabalho atual de ${flow}`, async () => {
+    const context = setup();
+    const vue = booking();
+    vue.cadastro_temporario.st_nome = 'Paciente salvo';
+    context.vue = vue;
+    vm.runInContext('component = () => vue;', context);
+    await vm.runInContext('save()', context);
+    const current = { paciente: { id_paciente: 99 } };
+    vue.dados = current;
+    vue[flow] = { id: 80 };
+    await vm.runInContext('resume(1)', context);
+    assert.equal(vue.dados, current);
+    assert.equal(vue.dados.paciente.id_paciente, 99);
+    assert.equal(vm.runInContext('drafts.length', context), 1);
+  });
+}

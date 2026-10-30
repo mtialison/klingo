@@ -167,6 +167,10 @@
 
     if (!period || !status || !dateKind || !authorizationQueue || !filters) return { ready: false, changed: false };
 
+    if (filters.status === 'tm-open-sent' &&
+        !Array.from(status.options).some(option => option.value === filters.status)) {
+      return { ready: false, changed: false };
+    }
     const changedElements = [];
     const selects = Array.from(cardBody.querySelectorAll('select'));
 
