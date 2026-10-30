@@ -257,6 +257,7 @@ function uiFixture() {
     append(...children) { children.forEach((child) => this.appendChild(child)); }
     replaceChildren() { redraws++; this.children.forEach((child) => { child.parentElement = null; }); this.children = []; }
     setAttribute(name, value) { this.attributes[name] = value; }
+    removeAttribute(name) { delete this.attributes[name]; if (name === 'title') this.title = ''; }
     getBoundingClientRect() { return { left: 10, top: 20, bottom: 50 }; }
     get offsetHeight() { return 320; }
     get offsetWidth() { return 322; }

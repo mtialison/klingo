@@ -97,13 +97,23 @@
         font-weight: 600; padding: 5px 0; }
       #${POPOVER_ID} .tm-cal-day { height: 34px; border: 1px solid transparent; border-radius: 5px;
         background: #f5f7fa; color: #344054; }
-      #${POPOVER_ID} .tm-cal-day:hover { border-color: #007bff; }
+      #${POPOVER_ID} .tm-cal-day:hover { background: #e2e6ea; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"] { background: #198754; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"] { background: #dc3545; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #0d6efd; color: #fff; font-weight: 700; }
-      #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline: 2px solid #0d6efd; outline-offset: 1px; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="attendance"]:hover { background: #146c43; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="blocked"]:hover { background: #b02a37; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="booked"]:hover { background: #0b5ed7; }
+      #${POPOVER_ID} .tm-cal-day[data-today="true"],
+      #${POPOVER_ID} .tm-cal-day[data-selected="true"] {
+        outline: 3px solid #ffc107; outline-offset: 1px;
+        box-shadow: 0 0 0 1px #fff; position: relative; z-index: 1;
+      }
+      #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline-color: #0d6efd; }
+      #${POPOVER_ID} .tm-cal-day[data-today="true"][data-selected="true"] {
+        box-shadow: inset 0 0 0 3px #ffc107, 0 0 0 1px #fff;
+      }
       #${POPOVER_ID} .tm-cal-day[data-outside="true"] { opacity: .45; }
-      #${POPOVER_ID} .tm-cal-day[data-today="true"] { border: 2px solid #212529; }
       #${POPOVER_ID} .tm-cal-footer { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
       #${POPOVER_ID} .tm-cal-status { color: #667085; }
       #${POPOVER_ID} .tm-cal-footer button { border: 0; background: transparent; color: #007bff;
@@ -131,8 +141,11 @@
     popover.querySelectorAll('button[data-date]').forEach((day) => {
       const detail = painted ? state.days.get(day.dataset.date) : null;
       day.dataset.kind = detail?.kind || '';
-      day.title = painted ? dayTitle(detail) : 'Selecionar data';
-      day.setAttribute('aria-label', day.dataset.date + ': ' + day.title);
+      const title = painted ? dayTitle(detail) : 'Selecionar data';
+      if (detail && (detail.kind === 'blocked' || detail.block || detail.holiday)) {
+        if (day.title !== title) day.title = title;
+      } else day.removeAttribute('title');
+      day.setAttribute('aria-label', day.dataset.date + ': ' + title);
     });
     const message = popover.querySelector('.tm-cal-status');
     if (message) message.textContent = painted ? (state.loading ? 'Buscando...' : state.error) : '';
