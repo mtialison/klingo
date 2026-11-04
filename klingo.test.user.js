@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.85
+// @version      1.86
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -12631,7 +12631,67 @@ const tmConfirmationCalendarAdapter = (() => {
   const FIELDS = new Set(['e-mail', 'Telefone', 'Celular', 'Operadora / Plano', 'Recepção',
     'Teleatendimento', 'Senha', 'Data de Liberação', 'Validade']);
   let patched = null;
+  const menuButtons = new Map();
+  const MENU = new Set(['Alterar Procedimento', 'Alterar Operadora/Plano']);
+  let menuObserver = null;
   const onRoute = () => /^#\/(recepcao|call-center\/confirmacao)(\/|$)/.test(window.location.hash.split('?')[0]);
+
+  function permitted(cell, data) {
+    if (!onRoute() || !data || data.ch_estado_marcacao !== 'B' || data.id_atendimento ||
+        !/^[1-9]\d*$/.test(String(data.id_marcacao)) || !cell || cell.block_editar ||
+        cell.hor?.marcacao?.ch_estado_marcacao !== 'B' || cell.hor.marcacao.id_atendimento ||
+        String(cell.hor.marcacao.id_marcacao) !== String(data.id_marcacao)) return false;
+    for (let v = cell; v; v = v.$parent) if (v.viewonly || v._isDestroyed) return false;
+    return true;
+  }
+
+  function cardCell(card) {
+    return Array.from(card.querySelectorAll('*')).map(node => node.__vue__)
+      .find(v => v?.$options?._componentTag === 'celula-horarios-marcacao');
+  }
+
+  function restoreButton(button, entry) {
+    const data = cardCell(entry.card)?.hor?.marcacao;
+    button.disabled = data ? entry.label === 'Alterar Procedimento'
+      ? data.ch_estado_marcacao !== 'A'
+      : data.ch_estado_marcacao !== 'A' && !!data.id_paciente : entry.disabled;
+    menuButtons.delete(button);
+  }
+
+  function updateMenus() {
+    const active = new Set();
+    if (onRoute()) document.querySelectorAll('.dashcard').forEach(card => {
+      if (card.closest('.modal')) return;
+      const cell = cardCell(card), data = cell?.hor?.marcacao;
+      if (!permitted(cell, data)) return;
+      card.querySelectorAll('.dropleft .dropdown-menu button.dropdown-item').forEach(button => {
+        const label = button.textContent.trim();
+        if (!MENU.has(label)) return;
+        if (!menuButtons.has(button)) menuButtons.set(button, { disabled: button.disabled });
+        Object.assign(menuButtons.get(button), { card, id: String(data.id_marcacao), label });
+        active.add(button);
+        if (button.disabled) button.disabled = false;
+      });
+    });
+    for (const [button, entry] of menuButtons) if (!active.has(button)) restoreButton(button, entry);
+    if (!onRoute()) { menuObserver?.disconnect(); menuObserver = null; }
+    else if (!menuObserver && document.body) {
+      menuObserver = new MutationObserver(records => {
+        if (records.some(record => menuButtons.has(record.target) && record.target.disabled)) tmRuntime.schedule(0);
+      });
+      menuObserver.observe(document.body, { attributes: true, attributeFilter: ['disabled'], subtree: true });
+    }
+  }
+
+  document.addEventListener('click', event => {
+    const button = event.target.closest?.('button.dropdown-item'), entry = menuButtons.get(button);
+    if (!entry) return;
+    const cell = cardCell(entry.card), data = cell?.hor?.marcacao;
+    if (!permitted(cell, data) || String(data.id_marcacao) !== entry.id) {
+      event.preventDefault(); event.stopImmediatePropagation(); tmRuntime.schedule(0);
+    }
+    // Quando válido, o próprio listener nativo abre o modal com o objeto original.
+  }, true);
 
   function editable(vm) {
     const data = vm.dados;
@@ -12641,12 +12701,7 @@ const tmConfirmationCalendarAdapter = (() => {
       const cell = Array.from(card.querySelectorAll('*')).map(node => node.__vue__).find(v =>
         v?.$options?._componentTag === 'celula-horarios-marcacao' &&
         String(v.hor?.marcacao?.id_marcacao) === String(data.id_marcacao));
-      if (!cell || cell.block_editar || cell.hor.marcacao.ch_estado_marcacao !== 'B') continue;
-      let permitted = true;
-      for (let v = cell; v; v = v.$parent) {
-        if (v.viewonly || v._isDestroyed) { permitted = false; break; }
-      }
-      if (permitted) return true;
+      if (permitted(cell, data)) return true;
     }
     return false;
   }
@@ -12677,6 +12732,7 @@ const tmConfirmationCalendarAdapter = (() => {
   function update() {
     // Compatibilidade com a versão anterior: retirar os itens duplicados do submenu.
     document.querySelectorAll('.tm-blocked-appointment-actions').forEach(group => group.remove());
+    updateMenus();
     if (!onRoute()) { restore(); return; }
     let modal = document.getElementById('editarMarcacaoModal'), vm = null;
     for (let node = modal; node; node = node.parentElement) {

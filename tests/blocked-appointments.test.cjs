@@ -5,8 +5,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../src/31-marcacoes-bloqueadas-acoes.js'), 'utf8');
 function fixture(route = '#/recepcao') {
-  let job, renders = 0;
-  const data = { id_marcacao: 123, ch_estado_marcacao: 'B', id_bloqueio: 5 };
+  let job, click, renders = 0, nativeCalls = 0;
+  const data = { id_marcacao: 123, id_paciente: 4, ch_estado_marcacao: 'B', id_bloqueio: 5 };
   const owner = {}, cell = { $options: { _componentTag: 'celula-horarios-marcacao' }, $parent: owner,
     hor: { marcacao: data } };
   const input = (label, edicao, tag = 'az-input') => ({ componentOptions: { tag, propsData: { label, edicao } } });
@@ -17,11 +17,22 @@ function fixture(route = '#/recepcao') {
   const modal = { dados: data, marcacao_ativa: false, $options: { render: original,
     methods: { abrir() {}, atualizar() {} }, computed: { marcacao_ativa() {} } }, $forceUpdate() { renders++; } };
   const oldGroup = { remove() { this.removed = true; } };
-  const document = { getElementById: () => ({ __vue__: modal }), querySelectorAll: selector =>
-    selector === '.dashcard' ? [{ querySelectorAll: () => [{ __vue__: cell }] }] : [oldGroup] };
+  const buttons = ['Alterar Procedimento', 'Alterar Operadora/Plano', 'Emitir Atestado'].map(textContent =>
+    ({ textContent, disabled: true, onclick: () => nativeCalls++ }));
+  const card = { closest: () => null, querySelectorAll: selector => selector === '*'
+    ? [{ __vue__: cell }] : buttons };
+  const document = { addEventListener: (_name, fn) => { click = fn; },
+    getElementById: () => ({ __vue__: modal }), querySelectorAll: selector =>
+    selector === '.dashcard' ? [card] : [oldGroup] };
   const window = { location: { hash: route } };
-  vm.runInNewContext(source, { document, window, tmRuntime: { register: (_name, fn) => job = fn } });
-  return { data, cell, owner, modal, original, oldGroup, window, job, render: () => modal.$options.render.call(modal), renders: () => renders };
+  vm.runInNewContext(source, { document, window, tmRuntime: { register: (_name, fn) => job = fn, schedule() {} } });
+  const press = index => {
+    let stopped = false;
+    click({ target: { closest: () => buttons[index] }, preventDefault() {}, stopImmediatePropagation() { stopped = true; } });
+    if (!stopped && !buttons[index].disabled) buttons[index].onclick();
+  };
+  return { data, cell, owner, modal, original, oldGroup, window, job, buttons, press,
+    nativeCalls: () => nativeCalls, render: () => modal.$options.render.call(modal), renders: () => renders };
 }
 for (const route of ['#/recepcao', '#/call-center/confirmacao']) {
   test(`bloqueados: libera campos de edição mantendo identidade, aviso e estado em ${route}`, () => {
@@ -50,4 +61,23 @@ test('bloqueados: restaura renderizador ao sair da rota e recusa efeito após mu
 test('bloqueados: usa novos dados do modal e não libera outra marcação carregada posteriormente', () => {
   const f = fixture(); f.job(); f.modal.dados = { ...f.data, id_marcacao: 456 };
   assert.equal(f.render().children[0].componentOptions.propsData.edicao, false);
+});
+test('bloqueados: habilita apenas os dois comandos pedidos mantendo os listeners nativos', () => {
+  const f = fixture(), handlers = f.buttons.map(b => b.onclick), before = JSON.stringify(f.data);
+  f.job(); assert.deepEqual(f.buttons.map(b => b.disabled), [false, false, true]);
+  f.press(0); f.press(1); assert.equal(f.nativeCalls(), 2);
+  assert.deepEqual(f.buttons.map(b => b.onclick), handlers); assert.equal(JSON.stringify(f.data), before);
+});
+test('bloqueados: bloqueia clique após reciclagem e restaura botões ao sair da rota', () => {
+  const f = fixture(); f.job(); f.cell.hor.marcacao = { ...f.data, id_marcacao: 456 };
+  f.press(0); assert.equal(f.nativeCalls(), 0);
+  f.cell.hor.marcacao = f.data; f.window.location.hash = '#/autorizacoes'; f.job();
+  assert.deepEqual(f.buttons.map(b => b.disabled), [true, true, true]);
+});
+test('bloqueados: restrição de leitura posterior impede comando e preserva ativo após restaurar', () => {
+  const f = fixture(); f.job(); f.owner.viewonly = true;
+  f.press(1); assert.equal(f.nativeCalls(), 0); f.job();
+  assert.deepEqual(f.buttons.map(b => b.disabled), [true, true, true]);
+  f.owner.viewonly = false; f.job(); f.data.ch_estado_marcacao = 'A'; f.job();
+  assert.deepEqual(f.buttons.map(b => b.disabled), [false, false, true]);
 });
