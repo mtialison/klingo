@@ -5,6 +5,7 @@
     'Teleatendimento', 'Senha', 'Data de Liberação', 'Validade']);
   let patched = null;
   const menuButtons = new Map();
+  const planPatches = new Map();
   const MENU = new Set(['Alterar Procedimento', 'Alterar Operadora/Plano']);
   let menuObserver = null;
   const onRoute = () => /^#\/(recepcao|call-center\/confirmacao)(\/|$)/.test(window.location.hash.split('?')[0]);
@@ -54,6 +55,35 @@
       });
       menuObserver.observe(document.body, { attributes: true, attributeFilter: ['disabled'], subtree: true });
     }
+  }
+
+  function updatePlanModal() {
+    if (!onRoute()) {
+      for (const [vm, entry] of planPatches) if (vm.abrir === entry.wrapped) vm.abrir = entry.original;
+      planPatches.clear(); return;
+    }
+    document.querySelectorAll('.dashcard').forEach(card => {
+      for (let owner = cardCell(card); owner; owner = owner.$parent) {
+        const vm = owner.$refs?.alterar_plano;
+        if (!vm || typeof vm.abrir !== 'function' || planPatches.has(vm)) continue;
+        const original = vm.abrir;
+        const wrapped = function (appointment, ...args) {
+          if (!editable({ dados: appointment })) return original.call(this, appointment, ...args);
+          const jq = window.jQuery || window.$;
+          const modal = typeof jq === 'function' ? jq('#alterarMarcPlanoModal') : null;
+          if (typeof modal?.modal !== 'function') return original.call(this, appointment, ...args);
+          // lista_dia omite B. O modal nativo usa ch_estado_marcacao como checkbox;
+          // copiar a linha evita que selecionar/desmarcar altere o estado no card.
+          const row = { ...appointment };
+          row.nome_paciente = row.nome_paciente || row.paciente?.search ||
+            row.paciente?.cadastro?.st_nome || row.cadastro_temporario?.st_nome || '';
+          this.novo_plano = null; this.nova_matricula = ''; this.nova_validade = '';
+          this.validate = false; this.dados = { lista: [row] }; this.marcacao = row;
+          modal.modal('show');
+        };
+        vm.abrir = wrapped; planPatches.set(vm, { original, wrapped });
+      }
+    });
   }
 
   document.addEventListener('click', event => {
@@ -106,6 +136,7 @@
     // Compatibilidade com a versão anterior: retirar os itens duplicados do submenu.
     document.querySelectorAll('.tm-blocked-appointment-actions').forEach(group => group.remove());
     updateMenus();
+    updatePlanModal();
     if (!onRoute()) { restore(); return; }
     let modal = document.getElementById('editarMarcacaoModal'), vm = null;
     for (let node = modal; node; node = node.parentElement) {

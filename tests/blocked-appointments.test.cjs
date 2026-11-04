@@ -7,7 +7,8 @@ const source = fs.readFileSync(path.join(__dirname, '../src/31-marcacoes-bloquea
 function fixture(route = '#/recepcao') {
   let job, click, renders = 0, nativeCalls = 0;
   const data = { id_marcacao: 123, id_paciente: 4, ch_estado_marcacao: 'B', id_bloqueio: 5 };
-  const owner = {}, cell = { $options: { _componentTag: 'celula-horarios-marcacao' }, $parent: owner,
+  const planCalls = [], plan = { abrir: a => planCalls.push(['native', a]) };
+  const owner = { $refs: { alterar_plano: plan } }, cell = { $options: { _componentTag: 'celula-horarios-marcacao' }, $parent: owner,
     hor: { marcacao: data } };
   const input = (label, edicao, tag = 'az-input') => ({ componentOptions: { tag, propsData: { label, edicao } } });
   const original = function () { return { children: [input('Operadora / Plano', false),
@@ -24,14 +25,14 @@ function fixture(route = '#/recepcao') {
   const document = { addEventListener: (_name, fn) => { click = fn; },
     getElementById: () => ({ __vue__: modal }), querySelectorAll: selector =>
     selector === '.dashcard' ? [card] : [oldGroup] };
-  const window = { location: { hash: route } };
+  const window = { location: { hash: route }, jQuery: selector => ({ modal: action => planCalls.push([selector, action]) }) };
   vm.runInNewContext(source, { document, window, tmRuntime: { register: (_name, fn) => job = fn, schedule() {} } });
   const press = index => {
     let stopped = false;
     click({ target: { closest: () => buttons[index] }, preventDefault() {}, stopImmediatePropagation() { stopped = true; } });
     if (!stopped && !buttons[index].disabled) buttons[index].onclick();
   };
-  return { data, cell, owner, modal, original, oldGroup, window, job, buttons, press,
+  return { data, cell, owner, modal, original, oldGroup, window, job, buttons, press, plan, planCalls,
     nativeCalls: () => nativeCalls, render: () => modal.$options.render.call(modal), renders: () => renders };
 }
 for (const route of ['#/recepcao', '#/call-center/confirmacao']) {
@@ -80,4 +81,18 @@ test('bloqueados: restrição de leitura posterior impede comando e preserva ati
   assert.deepEqual(f.buttons.map(b => b.disabled), [true, true, true]);
   f.owner.viewonly = false; f.job(); f.data.ch_estado_marcacao = 'A'; f.job();
   assert.deepEqual(f.buttons.map(b => b.disabled), [false, false, true]);
+});
+test('bloqueados: modal de plano contém somente a cópia da marcação alvo, sem lista_dia', () => {
+  const f = fixture(), original = f.plan.abrir; f.job(); f.plan.abrir(f.data);
+  assert.deepEqual(f.planCalls, [['#alterarMarcPlanoModal', 'show']]);
+  assert.equal(f.plan.dados.lista.length, 1); assert.equal(f.plan.dados.lista[0].id_marcacao, 123);
+  assert.notEqual(f.plan.dados.lista[0], f.data); f.plan.dados.lista[0].ch_estado_marcacao = false;
+  assert.equal(f.data.ch_estado_marcacao, 'B');
+  f.window.location.hash = '#/autorizacoes'; f.job(); assert.equal(f.plan.abrir, original);
+});
+test('bloqueados: abertura de plano de ativo ou sem permissão continua nativa', () => {
+  for (const change of [f => f.data.ch_estado_marcacao = 'A', f => f.owner.viewonly = true]) {
+    const f = fixture(); f.job(); change(f); f.plan.abrir(f.data);
+    assert.equal(f.planCalls[0][0], 'native'); assert.equal(f.plan.dados, undefined);
+  }
 });
