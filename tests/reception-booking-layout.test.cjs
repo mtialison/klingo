@@ -6,6 +6,29 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', '08-recepcao-novo-atendimento.js'), 'utf8');
 
+test('Confirmação mantém somente Ocupar nativo atualizado depois de Vue recriar o controle', () => {
+  const start = source.indexOf('  function arrangeConfirmationBookingControls(');
+  const end = source.indexOf('  function receptionOriginField(', start);
+  const row = {}, header = { closest: () => row, appendChild(node) { node.parentElement = this; } };
+  const groups = [];
+  const modal = { id: 'novoAtendimentoConfirmacaoModal',
+    querySelector: selector => selector.includes('alert-primary') ? header : null,
+    querySelectorAll: () => groups.filter(g => !g.removed).map(group => ({ textContent: 'Ocupar',
+      closest: selector => selector === '.modal' ? modal : group })) };
+  const old = { parentElement: header, remove() { this.removed = true; } };
+  const nativeHandler = () => {};
+  const fresh = { parentElement: {}, nativeHandler, remove() { this.removed = true; } };
+  groups.push(old, fresh);
+  const context = vm.createContext({ norm: text => text.trim(), setClass() {} });
+  vm.runInContext(source.slice(start, end), context);
+  const arrange = vm.runInContext('arrangeConfirmationBookingControls', context);
+  arrange(modal);
+  assert.equal(old.removed, true); assert.equal(fresh.removed, undefined);
+  assert.equal(fresh.parentElement, header); assert.equal(fresh.nativeHandler, nativeHandler);
+  arrange(modal); assert.equal(fresh.removed, undefined);
+  assert.equal(groups.filter(g => !g.removed).length, 1);
+});
+
 test('Confirmação encontra marcacao dentro do modal e não usa formulário da Recepção', () => {
   const start = source.indexOf('  function receptionBookingComponent(');
   const end = source.indexOf('  function installOriginConfig(', start);

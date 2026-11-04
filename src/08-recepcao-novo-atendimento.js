@@ -272,7 +272,8 @@
         margin-bottom: 0 !important;
       }
       #${MODAL_ID} .tm-confirmation-add-procedure > br { display: none !important; }
-      #${MODAL_ID} .tm-confirmation-date-header { position: relative; }
+      #${MODAL_ID} .tm-confirmation-date-row { position: relative; z-index: 20; }
+      #${MODAL_ID} .tm-confirmation-date-header { position: relative; z-index: 2; }
       #${MODAL_ID} .tm-confirmation-occupy {
         position: absolute;
         right: 20px;
@@ -296,11 +297,17 @@
   function arrangeConfirmationBookingControls(modal) {
     if (modal.id !== 'novoAtendimentoConfirmacaoModal') return;
     const header = modal.querySelector('.col-lg-8 > .row:first-child p.alert-primary');
-    const occupy = Array.from(modal.querySelectorAll('button.dropdown-toggle'))
-      .find(button => /^Ocupar\b/.test(norm(button.textContent)))?.closest('.btn-group');
+    const groups = Array.from(new Set(Array.from(modal.querySelectorAll('button.dropdown-toggle'))
+      .filter(button => button.closest('.modal') === modal && /^Ocupar\b/.test(norm(button.textContent)))
+      .map(button => button.closest('.btn-group')).filter(Boolean)));
+    // Vue pode recriar o controle em sua posição nativa durante uma atualização.
+    // Nesse caso, usar o novo (com estado/listeners atuais) e remover o anterior.
+    const occupy = groups.find(group => group.parentElement !== header) || groups[0];
     if (header && occupy) {
+      setClass(header.closest('.row'), 'tm-confirmation-date-row', true);
       setClass(header, 'tm-confirmation-date-header', true);
       setClass(occupy, 'tm-confirmation-occupy', true);
+      for (const group of groups) if (group !== occupy) group.remove();
       if (occupy.parentElement !== header) header.appendChild(occupy);
     }
     const input = modal.querySelector('input[placeholder^="Adicionar procedimento"]');
