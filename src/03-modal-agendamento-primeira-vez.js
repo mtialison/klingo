@@ -636,7 +636,7 @@ const tmBookingModalWatch = (() => {
 
   function tmCadIsCpfLookupTarget(modal) {
     return tmCadIsPrimeiraVez(modal) ||
-      (['novoAtendimento2Modal', 'editarMarcacaoModal'].includes(modal?.id) &&
+      (['novoAtendimento2Modal', 'novoAtendimentoConfirmacaoModal', 'editarMarcacaoModal'].includes(modal?.id) &&
         !!modal.querySelector('#cadTemp'));
   }
 
@@ -1769,13 +1769,13 @@ const tmBookingModalWatch = (() => {
   }
 
   for (const name of ['input', 'change']) document.addEventListener(name, (event) => {
-    const modal = event.target?.closest?.('#cadastroModal, #novoAtendimento2Modal, #editarMarcacaoModal');
+    const modal = event.target?.closest?.('#cadastroModal, #novoAtendimento2Modal, #novoAtendimentoConfirmacaoModal, #editarMarcacaoModal');
     if (!modal || !modal.querySelector('#cadTemp')?.contains(event.target)) return;
     window.setTimeout(() => tmCadLookupCpf(modal), 0);
   }, true);
 
   document.addEventListener('shown.bs.modal', (event) => {
-    if (!['novoAtendimento2Modal', 'editarMarcacaoModal'].includes(event.target?.id)) return;
+    if (!['novoAtendimento2Modal', 'novoAtendimentoConfirmacaoModal', 'editarMarcacaoModal'].includes(event.target?.id)) return;
     const modal = event.target;
     window.setTimeout(() => {
       const root = modal.querySelector('#cadTemp');
@@ -1804,7 +1804,7 @@ const tmBookingModalWatch = (() => {
 
   document.addEventListener('click', (event) => {
     const button = event.target?.closest?.('button');
-    const modal = button?.closest?.('#novoAtendimento2Modal, #editarMarcacaoModal');
+    const modal = button?.closest?.('#novoAtendimento2Modal, #novoAtendimentoConfirmacaoModal, #editarMarcacaoModal');
     if (!modal || !/^(Concluir|Atualizar)$/i.test(tmCadNorm(button.textContent))) return;
     tmCadGuardCpfLookup(modal, event);
   }, true);

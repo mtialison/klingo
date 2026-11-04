@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.90
+// @version      1.91
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -3464,7 +3464,7 @@ const tmBookingModalWatch = (() => {
 
   function tmCadIsCpfLookupTarget(modal) {
     return tmCadIsPrimeiraVez(modal) ||
-      (['novoAtendimento2Modal', 'editarMarcacaoModal'].includes(modal?.id) &&
+      (['novoAtendimento2Modal', 'novoAtendimentoConfirmacaoModal', 'editarMarcacaoModal'].includes(modal?.id) &&
         !!modal.querySelector('#cadTemp'));
   }
 
@@ -4597,13 +4597,13 @@ const tmBookingModalWatch = (() => {
   }
 
   for (const name of ['input', 'change']) document.addEventListener(name, (event) => {
-    const modal = event.target?.closest?.('#cadastroModal, #novoAtendimento2Modal, #editarMarcacaoModal');
+    const modal = event.target?.closest?.('#cadastroModal, #novoAtendimento2Modal, #novoAtendimentoConfirmacaoModal, #editarMarcacaoModal');
     if (!modal || !modal.querySelector('#cadTemp')?.contains(event.target)) return;
     window.setTimeout(() => tmCadLookupCpf(modal), 0);
   }, true);
 
   document.addEventListener('shown.bs.modal', (event) => {
-    if (!['novoAtendimento2Modal', 'editarMarcacaoModal'].includes(event.target?.id)) return;
+    if (!['novoAtendimento2Modal', 'novoAtendimentoConfirmacaoModal', 'editarMarcacaoModal'].includes(event.target?.id)) return;
     const modal = event.target;
     window.setTimeout(() => {
       const root = modal.querySelector('#cadTemp');
@@ -4632,7 +4632,7 @@ const tmBookingModalWatch = (() => {
 
   document.addEventListener('click', (event) => {
     const button = event.target?.closest?.('button');
-    const modal = button?.closest?.('#novoAtendimento2Modal, #editarMarcacaoModal');
+    const modal = button?.closest?.('#novoAtendimento2Modal, #novoAtendimentoConfirmacaoModal, #editarMarcacaoModal');
     if (!modal || !/^(Concluir|Atualizar)$/i.test(tmCadNorm(button.textContent))) return;
     tmCadGuardCpfLookup(modal, event);
   }, true);
@@ -7049,8 +7049,9 @@ const tmBookingModalWatch = (() => {
 (function () {
   'use strict';
 
-  const MODAL_ID = 'novoAtendimento2Modal';
-  const STYLE_ID = 'tm-recepcao-novo-atendimento-layout';
+  function enhanceBookingModal(MODAL_ID) {
+  const STYLE_ID = 'tm-recepcao-novo-atendimento-layout' +
+    (MODAL_ID === 'novoAtendimentoConfirmacaoModal' ? '-confirmacao' : '');
   let observedModal = null;
   let modalObserver = null;
   let observationWindowStart = 0;
@@ -7087,7 +7088,7 @@ const tmBookingModalWatch = (() => {
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      #${MODAL_ID} > .modal-dialog.modal-dialog-total.modal-dialog22 {
+      #${MODAL_ID} > .modal-dialog {
         width: 1180px !important;
         max-width: calc(100vw - 32px) !important;
         height: auto !important;
@@ -7095,7 +7096,7 @@ const tmBookingModalWatch = (() => {
         margin: 16px auto !important;
       }
 
-      #${MODAL_ID} > .modal-dialog > .modal-content.modal-content-total.modal-content22 {
+      #${MODAL_ID} > .modal-dialog > .modal-content {
         width: 100% !important;
         height: auto !important;
         min-height: 0 !important;
@@ -7110,7 +7111,7 @@ const tmBookingModalWatch = (() => {
         overflow-y: auto !important;
       }
 
-      #${MODAL_ID}.tm-recepcao-coluna-abaixo > .modal-dialog.modal-dialog-total.modal-dialog22 {
+      #${MODAL_ID}.tm-recepcao-coluna-abaixo > .modal-dialog {
         width: 920px !important;
       }
 
@@ -7815,12 +7816,18 @@ const tmBookingModalWatch = (() => {
   }
 
   function receptionBookingComponent(modal) {
+    const origin = modal.id === 'novoAtendimentoConfirmacaoModal' ? 'confirm' : 'recep';
+    const matches = component => component?.origem === origin && typeof component.marcar === 'function';
+    // Na Confirmação, marcacao é filho do modal, não seu ancestral.
+    for (const child of modal.querySelectorAll?.('*') || []) {
+      if (matches(child.__vue__)) return child.__vue__;
+    }
     let element = modal;
     while (element) {
       const component = element.__vue__;
-      if (component?.origem === 'recep' && typeof component.marcar === 'function') return component;
+      if (matches(component)) return component;
       const marcacao = component?.$refs?.marcacao;
-      if (marcacao?.origem === 'recep' && typeof marcacao.marcar === 'function') return marcacao;
+      if (matches(marcacao)) return marcacao;
       element = element.parentElement;
     }
 
@@ -7828,7 +7835,7 @@ const tmBookingModalWatch = (() => {
     element = document.getElementById('filtro-medico');
     while (element) {
       const marcacao = element.__vue__?.$refs?.marcacao;
-      if (marcacao?.origem === 'recep' && typeof marcacao.marcar === 'function') return marcacao;
+      if (matches(marcacao)) return marcacao;
       element = element.parentElement;
     }
     return null;
@@ -8094,6 +8101,8 @@ const tmBookingModalWatch = (() => {
   });
   discoveryObserver.observe(document.documentElement, { childList: true, subtree: true });
   observeModal(document.getElementById(MODAL_ID));
+  }
+  for (const id of ['novoAtendimento2Modal', 'novoAtendimentoConfirmacaoModal']) enhanceBookingModal(id);
 })();
 
 /* =========================

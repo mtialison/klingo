@@ -153,6 +153,8 @@ test('a busca cobre cadastro temporário da recepção e edição, sem exigir CP
   });
   assert.equal(target({ id: 'cadastroModal' }), true);
   assert.equal(target({ id: 'novoAtendimento2Modal', querySelector: () => ({}) }), true);
+  assert.equal(target({ id: 'novoAtendimentoConfirmacaoModal', querySelector: () => ({}) }), true);
+  assert.equal(target({ id: 'novoAtendimentoConfirmacaoModal', querySelector: () => null }), false);
   assert.equal(target({ id: 'editarMarcacaoModal', querySelector: () => ({}) }), true);
   assert.equal(target({ id: 'novoAtendimento2Modal', querySelector: () => null }), false);
 });

@@ -4,8 +4,9 @@
 (function () {
   'use strict';
 
-  const MODAL_ID = 'novoAtendimento2Modal';
-  const STYLE_ID = 'tm-recepcao-novo-atendimento-layout';
+  function enhanceBookingModal(MODAL_ID) {
+  const STYLE_ID = 'tm-recepcao-novo-atendimento-layout' +
+    (MODAL_ID === 'novoAtendimentoConfirmacaoModal' ? '-confirmacao' : '');
   let observedModal = null;
   let modalObserver = null;
   let observationWindowStart = 0;
@@ -42,7 +43,7 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      #${MODAL_ID} > .modal-dialog.modal-dialog-total.modal-dialog22 {
+      #${MODAL_ID} > .modal-dialog {
         width: 1180px !important;
         max-width: calc(100vw - 32px) !important;
         height: auto !important;
@@ -50,7 +51,7 @@
         margin: 16px auto !important;
       }
 
-      #${MODAL_ID} > .modal-dialog > .modal-content.modal-content-total.modal-content22 {
+      #${MODAL_ID} > .modal-dialog > .modal-content {
         width: 100% !important;
         height: auto !important;
         min-height: 0 !important;
@@ -65,7 +66,7 @@
         overflow-y: auto !important;
       }
 
-      #${MODAL_ID}.tm-recepcao-coluna-abaixo > .modal-dialog.modal-dialog-total.modal-dialog22 {
+      #${MODAL_ID}.tm-recepcao-coluna-abaixo > .modal-dialog {
         width: 920px !important;
       }
 
@@ -770,12 +771,18 @@
   }
 
   function receptionBookingComponent(modal) {
+    const origin = modal.id === 'novoAtendimentoConfirmacaoModal' ? 'confirm' : 'recep';
+    const matches = component => component?.origem === origin && typeof component.marcar === 'function';
+    // Na Confirmação, marcacao é filho do modal, não seu ancestral.
+    for (const child of modal.querySelectorAll?.('*') || []) {
+      if (matches(child.__vue__)) return child.__vue__;
+    }
     let element = modal;
     while (element) {
       const component = element.__vue__;
-      if (component?.origem === 'recep' && typeof component.marcar === 'function') return component;
+      if (matches(component)) return component;
       const marcacao = component?.$refs?.marcacao;
-      if (marcacao?.origem === 'recep' && typeof marcacao.marcar === 'function') return marcacao;
+      if (matches(marcacao)) return marcacao;
       element = element.parentElement;
     }
 
@@ -783,7 +790,7 @@
     element = document.getElementById('filtro-medico');
     while (element) {
       const marcacao = element.__vue__?.$refs?.marcacao;
-      if (marcacao?.origem === 'recep' && typeof marcacao.marcar === 'function') return marcacao;
+      if (matches(marcacao)) return marcacao;
       element = element.parentElement;
     }
     return null;
@@ -1049,4 +1056,6 @@
   });
   discoveryObserver.observe(document.documentElement, { childList: true, subtree: true });
   observeModal(document.getElementById(MODAL_ID));
+  }
+  for (const id of ['novoAtendimento2Modal', 'novoAtendimentoConfirmacaoModal']) enhanceBookingModal(id);
 })();

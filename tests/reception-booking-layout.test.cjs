@@ -6,6 +6,33 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', '08-recepcao-novo-atendimento.js'), 'utf8');
 
+test('Confirmação encontra marcacao dentro do modal e não usa formulário da Recepção', () => {
+  const start = source.indexOf('  function receptionBookingComponent(');
+  const end = source.indexOf('  function installOriginConfig(', start);
+  const reception = { origem: 'recep', marcar() {} };
+  const confirmation = { origem: 'confirm', marcar() {} };
+  const context = vm.createContext({ document: { getElementById: () => ({ __vue__: { $refs: { marcacao: reception } } }) } });
+  vm.runInContext(source.slice(start, end), context);
+  const find = vm.runInContext('receptionBookingComponent', context);
+  const modal = { id: 'novoAtendimentoConfirmacaoModal', querySelectorAll: () => [
+    { __vue__: reception }, { __vue__: confirmation }
+  ] };
+  assert.equal(find(modal), confirmation);
+  modal.querySelectorAll = () => [];
+  assert.equal(find(modal), null);
+});
+
+test('Recepção mantém resolução pelo componente ancestral e ignora filho da Confirmação', () => {
+  const start = source.indexOf('  function receptionBookingComponent(');
+  const end = source.indexOf('  function installOriginConfig(', start);
+  const reception = { origem: 'recep', marcar() {} };
+  const context = vm.createContext({ document: { getElementById: () => null } });
+  vm.runInContext(source.slice(start, end), context);
+  const find = vm.runInContext('receptionBookingComponent', context);
+  assert.equal(find({ id: 'novoAtendimento2Modal', __vue__: reception,
+    querySelectorAll: () => [{ __vue__: { origem: 'confirm', marcar() {} } }] }), reception);
+});
+
 test('Recepção coloca origem após celular e oculta apenas o título azul', () => {
   const start = source.indexOf('  function setClass(element');
   const end = source.indexOf('  function requiredReceptionCpf(', start);
