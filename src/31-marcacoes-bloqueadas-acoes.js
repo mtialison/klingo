@@ -69,17 +69,28 @@
         const original = vm.abrir;
         const wrapped = function (appointment, ...args) {
           if (!editable({ dados: appointment })) return original.call(this, appointment, ...args);
-          const jq = window.jQuery || window.$;
-          const modal = typeof jq === 'function' ? jq('#alterarMarcPlanoModal') : null;
-          if (typeof modal?.modal !== 'function') return original.call(this, appointment, ...args);
-          // lista_dia omite B. O modal nativo usa ch_estado_marcacao como checkbox;
-          // copiar a linha evita que selecionar/desmarcar altere o estado no card.
+          const util = this.$util;
+          if (typeof util?.load !== 'function') return original.call(this, appointment, ...args);
+          // O abridor nativo usa jQuery privado. Reutilizá-lo integralmente, fornecendo
+          // somente sua leitura lista_dia: ela exclui B, embora o modal suporte B.
           const row = { ...appointment };
           row.nome_paciente = row.nome_paciente || row.paciente?.search ||
             row.paciente?.cadastro?.st_nome || row.cadastro_temporario?.st_nome || '';
-          this.novo_plano = null; this.nova_matricula = ''; this.nova_validade = '';
-          this.validate = false; this.dados = { lista: [row] }; this.marcacao = row;
-          modal.modal('show');
+          const target = this, scoped = Object.create(util);
+          scoped.load = function (vm, options, ...rest) {
+            if (vm === target && options?.service === 'marcacoes' && options.func === 'lista_dia' &&
+                typeof options.loadTo === 'function') {
+              options.loadTo({ lista: [row] }); return Promise.resolve();
+            }
+            return util.load.call(util, vm, options, ...rest);
+          };
+          const descriptor = Object.getOwnPropertyDescriptor(this, '$util');
+          Object.defineProperty(this, '$util', { configurable: true, value: scoped, writable: true });
+          try { return original.call(this, appointment, ...args); }
+          finally {
+            if (descriptor) Object.defineProperty(this, '$util', descriptor);
+            else delete this.$util;
+          }
         };
         vm.abrir = wrapped; planPatches.set(vm, { original, wrapped });
       }

@@ -7,7 +7,16 @@ const source = fs.readFileSync(path.join(__dirname, '../src/31-marcacoes-bloquea
 function fixture(route = '#/recepcao') {
   let job, click, renders = 0, nativeCalls = 0;
   const data = { id_marcacao: 123, id_paciente: 4, ch_estado_marcacao: 'B', id_bloqueio: 5 };
-  const planCalls = [], plan = { abrir: a => planCalls.push(['native', a]) };
+  const planCalls = [], util = { load(vm, options) {
+    planCalls.push(['load-native']); options.loadTo({ lista: [] });
+  } };
+  const plan = { $util: util, abrir(a) {
+    planCalls.push(['native', a]); this.novo_plano = null;
+    this.$util.load(this, { service: 'marcacoes', func: 'lista_dia', loadTo: data => {
+      this.dados = data; this.marcacao = data.lista[0];
+    } });
+    planCalls.push(['#alterarMarcPlanoModal', 'show']);
+  } };
   const owner = { $refs: { alterar_plano: plan } }, cell = { $options: { _componentTag: 'celula-horarios-marcacao' }, $parent: owner,
     hor: { marcacao: data } };
   const input = (label, edicao, tag = 'az-input') => ({ componentOptions: { tag, propsData: { label, edicao } } });
@@ -33,7 +42,7 @@ function fixture(route = '#/recepcao') {
     if (!stopped && !buttons[index].disabled) buttons[index].onclick();
   };
   return { data, cell, owner, modal, original, oldGroup, window, job, buttons, press, plan, planCalls,
-    nativeCalls: () => nativeCalls, render: () => modal.$options.render.call(modal), renders: () => renders };
+    util, nativeCalls: () => nativeCalls, render: () => modal.$options.render.call(modal), renders: () => renders };
 }
 for (const route of ['#/recepcao', '#/call-center/confirmacao']) {
   test(`bloqueados: libera campos de edição mantendo identidade, aviso e estado em ${route}`, () => {
@@ -84,7 +93,9 @@ test('bloqueados: restrição de leitura posterior impede comando e preserva ati
 });
 test('bloqueados: modal de plano contém somente a cópia da marcação alvo, sem lista_dia', () => {
   const f = fixture(), original = f.plan.abrir; f.job(); f.plan.abrir(f.data);
-  assert.deepEqual(f.planCalls, [['#alterarMarcPlanoModal', 'show']]);
+  assert.equal(f.planCalls[0][0], 'native');
+  assert.deepEqual(f.planCalls[1], ['#alterarMarcPlanoModal', 'show']);
+  assert.equal(f.plan.$util, f.util); assert.equal(f.planCalls.length, 2);
   assert.equal(f.plan.dados.lista.length, 1); assert.equal(f.plan.dados.lista[0].id_marcacao, 123);
   assert.notEqual(f.plan.dados.lista[0], f.data); f.plan.dados.lista[0].ch_estado_marcacao = false;
   assert.equal(f.data.ch_estado_marcacao, 'B');
@@ -93,6 +104,7 @@ test('bloqueados: modal de plano contém somente a cópia da marcação alvo, se
 test('bloqueados: abertura de plano de ativo ou sem permissão continua nativa', () => {
   for (const change of [f => f.data.ch_estado_marcacao = 'A', f => f.owner.viewonly = true]) {
     const f = fixture(); f.job(); change(f); f.plan.abrir(f.data);
-    assert.equal(f.planCalls[0][0], 'native'); assert.equal(f.plan.dados, undefined);
+    assert.equal(f.planCalls[0][0], 'native'); assert.equal(f.planCalls[1][0], 'load-native');
+    assert.equal(f.plan.dados.lista.length, 0);
   }
 });
