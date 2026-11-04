@@ -1,11 +1,12 @@
-/* Definir a unidade no modelo nativo uma vez por abertura, sem impedir desmarcar. */
+/* Padrão aplicado antes da criação do checkbox nativo; o usuário pode desmarcar. */
 (function () {
   'use strict';
-  let current = null, unwatch = null;
+  let patch = null;
   const onRoute = () => /^#\/(recepcao|call-center\/confirmacao)(\/|$)/.test(window.location.hash.split('?')[0]);
 
   function cleanup() {
-    unwatch?.(); unwatch = null; current = null;
+    if (patch && patch.vm.remarcar === patch.wrapped) patch.vm.remarcar = patch.original;
+    patch = null;
   }
 
   function update() {
@@ -13,19 +14,19 @@
     let vm = null;
     for (let node = document.getElementById('remarcarComboModal'); node; node = node.parentElement) {
       const candidate = node.__vue__;
-      if (candidate?.$options?.methods?.remarcar && 'dados' in candidate &&
-          typeof candidate.$watch === 'function') { vm = candidate; break; }
+      if (candidate?.$options?.methods?.remarcar && 'dados' in candidate) { vm = candidate; break; }
     }
     if (!vm || vm._isDestroyed) { cleanup(); return; }
-    if (current === vm) return;
-    cleanup(); current = vm;
-    // remarcar() limpa dados e o preenche após a consulta. Observar só a referência:
-    // mudar o checkbox dentro do mesmo objeto não deve reativá-lo.
-    unwatch = vm.$watch('dados', data => {
-      if (onRoute() && data && typeof data === 'object') {
-        vm.$set(data, 'manter_mesma_unidade', true);
-      }
-    }, { immediate: true });
+    if (patch?.vm === vm) return;
+    cleanup();
+    const original = vm.remarcar;
+    const wrapped = function (id, trocarMedico, options) {
+      if (!onRoute()) return original.apply(this, arguments);
+      // O 3º argumento nativo é mesclado à resposta ANTES de montar os campos.
+      return original.call(this, id, trocarMedico, { ...options, manter_mesma_unidade: true });
+    };
+    vm.remarcar = wrapped;
+    patch = { vm, original, wrapped };
   }
   tmRuntime.register('remarcar na mesma unidade por padrão', update, ['#/recepcao', '#/call-center/confirmacao']);
 })();
