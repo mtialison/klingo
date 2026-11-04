@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.91
+// @version      1.92
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -7309,6 +7309,25 @@ const tmBookingModalWatch = (() => {
       #${MODAL_ID} .tm-recepcao-origem-col .input-group > :not(select) {
         flex: 0 0 auto !important;
       }
+
+      #${MODAL_ID} .tm-confirmation-add-procedure {
+        height: auto !important;
+        min-height: 0 !important;
+        margin-top: 12px !important;
+        margin-bottom: 0 !important;
+      }
+      #${MODAL_ID} .tm-confirmation-add-procedure > br { display: none !important; }
+      #${MODAL_ID} .tm-confirmation-date-header { position: relative; }
+      #${MODAL_ID} .tm-confirmation-occupy {
+        position: absolute;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        margin: 0 !important;
+      }
+      @media (max-width: 575px) {
+        #${MODAL_ID} .tm-confirmation-date-header { padding-right: 90px; }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -7317,6 +7336,27 @@ const tmBookingModalWatch = (() => {
     const label = Array.from(modal.querySelectorAll('small.form-text.text-muted'))
       .find((small) => small.closest('.modal') === modal && norm(small.textContent) === labelText);
     return label?.closest('.col') || null;
+  }
+
+  function arrangeConfirmationBookingControls(modal) {
+    if (modal.id !== 'novoAtendimentoConfirmacaoModal') return;
+    const header = modal.querySelector('.col-lg-8 > .row:first-child p.alert-primary');
+    const occupy = Array.from(modal.querySelectorAll('button.dropdown-toggle'))
+      .find(button => /^Ocupar\b/.test(norm(button.textContent)))?.closest('.btn-group');
+    if (header && occupy) {
+      setClass(header, 'tm-confirmation-date-header', true);
+      setClass(occupy, 'tm-confirmation-occupy', true);
+      if (occupy.parentElement !== header) header.appendChild(occupy);
+    }
+    const input = modal.querySelector('input[placeholder^="Adicionar procedimento"]');
+    const field = input?.closest('.form-group')?.parentElement;
+    const observation = modal.querySelector('.tm-recepcao-observacao-col')?.closest('.form-row');
+    if (field && observation?.parentElement) {
+      setClass(field, 'tm-confirmation-add-procedure', true);
+      if (field.parentElement !== observation.parentElement || field.previousElementSibling !== observation) {
+        observation.parentElement.insertBefore(field, observation.nextSibling);
+      }
+    }
   }
 
   function receptionOriginField(modal, contactRow) {
@@ -7969,6 +8009,7 @@ const tmBookingModalWatch = (() => {
       setClass(field, 'tm-recepcao-observacao-col', field === observation));
     if (cpf) setClass(cpf, 'tm-recepcao-cpf-col', true);
     if (observation) setClass(observation, 'tm-recepcao-observacao-col', true);
+    arrangeConfirmationBookingControls(modal);
     const firstTime = !!social;
     setClass(modal, 'tm-recepcao-primeira-vez', firstTime);
     hideRedundantReceptionPatientControls(modal,
