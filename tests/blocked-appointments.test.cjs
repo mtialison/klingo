@@ -4,69 +4,50 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../src/31-marcacoes-bloqueadas-acoes.js'), 'utf8');
-
 function fixture(route = '#/recepcao') {
-  let click, job, scheduled = 0;
-  const calls = [], groups = [];
-  const appointment = { id_marcacao: 123, ch_estado_marcacao: 'B', item_status: { valor: 'bloqueado' } };
-  const owner = { remarcar: a => calls.push(['reschedule', a]), load: a => calls.push(['load', a]) };
-  const cell = { $options: { _componentTag: 'celula-horarios-marcacao' }, $parent: owner,
-    hor: { marcacao: appointment }, $root: { editar_marcacao: (...args) => calls.push(['edit', ...args]) } };
-  const menu = { querySelector: () => groups[0], appendChild: g => groups.push(g) };
-  const card = { closest: () => null, querySelectorAll: () => [{ __vue__: cell }], querySelector: () => menu };
-  cell.$el = { closest: () => card };
+  let job, renders = 0;
+  const data = { id_marcacao: 123, ch_estado_marcacao: 'B', id_bloqueio: 5 };
+  const owner = {}, cell = { $options: { _componentTag: 'celula-horarios-marcacao' }, $parent: owner,
+    hor: { marcacao: data } };
+  const input = (label, edicao, tag = 'az-input') => ({ componentOptions: { tag, propsData: { label, edicao } } });
+  const original = function () { return { children: [input('Operadora / Plano', false),
+    input('e-mail', false), input('Nome', false), input('CPF', false), input('Quantidade de Ciclos', false),
+    input('Data de Liberação', false), input('', false, 'medico-solicitante'), input('Celular', true)],
+    blockedWarning: !this.marcacao_ativa }; };
+  const modal = { dados: data, marcacao_ativa: false, $options: { render: original,
+    methods: { abrir() {}, atualizar() {} }, computed: { marcacao_ativa() {} } }, $forceUpdate() { renders++; } };
+  const oldGroup = { remove() { this.removed = true; } };
+  const document = { getElementById: () => ({ __vue__: modal }), querySelectorAll: selector =>
+    selector === '.dashcard' ? [{ querySelectorAll: () => [{ __vue__: cell }] }] : [oldGroup] };
   const window = { location: { hash: route } };
-  const document = {
-    addEventListener: (_name, fn) => { click = fn; },
-    querySelectorAll: selector => selector === '.dashcard' ? [card] : [...groups],
-    createElement() {
-      const node = { dataset: {}, children: [], closest: () => card,
-        appendChild(child) { this.children.push(child); child.closest = () => node; },
-        remove() { const i = groups.indexOf(node); if (i >= 0) groups.splice(i, 1); } };
-      return node;
-    }
-  };
-  vm.runInNewContext(source, { document, window, tmRuntime: {
-    register: (_name, fn) => { job = fn; }, schedule: () => scheduled++
-  } });
-  const press = index => {
-    const button = groups[0].children[index];
-    click({ target: { closest: () => button }, preventDefault() {} });
-  };
-  return { appointment, owner, cell, groups, calls, window, job, press, scheduled: () => scheduled };
+  vm.runInNewContext(source, { document, window, tmRuntime: { register: (_name, fn) => job = fn } });
+  return { data, cell, owner, modal, original, oldGroup, window, job, render: () => modal.$options.render.call(modal), renders: () => renders };
 }
-
 for (const route of ['#/recepcao', '#/call-center/confirmacao']) {
-  test(`bloqueados: abre edição/remarcação nativas sem mudar estado em ${route}`, () => {
-    const f = fixture(route), before = JSON.stringify(f.appointment);
-    f.job(); assert.equal(f.groups.length, 1);
-    f.press(0); assert.equal(f.calls[0][0], 'edit'); assert.equal(f.calls[0][1], 123);
-    f.calls[0][2](); assert.equal(f.calls[1][0], 'load');
-    f.calls[0][3].remarcar(f.appointment); assert.equal(f.calls[2][1], f.appointment);
-    f.press(1); assert.equal(f.calls[3][0], 'reschedule'); assert.equal(f.calls[3][1], f.appointment);
-    assert.equal(JSON.stringify(f.appointment), before);
+  test(`bloqueados: libera campos de edição mantendo identidade, aviso e estado em ${route}`, () => {
+    const f = fixture(route), before = JSON.stringify(f.data); f.job();
+    const tree = f.render(), enabled = tree.children.map(n => n.componentOptions.propsData.edicao);
+    assert.deepEqual(Array.from(enabled), [true, true, false, false, false, true, true, true]);
+    assert.equal(tree.blockedWarning, true); assert.equal(f.modal.marcacao_ativa, false);
+    assert.equal(JSON.stringify(f.data), before); assert.equal(f.oldGroup.removed, true);
+    const render = f.modal.$options.render; f.job(); assert.equal(f.modal.$options.render, render);
+    assert.equal(f.renders(), 1);
   });
 }
-test('bloqueados: preserva modo somente leitura e bloqueio de edição', () => {
-  for (const restriction of ['viewonly', 'block_editar']) {
-    const f = fixture(); f.job();
-    if (restriction === 'viewonly') f.owner.viewonly = true;
-    else f.cell.block_editar = true;
-    f.press(0); assert.equal(f.calls.length, 0);
-    f.job(); assert.equal(f.groups.length, 0);
+test('bloqueados: preserva cancelados, atendimentos, modo somente leitura e bloqueio de edição', () => {
+  for (const change of [f => f.data.ch_estado_marcacao = 'C', f => f.data.ch_estado_marcacao = 'A',
+    f => f.data.id_atendimento = 9, f => f.owner.viewonly = true, f => f.cell.block_editar = true,
+    f => f.cell.hor.marcacao = { ...f.data, id_marcacao: 456 }]) {
+    const f = fixture(); f.job(); change(f);
+    assert.equal(f.render().children[0].componentOptions.propsData.edicao, false);
   }
 });
-test('bloqueados: recusa card reciclado, outro estado e outra rota', () => {
-  const f = fixture(); f.job(); f.cell.hor.marcacao = { ...f.appointment, id_marcacao: 456 };
-  f.press(1); assert.equal(f.calls.length, 0); assert.equal(f.scheduled(), 1);
-  f.cell.hor.marcacao = f.appointment; f.appointment.ch_estado_marcacao = 'A';
-  f.press(1); assert.equal(f.calls.length, 0); f.job(); assert.equal(f.groups.length, 0);
-  f.appointment.ch_estado_marcacao = 'B'; f.job(); f.window.location.hash = '#/autorizacoes';
-  f.press(0); assert.equal(f.calls.length, 0); f.job(); assert.equal(f.groups.length, 0);
+test('bloqueados: restaura renderizador ao sair da rota e recusa efeito após mudar o estado', () => {
+  const f = fixture(); f.job();
+  f.data.ch_estado_marcacao = 'C'; assert.equal(f.render().children[0].componentOptions.propsData.edicao, false);
+  f.window.location.hash = '#/autorizacoes'; f.job(); assert.equal(f.modal.$options.render, f.original);
 });
-test('bloqueados: não oferece ações em horários livres, atendidos ou cancelados', () => {
-  for (const change of [f => f.cell.hor.marcacao = null, f => f.appointment.id_atendimento = 9,
-    f => f.appointment.ch_estado_marcacao = 'C', f => f.appointment.item_status.valor = 'cancelado']) {
-    const f = fixture(); change(f); f.job(); assert.equal(f.groups.length, 0);
-  }
+test('bloqueados: usa novos dados do modal e não libera outra marcação carregada posteriormente', () => {
+  const f = fixture(); f.job(); f.modal.dados = { ...f.data, id_marcacao: 456 };
+  assert.equal(f.render().children[0].componentOptions.propsData.edicao, false);
 });

@@ -1,75 +1,75 @@
-/* Abrir os fluxos nativos sem retirar o bloqueio da marcação. */
+/* Edição pelo fluxo nativo: manter bloqueio e liberar somente os campos de edição. */
 (function () {
   'use strict';
-  const CLASS = 'tm-blocked-appointment-actions';
-  const owners = new WeakMap();
+  const FIELDS = new Set(['e-mail', 'Telefone', 'Celular', 'Operadora / Plano', 'Recepção',
+    'Teleatendimento', 'Senha', 'Data de Liberação', 'Validade']);
+  let patched = null;
   const onRoute = () => /^#\/(recepcao|call-center\/confirmacao)(\/|$)/.test(window.location.hash.split('?')[0]);
 
-  function context(cell) {
-    if (!cell || cell._isDestroyed || cell.block_editar) return null;
-    let owner = null;
-    for (let vue = cell; vue; vue = vue.$parent) {
-      if (vue.viewonly || vue._isDestroyed) return null;
-      if (!owner && typeof vue.remarcar === 'function' && typeof vue.load === 'function') owner = vue;
+  function editable(vm) {
+    const data = vm.dados;
+    if (!onRoute() || !data || data.ch_estado_marcacao !== 'B' || data.id_atendimento ||
+        !/^[1-9]\d*$/.test(String(data.id_marcacao))) return false;
+    for (const card of document.querySelectorAll('.dashcard')) {
+      const cell = Array.from(card.querySelectorAll('*')).map(node => node.__vue__).find(v =>
+        v?.$options?._componentTag === 'celula-horarios-marcacao' &&
+        String(v.hor?.marcacao?.id_marcacao) === String(data.id_marcacao));
+      if (!cell || cell.block_editar || cell.hor.marcacao.ch_estado_marcacao !== 'B') continue;
+      let permitted = true;
+      for (let v = cell; v; v = v.$parent) {
+        if (v.viewonly || v._isDestroyed) { permitted = false; break; }
+      }
+      if (permitted) return true;
     }
-    const appointment = cell.hor?.marcacao;
-    if (!owner || !appointment || !/^[1-9]\d*$/.test(String(appointment.id_marcacao)) ||
-        appointment.ch_estado_marcacao !== 'B' || appointment.id_atendimento ||
-        appointment.item_status?.valor !== 'bloqueado' ||
-        typeof cell.$root?.editar_marcacao !== 'function') return null;
-    return { cell, owner, appointment, id: String(appointment.id_marcacao) };
+    return false;
+  }
+
+  function unlockFields(node) {
+    if (!node || typeof node !== 'object') return;
+    const component = node.componentOptions;
+    const props = component?.propsData;
+    // Nome/CPF e campos fixos permanecem protegidos. Não alterar marcacao_ativa ou dados.
+    if (props?.edicao === false &&
+        ((component.tag === 'az-input' && FIELDS.has(props.label)) || component.tag === 'medico-solicitante')) {
+      props.edicao = true;
+    }
+    node.children?.forEach(unlockFields);
+    component?.children?.forEach(unlockFields);
+  }
+
+  function restore() {
+    if (!patched) return;
+    const { vm, original, wrapped } = patched;
+    if (vm.$options.render === wrapped) {
+      vm.$options.render = original;
+      if (!vm._isDestroyed) vm.$forceUpdate();
+    }
+    patched = null;
   }
 
   function update() {
-    const active = new Set();
-    if (onRoute()) document.querySelectorAll('.dashcard').forEach(card => {
-      if (card.closest('.modal')) return;
-      const cell = Array.from(card.querySelectorAll('*')).map(node => node.__vue__)
-        .find(vue => vue?.$options?._componentTag === 'celula-horarios-marcacao');
-      const ctx = context(cell);
-      const menu = card.querySelector('.dropleft .dropdown-menu');
-      if (!ctx || !menu || cell.$el.closest('.dashcard') !== card) return;
-      let group = menu.querySelector(`.${CLASS}`);
-      if (!group) {
-        group = document.createElement('div'); group.className = CLASS;
-        for (const [action, text] of [['edit', 'Editar marcação'], ['reschedule', 'Remarcar']]) {
-          const button = document.createElement('button'); button.type = 'button';
-          button.className = 'dropdown-item'; button.textContent = text;
-          button.dataset.tmBlockedAction = action; group.appendChild(button);
-        }
-        menu.appendChild(group);
-      }
-      owners.set(group, ctx); active.add(group);
-    });
-    document.querySelectorAll(`.${CLASS}`).forEach(group => {
-      if (!active.has(group)) { owners.delete(group); group.remove(); }
-    });
+    // Compatibilidade com a versão anterior: retirar os itens duplicados do submenu.
+    document.querySelectorAll('.tm-blocked-appointment-actions').forEach(group => group.remove());
+    if (!onRoute()) { restore(); return; }
+    let modal = document.getElementById('editarMarcacaoModal'), vm = null;
+    for (let node = modal; node; node = node.parentElement) {
+      const candidate = node.__vue__;
+      if (candidate?.$options?.methods?.abrir && candidate.$options.methods.atualizar &&
+          candidate.$options.computed?.marcacao_ativa) { vm = candidate; break; }
+    }
+    if (!vm || vm._isDestroyed) { restore(); return; }
+    if (patched?.vm === vm) return;
+    restore();
+    const original = vm.$options.render;
+    if (typeof original !== 'function') return;
+    const wrapped = function (...args) {
+      const tree = original.apply(this, args);
+      if (editable(this)) unlockFields(tree);
+      return tree;
+    };
+    vm.$options.render = wrapped;
+    patched = { vm, original, wrapped };
+    vm.$forceUpdate();
   }
-
-  document.addEventListener('click', event => {
-    const button = event.target.closest?.('[data-tm-blocked-action]');
-    const group = button?.closest(`.${CLASS}`);
-    const previous = group && owners.get(group);
-    if (!previous) return;
-    event.preventDefault();
-    if (!onRoute()) return;
-    const ctx = context(previous.cell);
-    // Vue reaproveita cards: nunca abrir a marcação anterior após uma troca da lista.
-    if (!ctx || ctx.id !== previous.id ||
-        ctx.cell.$el.closest('.dashcard') !== group.closest('.dashcard')) {
-      tmRuntime.schedule(0); return;
-    }
-    try {
-      if (button.dataset.tmBlockedAction === 'reschedule') ctx.owner.remarcar(ctx.appointment);
-      else if (button.dataset.tmBlockedAction === 'edit') {
-        ctx.cell.$root.editar_marcacao(ctx.appointment.id_marcacao, () => ctx.owner.load(false), {
-          remarcar: appointment => ctx.owner.remarcar(appointment)
-        });
-      }
-    } catch (_) {
-      ctx.owner.$toast?.add({ severity: 'warn', summary: 'Atenção',
-        detail: 'Não foi possível abrir a marcação. Atualize a listagem e tente novamente.', life: 5000 });
-    }
-  });
   tmRuntime.register('ações em marcações bloqueadas', update, ['#/recepcao', '#/call-center/confirmacao']);
 })();
