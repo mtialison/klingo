@@ -39,9 +39,9 @@ test('arquivo para copiar à main não aponta para a branch de testes', () => {
   assert.match(draft, /@downloadURL\s+https:\/\/raw\.githubusercontent\.com\/mtialison\/klingo\/testes-codex\/klingo\.test\.user\.js/);
 });
 
-test('versão publicada de testes sobe para 1.88', () => {
+test('versão publicada de testes sobe para 1.89', () => {
   const header = read('klingo.test.user.js').split('// ==/UserScript==')[0];
-  assert.match(header, /^\/\/ @version\s+1\.88\s*$/m);
+  assert.match(header, /^\/\/ @version\s+1\.89\s*$/m);
 });
 
 test('runtime reage a mudanças e executa só os módulos da rota ativa', () => {
