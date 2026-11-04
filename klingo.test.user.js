@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      1.83
+// @version      1.84
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -12649,13 +12649,13 @@ const tmConfirmationCalendarAdapter = (() => {
 
   function update() {
     const active = new Set();
-    if (onRoute()) document.querySelectorAll('.dashcard.my-2').forEach(card => {
+    if (onRoute()) document.querySelectorAll('.dashcard').forEach(card => {
       if (card.closest('.modal')) return;
       const cell = Array.from(card.querySelectorAll('*')).map(node => node.__vue__)
         .find(vue => vue?.$options?._componentTag === 'celula-horarios-marcacao');
       const ctx = context(cell);
       const menu = card.querySelector('.dropleft .dropdown-menu');
-      if (!ctx || !menu) return;
+      if (!ctx || !menu || cell.$el.closest('.dashcard') !== card) return;
       let group = menu.querySelector(`.${CLASS}`);
       if (!group) {
         group = document.createElement('div'); group.className = CLASS;
@@ -12683,7 +12683,7 @@ const tmConfirmationCalendarAdapter = (() => {
     const ctx = context(previous.cell);
     // Vue reaproveita cards: nunca abrir a marcação anterior após uma troca da lista.
     if (!ctx || ctx.id !== previous.id ||
-        ctx.cell.$el.closest('.dashcard.my-2') !== group.closest('.dashcard.my-2')) {
+        ctx.cell.$el.closest('.dashcard') !== group.closest('.dashcard')) {
       tmRuntime.schedule(0); return;
     }
     try {

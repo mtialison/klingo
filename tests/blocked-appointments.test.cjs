@@ -18,7 +18,7 @@ function fixture(route = '#/recepcao') {
   const window = { location: { hash: route } };
   const document = {
     addEventListener: (_name, fn) => { click = fn; },
-    querySelectorAll: selector => selector === '.dashcard.my-2' ? [card] : [...groups],
+    querySelectorAll: selector => selector === '.dashcard' ? [card] : [...groups],
     createElement() {
       const node = { dataset: {}, children: [], closest: () => card,
         appendChild(child) { this.children.push(child); child.closest = () => node; },
