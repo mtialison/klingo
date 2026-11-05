@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  const { source, prepare, createCalendarPreloader, calendarDates, iso, monthNames } = tmAppointmentCalendarCore;
+  const { source, prepare, refreshDay, createCalendarPreloader, calendarDates, iso, monthNames } = tmAppointmentCalendarCore;
   const STYLE_ID = 'tm-confirmacao-calendario-style';
   const POPOVER_ID = 'tm-confirmacao-calendario-popover';
   const BUTTON_CLASS = 'tm-confirmacao-calendario-botao';
@@ -335,7 +335,8 @@
   document.addEventListener('click', (event) => {
     const current = tmConfirmationCalendarAdapter.read();
     if (current && event.target instanceof Element && event.target.closest('#refresh-button')) {
-      source.invalidate(current.context.doctor, current.context.unit);
+      refreshDay(current.context.start, current.context.doctor, current.context.unit, componentFor(current))
+        .catch(error => { if (!error.cancelled) console.warn('[TM] Atualização do dia no calendário:', error.message); });
     }
   }, true);
   window.addEventListener('resize', positionPopover);

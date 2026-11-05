@@ -267,6 +267,26 @@ test('renovação remove azul quando não há mais paciente bloqueado, sem subst
   assert.equal(refreshed.get('2026-10-06').kind, 'blocked');
 });
 
+test('revalidar um dia mantém sua última cor confirmada até a nova conferência terminar', async () => {
+  let hold = false, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const day = '2026-10-06', blocked = { [day]: [slot('ocupado')] };
+  const f = fixture({ blocked, schedules: { [day]: [{ id_unidade_operacao: 5 }] },
+    data: { [day]: { agendas: [slot('bloqueado')] } },
+    onRequest: q => hold && q.some(x => x.parms.status === 'B') ? gate : undefined });
+  await f.source.ensure(dates, 19, '5', {});
+  hold = true; delete blocked[day];
+  const refresh = f.source.ensure([day], 19, '5', {}, { refresh: true });
+  try {
+    for (let i = 0; i < 8; i++) await delay();
+    assert.equal(f.source.read(dates, 19, '5').size, 42);
+    assert.equal(f.source.read([day], 19, '5').get(day).kind, 'booked');
+  } finally { release(); }
+  assert.equal((await refresh).get(day).kind, 'blocked');
+  f.source.invalidate(19, '5');
+  assert.equal(f.source.read([day], 19, '5').size, 0, 'invalidação real também limpa a cor anterior');
+});
+
 test('sem permissão de feriados ou período, fallback diário continua correto', async () => {
   for (const flags of [{ failHoliday: true }, { failRange: true }]) {
     const f = fixture(flags);
@@ -386,6 +406,7 @@ function uiFixture({ records = [] } = {}) {
   const handlers = {}, timers = new Map(), timerDelays = new Map(), elements = new Map();
   let contextChanged, watcherDetached = false;
   let nextTimer = 1, posts = 0, redraws = 0, refreshes = 0, nativeHook, ejections = 0;
+  const requests = [];
   class Element {
     constructor(tag = 'div') {
       this.tag = tag; this.children = []; this.dataset = {}; this.style = {};
@@ -427,6 +448,7 @@ function uiFixture({ records = [] } = {}) {
   refresh.click = () => { refreshes++; handlers.click?.forEach((fn) => fn({ target: refresh })); };
   const http = { post: async (_url, payload) => {
     posts++;
+    requests.push(payload.q);
     return { data: Object.fromEntries(payload.q.map((q) => [q.id, { status: 200, data:
       q.name === 'medicos.agenda_semanal' ? { agendas: {} } :
         q.name === 'agenda_feriados.index' ? records : { agendas: [] } }])) };
@@ -459,7 +481,7 @@ function uiFixture({ records = [] } = {}) {
       assert.ok(entry, `timer de ${ms}ms agendado`);
       timers.delete(entry[0]); entry[1]();
     },
-    posts: () => posts, redraws: () => redraws, refreshes: () => refreshes,
+    posts: () => posts, requests, redraws: () => redraws, refreshes: () => refreshes,
     nativeHook: () => nativeHook, ejections: () => ejections };
 }
 
@@ -613,6 +635,22 @@ test('alteração nativa invalida e recarrega; sessão diferente não herda core
   f.ui.preloader.stop();
 });
 
+test('refresh da Recepção conserva o mês e consulta somente o dia selecionado', async () => {
+  const f = uiFixture();
+  await f.ui.prefetchSelectedMonth();
+  const before = f.requests.length;
+  f.input.value = '2026-10-27';
+  const refresh = f.document.getElementById('refresh-button');
+  f.handlers.click.forEach(fn => fn({ target: refresh }));
+  assert.equal(f.ui.source.read(dates, 19, '5').size, 42, 'clique não apaga cores');
+  for (let i = 0; i < 5; i++) await delay();
+  const queries = f.requests.slice(before).flat();
+  assert.ok(queries.some(q => q.parms.status === 'T'));
+  assert.ok(queries.every(q => q.name === 'agendas.index' &&
+    (q.parms.data === '2026-10-27' || (q.parms.inicio === '2026-10-27' && q.parms.fim === '2026-10-27'))));
+  f.ui.preloader.stop(); f.ui.source.stop();
+});
+
 function mountConfirmation(f) {
   f.window.location.hash = '#/call-center/confirmacao';
   f.ui.ensureCalendar();
@@ -672,4 +710,24 @@ test('data final não pinta nem consulta seu mês; médico ainda inicia pré-bus
   assert.equal(c.source.read(calendarDates(new Date(2030, 1, 1)), 20, '5').size, 0);
   assert.equal(c.state.days.size, 0);
   c.stopWork();
+});
+
+test('refresh da Confirmação após trocar data conserva mês e revalida apenas data inicial', async () => {
+  const f = uiFixture(), c = mountConfirmation(f);
+  await c.preload();
+  const before = f.requests.length;
+  c.startInput.value = '2026-10-27';
+  f.handlers.input.forEach(fn => fn({ target: c.startInput }));
+  const target = new f.Element();
+  target.closest = selector => selector === '#refresh-button' ? {} : null;
+  f.handlers.click.forEach(fn => fn({ target }));
+  assert.equal(c.source.read(dates, 19, '5').size, 42);
+  for (let i = 0; i < 5; i++) await delay();
+  const queries = f.requests.slice(before).flat();
+  assert.ok(queries.some(q => q.parms.status === 'T'));
+  assert.ok(queries.every(q => q.name === 'agendas.index' &&
+    (q.parms.data === '2026-10-27' || (q.parms.inicio === '2026-10-27' && q.parms.fim === '2026-10-27'))));
+  c.openCalendar(c.startInput);
+  assert.equal(c.state.days.size, 42);
+  c.stopWork(); c.source.stop();
 });

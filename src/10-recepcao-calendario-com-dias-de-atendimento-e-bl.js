@@ -91,7 +91,7 @@ let tmAppointmentCalendarCore;
 
   // Núcleo independente da interface. Só conserva resumos; nunca pacientes.
   function createCalendarSource({ post, busy = () => false, paused = () => false, changed = () => {}, now = Date.now }) {
-    const days = new Map(), weeks = new Map(), holidays = new Map();
+    const days = new Map(), weeks = new Map(), holidays = new Map(), confirmedDays = new Map();
     const runs = new Map(), pendingDays = new Map(), pendingMetadata = new Map(), listeners = new Set();
     let activeContext = '', sequence = 0, invalidatedAt = 0, active = 0, wake = null;
     const stats = { requests: 0, queries: 0, joined: 0, cacheHits: 0 };
@@ -128,7 +128,11 @@ let tmAppointmentCalendarCore;
       for (const date of dates) {
         const value = retained(days, dayKey(context, date));
         // Vermelho só é definitivo depois de excluir pacientes na aba Bloqueados.
-        if (doctor && value?.kind === 'blocked' && !value.blockedChecked) continue;
+        if (doctor && value?.kind === 'blocked' && !value.blockedChecked) {
+          const previous = retained(confirmedDays, dayKey(context, date));
+          if (previous !== undefined) result.set(date, previous);
+          continue;
+        }
         if (value !== undefined) result.set(date, value);
       }
       return result;
@@ -429,6 +433,7 @@ let tmAppointmentCalendarCore;
           remember(days, key, { ...current.value, blockedChecked: true, blockedPatient, blockedStamp: run.stamp,
             kind
           }, Math.max(current.stamp, run.stamp), 1008);
+          remember(confirmedDays, key, days.get(key).value, Math.max(current.stamp, run.stamp), 1008);
           if (kind !== current.value.kind || (kind === 'blocked' && !current.value.blockedChecked)) notify();
         }
       }
@@ -580,7 +585,7 @@ let tmAppointmentCalendarCore;
       stop();
       invalidatedAt = ++sequence;
       const prefix = doctor == null ? '' : contextKey(doctor, unit) + '|';
-      [days, weeks].forEach((map) => {
+      [days, weeks, confirmedDays].forEach((map) => {
         for (const key of map.keys()) if (key.startsWith(prefix)) map.delete(key);
       });
       holidays.clear();
@@ -622,6 +627,7 @@ let tmAppointmentCalendarCore;
             if (value.blockedPatient && value.kind !== 'attendance') value.kind = 'booked';
           }
           remember(days, dayKey(context, p.data), value, stamp, 1008);
+          if (value.blockedChecked) remember(confirmedDays, dayKey(context, p.data), value, stamp, 1008);
           notify();
         } catch (_) { /* Resposta nativa desconhecida: conserva a busca independente. */ }
       }
@@ -751,7 +757,13 @@ let tmAppointmentCalendarCore;
     return { sync, stop };
   }
 
-  tmAppointmentCalendarCore = { source, prepare, createCalendarSource, createCalendarPreloader, calendarDates, iso, monthNames };
+  function refreshDay(date, doctor, unit, component) {
+    if (!component || !/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return Promise.resolve();
+    prepare(component);
+    return source.ensure([date], doctor, unit, component, { refresh: true });
+  }
+
+  tmAppointmentCalendarCore = { source, prepare, refreshDay, createCalendarSource, createCalendarPreloader, calendarDates, iso, monthNames };
   const supportedRoute = () => ['#/recepcao', '#/call-center/confirmacao'].includes(window.location.hash);
   window.addEventListener('hashchange', () => { if (!supportedRoute()) source.stop(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) source.stop(); });
@@ -1152,7 +1164,9 @@ let tmAppointmentCalendarCore;
   document.addEventListener('click', (event) => {
     if (!automaticRefresh && isReceptionPage() && event.target instanceof Element && event.target.closest('#refresh-button')) {
       const component = receptionComponent();
-      source.invalidate(document.querySelector('#filtro-medico')?.value || '', String(component?.unidade_operacao || ''));
+      refreshDay(document.querySelector('#ref-data')?.value, document.querySelector('#filtro-medico')?.value || '',
+        String(component?.unidade_operacao || ''), component)
+        .catch(error => { if (!error.cancelled) console.warn('[TM] Atualização do dia no calendário:', error.message); });
     }
   }, true);
   document.addEventListener('visibilitychange', () => {
