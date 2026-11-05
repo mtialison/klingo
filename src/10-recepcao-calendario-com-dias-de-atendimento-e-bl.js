@@ -389,6 +389,65 @@ let tmAppointmentCalendarCore;
       });
       await daily(run, exceptions, scheduled);
     }
+    async function checkBlockedPatients(run, dates) {
+      if (!run.doctor) return;
+      const needed = dates.filter(date => {
+        const value = fresh(days, dayKey(run.context, date));
+        return value?.blockedChecked !== true || (run.refresh && (value.blockedStamp || 0) < run.stamp);
+      });
+      const chunks = [];
+      for (const date of needed) {
+        const last = chunks[chunks.length - 1];
+        const next = last && new Date(last[last.length - 1] + 'T12:00:00');
+        if (next) next.setDate(next.getDate() + 1);
+        if (!last || last.length === 14 || iso(next) !== date) chunks.push([date]);
+        else last.push(date);
+      }
+      function consume(data, batch) {
+        if (!Array.isArray(data?.agendas) || data.paginate) throw new Error('Marcações bloqueadas incompletas.');
+        if ((data.parms?.inicio && data.parms.inicio.slice(0, 10) > batch[0]) ||
+            (data.parms?.fim && data.parms.fim.slice(0, 10) < batch[batch.length - 1]) ||
+            (data.parms?.data && (batch.length !== 1 || data.parms.data.slice(0, 10) !== batch[0]))) {
+          throw new Error('Período de bloqueados limitado pelo servidor.');
+        }
+        const occupied = new Set();
+        for (const entry of data.agendas) {
+          const date = entry.data || (batch.length === 1 ? batch[0] : '');
+          if (!batch.includes(date)) throw new Error('Data de marcação bloqueada inesperada.');
+          if (entry.marcacao) occupied.add(date);
+        }
+        for (const date of batch) {
+          const key = dayKey(run.context, date), current = days.get(key);
+          if (!current || (current.value.blockedStamp || 0) > run.stamp) continue;
+          const blockedPatient = occupied.has(date);
+          const kind = blockedPatient && current.value.kind !== 'attendance' ? 'booked' : current.value.kind;
+          remember(days, key, { ...current.value, blockedChecked: true, blockedPatient, blockedStamp: run.stamp,
+            kind
+          }, Math.max(current.stamp, run.stamp), 1008);
+          if (kind !== current.value.kind) notify();
+        }
+      }
+      for (let start = 0; start < chunks.length; start += 7) {
+        const batch = chunks.slice(start, start + 7);
+        try {
+          const response = await query(run, batch.map((dates, i) => ({ name: 'agendas.index', id: 'blocked' + i,
+            parms: { ...parms(run), status: 'B', livres: 0, inicio: dates[0], fim: dates[dates.length - 1] }
+          })));
+          batch.forEach((dates, i) => consume(result(response, 'blocked' + i), dates));
+        } catch (error) {
+          if (run.cancelled) throw cancelled();
+          // Se o período não vier completo, conferir cada dia; nunca concluir ausência pela primeira página.
+          const dates = batch.flat();
+          for (let offset = 0; offset < dates.length; offset += 7) {
+            const group = dates.slice(offset, offset + 7);
+            const response = await query(run, group.map((date, i) => ({ name: 'agendas.index', id: 'blocked' + i,
+              parms: { ...parms(run), status: 'B', livres: 0, data: date }
+            })));
+            group.forEach((date, i) => consume(result(response, 'blocked' + i), [date]));
+          }
+        }
+      }
+    }
     function ensure(dates, doctor, unit, component, { refresh = false, priority = 0 } = {}) {
       dates = [...new Set(dates)].sort();
       doctor = String(doctor || ''); unit = String(unit || '');
@@ -406,7 +465,8 @@ let tmAppointmentCalendarCore;
       }
       const needed = dates.filter((date) => refresh || fresh(days, dayKey(context, date)) === undefined);
       stats.cacheHits += dates.length - needed.length;
-      if (!needed.length) return Promise.resolve(read(dates, doctor, unit));
+      if (!needed.length && (!doctor || dates.every(date =>
+          fresh(days, dayKey(context, date))?.blockedChecked))) return Promise.resolve(read(dates, doctor, unit));
       const dependencies = new Set();
       const missing = needed.filter((date) => {
         const owner = pendingDays.get(dayKey(context, date));
@@ -484,12 +544,13 @@ let tmAppointmentCalendarCore;
         }
       });
       run.promise = Promise.allSettled([own, ...[...dependencies].map((owner) => owner.promise)])
-        .then((outcomes) => {
+        .then(async (outcomes) => {
           if (run.cancelled) throw cancelled();
           const failure = outcomes.find((item) => item.status === 'rejected');
           // Uma falha em datas de outro mês não invalida as datas já completas deste.
           if (failure && needed.some((date) => fresh(days, dayKey(context, date)) === undefined)) throw failure.reason;
           if (outcomes[0].status === 'rejected') throw outcomes[0].reason;
+          await checkBlockedPatients(run, dates);
           return read(dates, doctor, unit);
         }).finally(() => {
           if (runs.get(key) === run) runs.delete(key);
@@ -537,7 +598,14 @@ let tmAppointmentCalendarCore;
           }
           const week = fresh(weeks, dayKey(context, weekAnchor(p.data)));
           if (!week) continue;
+          const previous = fresh(days, dayKey(context, p.data));
           const value = classify(compact(data), week.get(p.data));
+          if (previous?.blockedChecked) {
+            value.blockedChecked = true;
+            value.blockedPatient = previous.blockedPatient;
+            value.blockedStamp = previous.blockedStamp;
+            if (value.blockedPatient && value.kind !== 'attendance') value.kind = 'booked';
+          }
           remember(days, dayKey(context, p.data), value, stamp, 1008);
           notify();
         } catch (_) { /* Resposta nativa desconhecida: conserva a busca independente. */ }

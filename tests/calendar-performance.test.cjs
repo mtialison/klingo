@@ -18,8 +18,8 @@ const empty = () => ({ agendas: [], bloqueio: null, feriado: null });
 const slot = (status, regular = true) => ({ hora: '08:00', status,
   ...(regular ? { id_agenda: 42 } : {}), marcacao: status === 'ocupado' });
 
-function fixture({ data = {}, schedules = {}, records = [], onRequest, busy, paused, failHoliday = false,
-  failDaily = false, failRange = false } = {}) {
+function fixture({ data = {}, blocked = {}, schedules = {}, records = [], onRequest, busy, paused, failHoliday = false,
+  failDaily = false, failRange = false, blockedPaginate = false } = {}) {
   let time = 1000, active = 0, peak = 0, painted = 0;
   const calls = [];
   const source = createCalendarSource({
@@ -41,6 +41,12 @@ function fixture({ data = {}, schedules = {}, records = [], onRequest, busy, pau
               if (schedules[key]) agendas[key] = schedules[key];
             }
             return [query.id, { status: 200, data: { agendas } }];
+          }
+          if (p.status === 'B') {
+            const agendas = Object.entries(blocked).filter(([date]) => p.data ? date === p.data : date >= p.inicio && date <= p.fim)
+              .flatMap(([date, rows]) => rows.map(row => ({ ...row, data: date })));
+            return [query.id, { status: 200,
+              data: { agendas, paginate: !!(blockedPaginate && !p.data) } }];
           }
           if (p.data) return [query.id, { status: failDaily ? 500 : 200, data: data[p.data] || empty() }];
           const agendas = Object.entries(data).filter(([date]) => date >= p.inicio && date <= p.fim)
@@ -118,12 +124,12 @@ test('busca fria agrupa períodos, limita concorrência a 2 e cacheia inclusive 
   assert.equal(f.source.ensure(dates, 19, '5', {}), first, 'pré-busca e abertura compartilham a promessa');
   const result = await first;
   assert.equal(result.size, 42);
-  assert.equal(f.total(), 11, '7 semanas + feriados + 3 períodos de 14 dias');
+  assert.equal(f.total(), 14, '7 semanas + feriados + 3 períodos normais + 3 de bloqueados');
   assert.ok(f.peak() <= 2);
   assert.ok([...result.values()].every((value) => value.kind === ''));
   assert.equal(f.painted(), 42);
   await f.source.ensure(dates, 19, '5', {});
-  assert.equal(f.total(), 11, 'reabrir não consulta novamente');
+  assert.equal(f.total(), 14, 'reabrir não consulta novamente');
 });
 
 test('meses vizinhos reaproveitam datas e semanas; unidades nunca compartilham cores', async () => {
@@ -164,7 +170,7 @@ test('feriado, bloqueio total/parcial, lotação e paciente fora de agenda prese
   }
   const daily = f.calls.flat().filter((q) => q.parms.data && q.name === 'agendas.index');
   assert.equal(daily.length, 7);
-  const ranges = f.calls.flat().filter((q) => q.parms.inicio);
+  const ranges = f.calls.flat().filter((q) => q.parms.inicio && q.parms.status !== 'B');
   assert.ok(daily.every((q) => ranges.every((range) =>
     q.parms.data < range.parms.inicio || q.parms.data > range.parms.fim)),
   'não baixa novamente os pacientes dos dias já lidos diretamente');
@@ -181,6 +187,58 @@ test('feriado permitido e feriado com paciente têm regras próprias', () => {
     dt_inicio: '2000-12-31', dt_termino: '2001-01-02' }]), true);
   assert.equal(source.holidayCandidate('2026-02-17', [{ fl_recorrente: false,
     dt_inicio: '2026-02-14 00:00:00', dt_termino: '2026-02-18 18:00:00' }]), true);
+});
+
+test('pacientes da aba Bloqueados deixam o dia azul; bloqueio vazio continua vermelho', async () => {
+  const schedule = [{ id_unidade_operacao: 5 }];
+  const f = fixture({ schedules: { '2026-10-06': schedule, '2026-10-07': schedule },
+    data: { '2026-10-06': { agendas: [slot('bloqueado')] },
+      '2026-10-07': { agendas: [slot('bloqueado')] } },
+    blocked: { '2026-10-06': [slot('ocupado')] } });
+  const result = await f.source.ensure(dates, 19, '5', {});
+  assert.equal(result.get('2026-10-06').kind, 'booked');
+  assert.equal(result.get('2026-10-07').kind, 'blocked');
+  const count = f.total();
+  await f.source.ensure(dates, 19, '5', {});
+  assert.equal(f.total(), count, 'reabertura não repete consulta dos bloqueados');
+  f.source.ingestNative([{ name: 'agendas.index', id: 'lista', parms: { data: '2026-10-06', medico: 19,
+    unidade_operacao: '5', group: 'none', livres: 1, status: 'T', na_recepcao: true } }],
+    { lista: { status: 200, data: { agendas: [slot('bloqueado')] } } });
+  assert.equal(f.source.read(['2026-10-06'], 19, '5').get('2026-10-06').kind, 'booked');
+});
+
+test('bloqueados paginados são conferidos por dia antes de concluir ausência de pacientes', async () => {
+  const f = fixture({ blockedPaginate: true, blocked: { '2026-10-06': [slot('ocupado')] } });
+  const result = await f.source.ensure(dates, 19, '5', {});
+  assert.equal(result.get('2026-10-06').kind, 'booked');
+  assert.equal(result.get('2026-10-07').kind, '');
+  assert.equal(f.calls.flat().filter(q => q.parms.status === 'B' && q.parms.data).length, 42);
+});
+
+test('erro dos bloqueados permite repetir conferência sem repetir consultas normais', async () => {
+  let failed = true;
+  const f = fixture({ blocked: { '2026-10-06': [slot('ocupado')] },
+    onRequest: q => { if (failed && q.some(x => x.parms.status === 'B')) throw Error('indisponível'); } });
+  await assert.rejects(f.source.ensure(dates, 19, '5', {}));
+  const countNormal = () => f.calls.flat().filter(q => q.name === 'agendas.index' && q.parms.status !== 'B').length;
+  const before = countNormal();
+  failed = false;
+  const result = await f.source.ensure(dates, 19, '5', {});
+  assert.equal(result.get('2026-10-06').kind, 'booked');
+  assert.equal(countNormal(), before);
+});
+
+test('renovação remove azul quando não há mais paciente bloqueado, sem substituir dia de atendimento', async () => {
+  const blocked = { '2026-10-06': [slot('ocupado')], '2026-10-07': [slot('ocupado')] };
+  const f = fixture({ blocked, schedules: {
+    '2026-10-06': [{ id_unidade_operacao: 5 }], '2026-10-07': [{ id_unidade_operacao: 5 }] },
+    data: { '2026-10-06': { agendas: [slot('bloqueado')] }, '2026-10-07': { agendas: [slot('livre')] } } });
+  const first = await f.source.ensure(dates, 19, '5', {});
+  assert.equal(first.get('2026-10-06').kind, 'booked');
+  assert.equal(first.get('2026-10-07').kind, 'attendance');
+  delete blocked['2026-10-06'];
+  const refreshed = await f.source.ensure(dates, 19, '5', {}, { refresh: true });
+  assert.equal(refreshed.get('2026-10-06').kind, 'blocked');
 });
 
 test('sem permissão de feriados ou período, fallback diário continua correto', async () => {
@@ -270,7 +328,7 @@ test('resposta nativa completa é reaproveitada e filtros restritivos são rejei
   f.source.ingestNative(q, response);
   assert.equal(f.source.read(['2026-10-14'], 19, '5').get('2026-10-14').kind, 'attendance');
   await f.source.ensure(dates, 19, '5', {});
-  assert.ok(f.calls.flat().filter((x) => x.parms.inicio)
+  assert.ok(f.calls.flat().filter((x) => x.parms.inicio && x.parms.status !== 'B')
     .every((x) => x.parms.fim < '2026-10-14' || x.parms.inicio > '2026-10-14'));
   for (const restrictive of [{ search: 'nome' }, { recepcao: 1 }, { status: 'B' },
     { livres: 0 }, { especialidade: 3 }, { turno: 'M' }, { view_status: 'RP' },
@@ -395,7 +453,7 @@ test('meses sobrepostos em trânsito não duplicam datas nem metadados', async (
   assert.equal(new Set(weeks.map((q) => q.parms.data)).size, weeks.length);
   assert.equal(f.calls.flat().filter((q) => q.name === 'agenda_feriados.index').length, 1);
   const counts = new Map();
-  for (const q of f.calls.flat().filter((q) => q.parms.inicio)) {
+  for (const q of f.calls.flat().filter((q) => q.parms.inicio && q.parms.status !== 'B')) {
     const date = new Date(q.parms.inicio + 'T12:00:00');
     while (date.toISOString().slice(0, 10) <= q.parms.fim) {
       const key = date.toISOString().slice(0, 10);
