@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      2.01
+// @version      2.02
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -13484,4 +13484,22 @@ const tmConfirmationCalendarAdapter = (() => {
   document.addEventListener('keydown', escape, true);
   tmRuntime.register('remarcação nativa em modal', update);
   return () => { if (active) close(active, true); unpatch(); document.removeEventListener('keydown', escape, true); };
+})();
+
+/* Perfil em tela inteira, sem a compensação lateral de scrollbar do Bootstrap. */
+(function () {
+  'use strict';
+  const STYLE_ID = 'tm-profile-fullscreen-style';
+  function injectStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      /* O perfil já possui rolagem interna; a página ao fundo não precisa de outra. */
+      html:has(#perfilPacienteModal.show) { overflow: hidden !important; }
+      #perfilPacienteModal { padding: 0 !important; }
+    `;
+    document.head.appendChild(style);
+  }
+  tmRuntime.register('perfil em tela inteira', injectStyle);
 })();
