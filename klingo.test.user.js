@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      2.07
+// @version      2.08
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -9206,7 +9206,7 @@ let tmAppointmentCalendarCore;
       #${POPOVER_ID} .tm-cal-weekday { text-align: center; color: #667085; font-size: 11px;
         font-weight: 600; padding: 5px 0; }
       #${POPOVER_ID} .tm-cal-day { height: 34px; border: 1px solid transparent; border-radius: 5px;
-        background: #f5f7fa; color: #344054; font-weight: 700; }
+        background: #f5f7fa; color: #344054; font-weight: 400; }
       #${POPOVER_ID} .tm-cal-day:hover { background: #e2e6ea; }
       #${POPOVER_ID} .tm-cal-day:focus:not(:focus-visible):not([data-selected="true"]) { outline: none; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"] { background: #198754; color: #fff; font-weight: 700; }
@@ -9713,7 +9713,7 @@ const tmConfirmationCalendarAdapter = (() => {
       #${POPOVER_ID} .tm-cal-weekday { text-align: center; color: #667085; font-size: 11px;
         font-weight: 600; padding: 5px 0; }
       #${POPOVER_ID} .tm-cal-day { height: 34px; border: 1px solid transparent; border-radius: 5px;
-        background: #f5f7fa; color: #344054; font-weight: 700; }
+        background: #f5f7fa; color: #344054; font-weight: 400; }
       #${POPOVER_ID} .tm-cal-day:hover { background: #e2e6ea; }
       #${POPOVER_ID} .tm-cal-day:focus:not(:focus-visible):not([data-selected="true"]) { outline: none; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"] { background: #198754; color: #fff; font-weight: 700; }
