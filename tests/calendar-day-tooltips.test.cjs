@@ -25,11 +25,13 @@ for (const file of ['10-recepcao-calendario-com-dias-de-atendimento-e-bl.js',
       state.days.set(day.dataset.date, detail);
       context.paintDays();
       assert.ok(day.title);
+      assert.equal(day.dataset.holiday, String(!!detail.holiday));
     }
     for (const detail of [undefined, { kind: '' }, { kind: 'attendance' }, { kind: 'booked' }]) {
       state.days.set(day.dataset.date, detail);
       context.paintDays();
       assert.ok(!day.title);
+      assert.equal(day.dataset.holiday, 'false');
       assert.ok(day['aria-label'].includes(day.dataset.date));
     }
   });

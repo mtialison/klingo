@@ -778,13 +778,13 @@ let tmAppointmentCalendarCore;
       #${POPOVER_ID} .tm-cal-day:hover { background: #e2e6ea; }
       #${POPOVER_ID} .tm-cal-day:focus:not(:focus-visible):not([data-today="true"]):not([data-selected="true"]) { outline: none; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"] { background: #198754; color: #fff; font-weight: 700; }
-      #${POPOVER_ID} .tm-cal-day[data-kind="holiday"],
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"] { background: #dc3545; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #0d6efd; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"]:hover { background: #146c43; }
-      #${POPOVER_ID} .tm-cal-day[data-kind="holiday"]:hover,
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"]:hover { background: #b02a37; }
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"]:hover { background: #0b5ed7; }
+      #${POPOVER_ID} .tm-cal-day[data-holiday="true"] { background: #000; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-holiday="true"]:hover { background: #212529; }
       #${POPOVER_ID} .tm-cal-day[data-today="true"],
       #${POPOVER_ID} .tm-cal-day[data-selected="true"] {
         outline: 3px solid #2B7FFF; outline-offset: -3px;
@@ -906,6 +906,7 @@ let tmAppointmentCalendarCore;
     popover.querySelectorAll('button[data-date]').forEach((day) => {
       const detail = state.days.get(day.dataset.date), kind = detail?.kind || '';
       if (day.dataset.kind !== kind) day.dataset.kind = kind;
+      day.dataset.holiday = String(!!detail?.holiday);
       const title = dayTitle(detail);
       if (detail && (detail.kind === 'blocked' || detail.block || detail.holiday)) {
         if (day.title !== title) day.title = title;
