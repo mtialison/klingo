@@ -20,7 +20,7 @@ for (const file of ['10-recepcao-calendario-com-dias-de-atendimento-e-bl.js',
     const titleEnd = file.startsWith('10') ? '  function paintDays()' : '  function injectStyle()';
     const paintEnd = file.startsWith('10') ? '  function selectDate(' : '  function render()';
     vm.runInContext(slice('  function dayTitle(', titleEnd) + slice('  function paintDays()', paintEnd), context);
-    for (const detail of [{ kind: 'blocked' }, { kind: 'blocked', holidayClosed: true, holiday: 'Feriado' },
+    for (const detail of [{ kind: 'holiday', holiday: 'Feriado' }, { kind: 'blocked' }, { kind: 'blocked', holidayClosed: true, holiday: 'Feriado' },
       { kind: 'attendance', holiday: 'Feriado' }, { kind: 'booked', block: true }]) {
       state.days.set(day.dataset.date, detail);
       context.paintDays();

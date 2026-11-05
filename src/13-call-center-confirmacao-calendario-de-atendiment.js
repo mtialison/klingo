@@ -69,6 +69,7 @@
 
   function dayTitle(detail) {
     if (!detail) return state.loading ? 'Data ainda em consulta' : 'Data não verificada';
+    if (detail.kind === 'holiday') return `Feriado: ${detail.holiday}`;
     if (detail.kind === 'booked') return 'Paciente marcado sem atendimento regular disponível';
     if (detail.kind === 'blocked') return detail.holidayClosed ? `Feriado: ${detail.holiday}` : 'Agenda bloqueada';
     if (detail.kind === 'attendance') return detail.holiday ?
@@ -100,9 +101,11 @@
       #${POPOVER_ID} .tm-cal-day:hover { background: #e2e6ea; }
       #${POPOVER_ID} .tm-cal-day:focus:not(:focus-visible):not([data-today="true"]):not([data-selected="true"]) { outline: none; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"] { background: #198754; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="holiday"],
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"] { background: #dc3545; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #0d6efd; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"]:hover { background: #146c43; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="holiday"]:hover,
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"]:hover { background: #b02a37; }
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"]:hover { background: #0b5ed7; }
       #${POPOVER_ID} .tm-cal-day[data-today="true"],
@@ -209,9 +212,9 @@
     prepare(componentFor(current));
     state.days = source.read(dates, doctor, unit);
     state.error = '';
-    state.loading = !!doctor && source.freshCount(dates, doctor, unit) !== dates.length;
+    state.loading = !!componentFor(current) && source.freshCount(dates, doctor, unit) !== dates.length;
     render();
-    if (!doctor || !componentFor(current)) { preload(); state.loading = false; paintDays(); return; }
+    if (!componentFor(current)) { state.loading = false; paintDays(); return; }
     try {
       const days = await preload(true);
       if (request === state.request && days) state.days = days;

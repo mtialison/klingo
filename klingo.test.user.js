@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      2.02
+// @version      2.03
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -8615,7 +8615,7 @@ let tmAppointmentCalendarCore;
       });
     }
     async function metadata(run, dates) {
-      const anchors = [...new Set(dates.map(weekAnchor))];
+      const anchors = run.doctor ? [...new Set(dates.map(weekAnchor))] : [];
       const years = [...new Set(dates.map((date) => date.slice(0, 4)))];
       const holidayKey = (year) => run.unit + '|' + year;
       const missingWeeks = anchors.filter((date) => fresh(weeks, dayKey(run.context, date)) === undefined);
@@ -8655,7 +8655,8 @@ let tmAppointmentCalendarCore;
           if (!Array.isArray(records)) throw new Error('Cadastro de feriados incompleto.');
           remember(holidays, holidayKey(year), records.map((h) => ({
             dt_inicio: h.dt_inicio, dt_termino: h.dt_termino,
-            fl_recorrente: h.fl_recorrente, fl_ativo: h.fl_ativo
+            fl_recorrente: h.fl_recorrente, fl_ativo: h.fl_ativo,
+            st_descricao: h.st_descricao
           })), run.stamp, 12);
         }));
       }
@@ -8740,7 +8741,7 @@ let tmAppointmentCalendarCore;
     function ensure(dates, doctor, unit, component, { refresh = false, priority = 0 } = {}) {
       dates = [...new Set(dates)].sort();
       doctor = String(doctor || ''); unit = String(unit || '');
-      if (!doctor || !component || !dates.length) return Promise.resolve(new Map());
+      if (!component || !dates.length) return Promise.resolve(new Map());
       const context = contextKey(doctor, unit), key = context + '|' + dates.join(',');
       if (activeContext && activeContext !== context) stop();
       activeContext = context;
@@ -8777,6 +8778,7 @@ let tmAppointmentCalendarCore;
           meta = await metadata(run, missing);
         } catch (error) {
           if (run.cancelled) throw cancelled();
+          if (!doctor) throw error; // Não consultar pacientes de todos os médicos como fallback.
           const scheduled = new Map();
           for (const anchor of new Set(missing.map(weekAnchor))) {
             const week = fresh(weeks, dayKey(context, anchor));
@@ -8785,6 +8787,21 @@ let tmAppointmentCalendarCore;
           }
           await daily(run, missing, scheduled);
           return read(dates, doctor, unit);
+        }
+        if (!doctor) {
+          // Sem profissional, o cadastro prova somente que é feriado, não que a agenda está fechada.
+          for (const date of missing) {
+            const matching = meta.records.filter(h =>
+              /^\d{4}-\d{2}-\d{2}/.test(h.dt_inicio || '') &&
+              /^\d{4}-\d{2}-\d{2}/.test(h.dt_termino || '') && holidayCandidate(date, [h]));
+            remember(days, dayKey(context, date), {
+              kind: matching.length ? 'holiday' : '',
+              holiday: [...new Set(matching.map(h => h.st_descricao || 'Feriado'))].join(' / '),
+              holidayClosed: false, block: false
+            }, run.stamp, 1008);
+            notify();
+          }
+          return;
         }
         // Dias previstos (inclusive lotados/bloqueados) e feriados são lidos
         // diretamente UMA vez. O período agrega somente as lacunas: evita
@@ -8956,7 +8973,6 @@ let tmAppointmentCalendarCore;
       const current = context();
       if (!current?.component) return Promise.resolve();
       const { month, doctor, unit, component } = current;
-      if (!doctor) { stop(); source.stop(); return Promise.resolve(); }
       const nextKey = monthKey(month, doctor, unit);
       if (!force && key === nextKey && pending) return pending;
       key = nextKey;
@@ -9070,9 +9086,9 @@ let tmAppointmentCalendarCore;
     state.context = doctor + '|' + unit;
     state.days = source.read(dates, doctor, unit);
     state.error = '';
-    state.loading = !!doctor && source.freshCount(dates, doctor, unit) !== dates.length;
+    state.loading = !!component && source.freshCount(dates, doctor, unit) !== dates.length;
     render();
-    if (!doctor || !component) { preloader.sync(); state.loading = false; paintDays(); return; }
+    if (!component) { state.loading = false; paintDays(); return; }
     try {
       const days = await prefetchSelectedMonth(true);
       if (request === state.request && days) state.days = days;
@@ -9111,9 +9127,11 @@ let tmAppointmentCalendarCore;
       #${POPOVER_ID} .tm-cal-day:hover { background: #e2e6ea; }
       #${POPOVER_ID} .tm-cal-day:focus:not(:focus-visible):not([data-today="true"]):not([data-selected="true"]) { outline: none; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"] { background: #198754; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="holiday"],
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"] { background: #dc3545; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #0d6efd; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"]:hover { background: #146c43; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="holiday"]:hover,
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"]:hover { background: #b02a37; }
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"]:hover { background: #0b5ed7; }
       #${POPOVER_ID} .tm-cal-day[data-today="true"],
@@ -9213,6 +9231,7 @@ let tmAppointmentCalendarCore;
 
   function dayTitle(detail) {
     if (!detail) return state.loading ? 'Data ainda em consulta' : 'Data não verificada';
+    if (detail.kind === 'holiday') return `Feriado: ${detail.holiday}`;
     return detail.kind === 'booked' && detail.holidayClosed
         ? `Paciente marcado no feriado: ${detail.holiday}`
         : detail?.kind === 'booked' && detail?.block
@@ -9582,6 +9601,7 @@ const tmConfirmationCalendarAdapter = (() => {
 
   function dayTitle(detail) {
     if (!detail) return state.loading ? 'Data ainda em consulta' : 'Data não verificada';
+    if (detail.kind === 'holiday') return `Feriado: ${detail.holiday}`;
     if (detail.kind === 'booked') return 'Paciente marcado sem atendimento regular disponível';
     if (detail.kind === 'blocked') return detail.holidayClosed ? `Feriado: ${detail.holiday}` : 'Agenda bloqueada';
     if (detail.kind === 'attendance') return detail.holiday ?
@@ -9613,9 +9633,11 @@ const tmConfirmationCalendarAdapter = (() => {
       #${POPOVER_ID} .tm-cal-day:hover { background: #e2e6ea; }
       #${POPOVER_ID} .tm-cal-day:focus:not(:focus-visible):not([data-today="true"]):not([data-selected="true"]) { outline: none; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"] { background: #198754; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="holiday"],
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"] { background: #dc3545; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #0d6efd; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"]:hover { background: #146c43; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="holiday"]:hover,
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"]:hover { background: #b02a37; }
       #${POPOVER_ID} .tm-cal-day[data-kind="booked"]:hover { background: #0b5ed7; }
       #${POPOVER_ID} .tm-cal-day[data-today="true"],
@@ -9722,9 +9744,9 @@ const tmConfirmationCalendarAdapter = (() => {
     prepare(componentFor(current));
     state.days = source.read(dates, doctor, unit);
     state.error = '';
-    state.loading = !!doctor && source.freshCount(dates, doctor, unit) !== dates.length;
+    state.loading = !!componentFor(current) && source.freshCount(dates, doctor, unit) !== dates.length;
     render();
-    if (!doctor || !componentFor(current)) { preload(); state.loading = false; paintDays(); return; }
+    if (!componentFor(current)) { state.loading = false; paintDays(); return; }
     try {
       const days = await preload(true);
       if (request === state.request && days) state.days = days;

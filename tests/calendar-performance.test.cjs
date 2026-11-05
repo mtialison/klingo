@@ -54,6 +54,64 @@ function fixture({ data = {}, schedules = {}, records = [], onRequest, busy, pau
     advance: (ms) => { time += ms; }, total: () => calls.reduce((n, q) => n + q.length, 0) };
 }
 
+test('sem médico mostra feriados ativos, sem consultar semanas nem pacientes', async () => {
+  const f = fixture({ records: [
+    { dt_inicio: '2000-10-12', dt_termino: '2000-10-12', fl_recorrente: true,
+      fl_ativo: true, st_descricao: 'Aparecida', fl_pode_agendar: true },
+    { dt_inicio: '2026-10-13', dt_termino: '2026-10-13', fl_ativo: false, st_descricao: 'Inativo' },
+    { dt_inicio: null, dt_termino: null, fl_ativo: true, st_descricao: 'Inválido' }
+  ] });
+  const result = await f.source.ensure(dates, '', '5', {});
+  assert.equal(result.size, 42);
+  assert.equal(result.get('2026-10-12').kind, 'holiday');
+  assert.equal(result.get('2026-10-12').holiday, 'Aparecida');
+  assert.equal(result.get('2026-10-12').holidayClosed, false, 'não presume fechamento sem médico');
+  assert.equal(result.get('2026-10-13').kind, '');
+  assert.equal([...result.values()].filter(d => d.kind).length, 1);
+  assert.ok(f.calls.flat().every(q => q.name === 'agenda_feriados.index'));
+  await f.source.ensure(dates, '', '5', {});
+  assert.equal(f.total(), 1, 'reabertura usa cache');
+});
+
+test('sem médico cobre feriado recorrente na virada do ano e não mascara erro da API', async () => {
+  const f = fixture({ records: [{ dt_inicio: '2000-12-31', dt_termino: '2001-01-02',
+    fl_recorrente: true, fl_ativo: true, st_descricao: 'Virada' }] });
+  const result = await f.source.ensure(['2026-12-31', '2027-01-01', '2027-01-02', '2027-01-03'], '', '5', {});
+  assert.equal(result.get('2027-01-02').holiday, 'Virada');
+  assert.equal(result.get('2027-01-03').kind, '');
+  assert.equal(f.total(), 2);
+  const failed = fixture({ failHoliday: true });
+  await assert.rejects(failed.source.ensure(dates, '', '5', {}));
+  assert.equal(failed.source.read(dates, '', '5').size, 0);
+  assert.ok(failed.calls.flat().every(q => q.name === 'agenda_feriados.index'));
+});
+
+test('selecionar médico não reaproveita a classificação genérica de feriado', async () => {
+  const f = fixture({ records: [{ dt_inicio: '2000-10-12', dt_termino: '2000-10-12',
+    fl_recorrente: true, fl_ativo: true, st_descricao: 'Feriado' }],
+    schedules: { '2026-10-12': [{ id_unidade_operacao: 5, fl_pode_feriado: true }] },
+    data: { '2026-10-12': { agendas: [slot('livre')],
+      feriado: { fl_ativo: true, fl_pode_agendar: false, st_descricao: 'Feriado' } } } });
+  await f.source.ensure(dates, '', '5', {});
+  const result = await f.source.ensure(dates, 19, '5', {});
+  assert.equal(result.get('2026-10-12').kind, 'attendance');
+  assert.equal(f.source.read(dates, '', '5').get('2026-10-12').kind, 'holiday');
+});
+
+test('abrir calendário sem médico pinta o feriado e mantém os outros dias neutros', async () => {
+  const f = uiFixture({ records: [{ dt_inicio: '2000-10-12', dt_termino: '2000-10-12',
+    fl_recorrente: true, fl_ativo: true, st_descricao: 'Aparecida' }] });
+  f.doctor.value = '';
+  f.ui.openCalendar();
+  await delay(); await delay();
+  const buttons = f.document.getElementById('tm-recepcao-calendario-popover').querySelectorAll('button[data-date]');
+  assert.equal(buttons.find(b => b.dataset.date === '2026-10-12').dataset.kind, 'holiday');
+  assert.equal(buttons.find(b => b.dataset.date === '2026-10-12').title, 'Feriado: Aparecida');
+  assert.equal(buttons.find(b => b.dataset.date === '2026-10-13').dataset.kind, '');
+  assert.equal(f.ui.state.loading, false);
+  f.ui.preloader.stop(); f.ui.source.stop();
+});
+
 test('busca fria agrupa períodos, limita concorrência a 2 e cacheia inclusive dias neutros', async () => {
   const f = fixture();
   const first = f.source.ensure(dates, 19, '5', {});
@@ -240,7 +298,7 @@ test('resposta nativa recente prevalece sobre uma busca anterior em trânsito', 
   assert.equal(result.get('2026-10-14').kind, 'booked');
 });
 
-function uiFixture() {
+function uiFixture({ records = [] } = {}) {
   const handlers = {}, timers = new Map(), timerDelays = new Map(), elements = new Map();
   let contextChanged, watcherDetached = false;
   let nextTimer = 1, posts = 0, redraws = 0, refreshes = 0, nativeHook, ejections = 0;
@@ -287,7 +345,7 @@ function uiFixture() {
     posts++;
     return { data: Object.fromEntries(payload.q.map((q) => [q.id, { status: 200, data:
       q.name === 'medicos.agenda_semanal' ? { agendas: {} } :
-        q.name === 'agenda_feriados.index' ? [] : { agendas: [] } }])) };
+        q.name === 'agenda_feriados.index' ? records : { agendas: [] } }])) };
   }, interceptors: { request: { use: () => 2, eject() {} }, response: { use: (fn) => { nativeHook = fn; return 1; },
     eject: () => { nativeHook = null; ejections++; } } } };
   const component = { medico: 19, referencia: '2026-10-14', unidade_operacao: '5', turno: 'G', $http: http, axios: http,
@@ -434,12 +492,13 @@ test('falha na pré-busca agenda nova tentativa, sem precisar abrir o calendári
   f.ui.preloader.stop();
 });
 
-test('renovação automática mantém calendário fechado pronto e sem médico não busca', async () => {
+test('renovação automática mantém calendário pronto e sem médico busca somente feriados', async () => {
   const f = uiFixture();
   f.doctor.value = '';
   await f.ui.prefetchSelectedMonth();
   await delay();
-  assert.equal(f.posts(), 0);
+  assert.equal(f.posts(), 1);
+  assert.equal(f.ui.source.read(dates, '', '5').size, 42);
   f.doctor.value = '19';
   await f.ui.prefetchSelectedMonth();
   await delay();
