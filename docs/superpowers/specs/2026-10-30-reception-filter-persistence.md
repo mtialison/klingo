@@ -1,5 +1,7 @@
 # Permanência dos filtros da Recepção
 
+Status: removida por pedido explícito do usuário em 2026-11-05, versão de testes 2.01. O módulo28 e seus testes foram retirados; o conteúdo abaixo registra a implementação anterior. Não há mais gravação/restauração desses filtros pelo sessionStorage. A preservação específica da remarcação em modal (módulo38) continua independente. Nenhum reset forçado de filtros nativos foi acrescentado.
+
 Pedido: manter os filtros mostrados na barra da Recepção após recarregar.
 
 Implementação: sessionStorage por aba, conta, unidade e recepção. Guardar somente campos de filtro e IDs, sem objetos de pacientes. Restaurar após montagem/carga inicial; respeitar navegação explícita para paciente/atendimento e intervenção manual durante a espera. Não armazenar via GM ou localStorage nem compartilhar estado entre abas.

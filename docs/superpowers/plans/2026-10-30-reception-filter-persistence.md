@@ -1,5 +1,7 @@
 # Reception filter persistence implementation plan
 
+Retirada em 2026-11-05 por solicitação do usuário (2.01). Plano e evidências abaixo são históricos; módulo28 e testes específicos removidos. Remarcação em modal preservada pelo módulo38.
+
 Goal: restaurar a barra de filtros da Recepção ao recarregar, conforme ../specs/2026-10-30-reception-filter-persistence.md.
 Architecture: módulo28 isolado; sessionStorage com chave por contexto e whitelist de campos, watcher nativo e ciclo tmRuntime. Tech stack: JavaScript/Vue2/Node test.
 
