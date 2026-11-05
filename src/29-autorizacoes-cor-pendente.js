@@ -1,4 +1,4 @@
-/* AUTORIZAÇÕES/RECEPÇÃO — Pendente usa o mesmo visual nativo de Autorizado Parcialmente. */
+/* AUTORIZAÇÕES/RECEPÇÃO/CONFIRMAÇÃO — Pendente usa o visual de Autorizado Parcialmente. */
 (function () {
   'use strict';
   const ATTRIBUTE = 'data-tm-pending-authorization';
@@ -11,7 +11,8 @@
     const route = window.location.hash.split('?')[0];
     const reception = /^#\/recepcao(?:\/|$)/.test(route);
     const authorization = /^#\/autorizacoes(?:\/|$)/.test(route);
-    const selector = reception ? '.tm-reception-authorization-button' : authorization ? '.badge' : null;
+    const confirmation = /^#\/call-center\/confirmacao(?:\/|$)/.test(route);
+    const selector = reception ? '.tm-reception-authorization-button' : authorization || confirmation ? '.badge' : null;
     watchedSelector = selector;
     if (!selector) {
       textObserver?.disconnect();
@@ -54,5 +55,6 @@
     });
   }
 
-  tmRuntime.register('cor de autorização Pendente', ensurePendingColor, ['#/autorizacoes', '#/recepcao']);
+  tmRuntime.register('cor de autorização Pendente', ensurePendingColor,
+    ['#/autorizacoes', '#/recepcao', '#/call-center/confirmacao']);
 })();
