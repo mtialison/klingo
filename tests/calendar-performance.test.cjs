@@ -207,6 +207,32 @@ test('pacientes da aba Bloqueados deixam o dia azul; bloqueio vazio continua ver
   assert.equal(f.source.read(['2026-10-06'], 19, '5').get('2026-10-06').kind, 'booked');
 });
 
+test('consulta bloqueados em paralelo e não publica vermelho antes de confirmar ausência de pacientes', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const target = ['2026-10-06', '2026-10-07'];
+  const f = fixture({ schedules: Object.fromEntries(target.map(d => [d, [{ id_unidade_operacao: 5 }]])),
+    data: Object.fromEntries(target.map(d => [d, { agendas: [slot('bloqueado')] }])),
+    blocked: { '2026-10-06': [slot('ocupado')] },
+    onRequest: q => q.some(x => x.parms.status === 'B') ? gate : undefined });
+  const seen = [];
+  f.source.subscribe(() => seen.push(f.source.read(target, 19, '5').get(target[0])?.kind));
+  const pending = f.source.ensure(target, 19, '5', {});
+  try {
+    for (let i = 0; i < 8; i++) await delay();
+    assert.ok(f.calls.some(q => q.some(x => x.parms.status === 'B')), 'bloqueados já devem estar em consulta');
+    assert.ok(f.calls.findIndex(q => q.some(x => x.parms.status === 'B')) <
+      f.calls.findIndex(q => q.some(x => x.name === 'agendas.index' && x.parms.status === 'T')),
+      'consulta dos bloqueados começa antes da resposta das agendas diárias');
+    assert.ok(!seen.includes('blocked'), 'vermelho provisório não deve ser publicado');
+    assert.equal(f.source.freshCount(target, 19, '5'), 0, 'resultado ainda não está completo');
+  } finally { release(); }
+  const result = await pending;
+  assert.equal(result.get(target[0]).kind, 'booked');
+  assert.equal(result.get(target[1]).kind, 'blocked');
+  assert.ok(!seen.includes('blocked'));
+});
+
 test('bloqueados paginados são conferidos por dia antes de concluir ausência de pacientes', async () => {
   const f = fixture({ blockedPaginate: true, blocked: { '2026-10-06': [slot('ocupado')] } });
   const result = await f.source.ensure(dates, 19, '5', {});
@@ -490,7 +516,7 @@ test('mês aberto ultrapassa meses secundários na fila sem cancelar seus result
   await delay();
   gates.shift().resolve(); // libera metadados do mês secundário
   await delay(); await delay();
-  assert.ok(gates[0].q[0].id.startsWith('day'));
+  assert.ok(gates[0].q[0].id.startsWith('blocked'));
   const foreground = f.source.ensure(calendarDates(new Date(2027, 1, 1)), 19, '5', {});
   gates.shift().resolve(); // uma consulta ativa não é interrompida
   await delay(); await delay();

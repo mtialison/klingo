@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      2.06
+// @version      2.07
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -8476,13 +8476,18 @@ let tmAppointmentCalendarCore;
       const context = contextKey(doctor, unit), result = new Map();
       for (const date of dates) {
         const value = retained(days, dayKey(context, date));
+        // Vermelho só é definitivo depois de excluir pacientes na aba Bloqueados.
+        if (doctor && value?.kind === 'blocked' && !value.blockedChecked) continue;
         if (value !== undefined) result.set(date, value);
       }
       return result;
     }
     function freshCount(dates, doctor, unit) {
       const context = contextKey(doctor, unit);
-      return dates.filter((date) => fresh(days, dayKey(context, date)) !== undefined).length;
+      return dates.filter((date) => {
+        const value = fresh(days, dayKey(context, date));
+        return value !== undefined && (!doctor || value.blockedChecked);
+      }).length;
     }
     function stop() {
       runs.forEach((run) => {
@@ -8738,7 +8743,7 @@ let tmAppointmentCalendarCore;
       });
       await daily(run, exceptions, scheduled);
     }
-    async function checkBlockedPatients(run, dates) {
+    async function checkBlockedPatients(run, dates, ready) {
       if (!run.doctor) return;
       const needed = dates.filter(date => {
         const value = fresh(days, dayKey(run.context, date));
@@ -8773,7 +8778,7 @@ let tmAppointmentCalendarCore;
           remember(days, key, { ...current.value, blockedChecked: true, blockedPatient, blockedStamp: run.stamp,
             kind
           }, Math.max(current.stamp, run.stamp), 1008);
-          if (kind !== current.value.kind) notify();
+          if (kind !== current.value.kind || (kind === 'blocked' && !current.value.blockedChecked)) notify();
         }
       }
       for (let start = 0; start < chunks.length; start += 7) {
@@ -8782,9 +8787,12 @@ let tmAppointmentCalendarCore;
           const response = await query(run, batch.map((dates, i) => ({ name: 'agendas.index', id: 'blocked' + i,
             parms: { ...parms(run), status: 'B', livres: 0, inicio: dates[0], fim: dates[dates.length - 1] }
           })));
+          await ready; // A consulta começa em paralelo; combinar apenas com a agenda normal já recebida.
+          if (run.cancelled) throw cancelled();
           batch.forEach((dates, i) => consume(result(response, 'blocked' + i), dates));
         } catch (error) {
           if (run.cancelled) throw cancelled();
+          await ready; // Falha da agenda normal não deve disparar fallback de bloqueados.
           // Se o período não vier completo, conferir cada dia; nunca concluir ausência pela primeira página.
           const dates = batch.flat();
           for (let offset = 0; offset < dates.length; offset += 7) {
@@ -8892,14 +8900,21 @@ let tmAppointmentCalendarCore;
           await daily(run, missing, scheduled);
         }
       });
-      run.promise = Promise.allSettled([own, ...[...dependencies].map((owner) => owner.promise)])
+      const blocked = Promise.resolve().then(() => checkBlockedPatients(run, dates.filter(date => {
+        const owner = pendingDays.get(dayKey(context, date));
+        return !owner || owner === run;
+      }), own));
+      run.promise = Promise.allSettled([own, blocked, ...[...dependencies].map((owner) => owner.promise)])
         .then(async (outcomes) => {
           if (run.cancelled) throw cancelled();
           const failure = outcomes.find((item) => item.status === 'rejected');
           // Uma falha em datas de outro mês não invalida as datas já completas deste.
-          if (failure && needed.some((date) => fresh(days, dayKey(context, date)) === undefined)) throw failure.reason;
+          if (failure && needed.some((date) => {
+            const value = fresh(days, dayKey(context, date));
+            return value === undefined || (doctor && !value.blockedChecked);
+          })) throw failure.reason;
           if (outcomes[0].status === 'rejected') throw outcomes[0].reason;
-          await checkBlockedPatients(run, dates);
+          if (outcomes[1].status === 'rejected') throw outcomes[1].reason;
           return read(dates, doctor, unit);
         }).finally(() => {
           if (runs.get(key) === run) runs.delete(key);
