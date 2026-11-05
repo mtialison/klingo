@@ -931,6 +931,9 @@
     const formButtons = Array.from(leftColumn?.querySelectorAll('button') || []);
     const backButton = formButtons.find((button) => norm(button.textContent) === 'Voltar');
     const concludeButton = formButtons.find((button) => norm(button.textContent) === 'Concluir');
+    leftColumn?.querySelectorAll('button.tm-recepcao-concluir-button').forEach(button =>
+      setClass(button, 'tm-recepcao-concluir-button', button === concludeButton));
+    if (concludeButton) setClass(concludeButton, 'tm-recepcao-concluir-button', true);
     const concludeSection = Array.from(leftColumn?.children || [])
       .find((section) => concludeButton && section.contains(concludeButton));
     leftColumn?.querySelectorAll(':scope > .tm-recepcao-concluir-section').forEach((section) =>
@@ -1070,7 +1073,7 @@
     const modal = button?.closest?.(`#${MODAL_ID}`);
     if (modal && openReceptionPatientProfile(modal, event)) return;
     if (modal && (norm(button.textContent) === 'Concluir' ||
-        button.closest('.tm-recepcao-concluir-section'))) {
+        button.classList.contains('tm-recepcao-concluir-button'))) {
       validateRequiredReceptionFields(modal, event);
     }
   }, true);
