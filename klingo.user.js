@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/klingo
-// @version      1.1
+// @version      1.2
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
@@ -3464,7 +3464,7 @@ const tmBookingModalWatch = (() => {
 
   function tmCadIsCpfLookupTarget(modal) {
     return tmCadIsPrimeiraVez(modal) ||
-      (['novoAtendimento2Modal', 'editarMarcacaoModal'].includes(modal?.id) &&
+      (['novoAtendimento2Modal', 'novoAtendimentoConfirmacaoModal', 'editarMarcacaoModal'].includes(modal?.id) &&
         !!modal.querySelector('#cadTemp'));
   }
 
@@ -4597,13 +4597,13 @@ const tmBookingModalWatch = (() => {
   }
 
   for (const name of ['input', 'change']) document.addEventListener(name, (event) => {
-    const modal = event.target?.closest?.('#cadastroModal, #novoAtendimento2Modal, #editarMarcacaoModal');
+    const modal = event.target?.closest?.('#cadastroModal, #novoAtendimento2Modal, #novoAtendimentoConfirmacaoModal, #editarMarcacaoModal');
     if (!modal || !modal.querySelector('#cadTemp')?.contains(event.target)) return;
     window.setTimeout(() => tmCadLookupCpf(modal), 0);
   }, true);
 
   document.addEventListener('shown.bs.modal', (event) => {
-    if (!['novoAtendimento2Modal', 'editarMarcacaoModal'].includes(event.target?.id)) return;
+    if (!['novoAtendimento2Modal', 'novoAtendimentoConfirmacaoModal', 'editarMarcacaoModal'].includes(event.target?.id)) return;
     const modal = event.target;
     window.setTimeout(() => {
       const root = modal.querySelector('#cadTemp');
@@ -4632,7 +4632,7 @@ const tmBookingModalWatch = (() => {
 
   document.addEventListener('click', (event) => {
     const button = event.target?.closest?.('button');
-    const modal = button?.closest?.('#novoAtendimento2Modal, #editarMarcacaoModal');
+    const modal = button?.closest?.('#novoAtendimento2Modal, #novoAtendimentoConfirmacaoModal, #editarMarcacaoModal');
     if (!modal || !/^(Concluir|Atualizar)$/i.test(tmCadNorm(button.textContent))) return;
     tmCadGuardCpfLookup(modal, event);
   }, true);
@@ -7049,8 +7049,9 @@ const tmBookingModalWatch = (() => {
 (function () {
   'use strict';
 
-  const MODAL_ID = 'novoAtendimento2Modal';
-  const STYLE_ID = 'tm-recepcao-novo-atendimento-layout';
+  function enhanceBookingModal(MODAL_ID) {
+  const STYLE_ID = 'tm-recepcao-novo-atendimento-layout' +
+    (MODAL_ID === 'novoAtendimentoConfirmacaoModal' ? '-confirmacao' : '');
   let observedModal = null;
   let modalObserver = null;
   let observationWindowStart = 0;
@@ -7087,7 +7088,7 @@ const tmBookingModalWatch = (() => {
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      #${MODAL_ID} > .modal-dialog.modal-dialog-total.modal-dialog22 {
+      #${MODAL_ID} > .modal-dialog {
         width: 1180px !important;
         max-width: calc(100vw - 32px) !important;
         height: auto !important;
@@ -7095,7 +7096,7 @@ const tmBookingModalWatch = (() => {
         margin: 16px auto !important;
       }
 
-      #${MODAL_ID} > .modal-dialog > .modal-content.modal-content-total.modal-content22 {
+      #${MODAL_ID} > .modal-dialog > .modal-content {
         width: 100% !important;
         height: auto !important;
         min-height: 0 !important;
@@ -7110,7 +7111,7 @@ const tmBookingModalWatch = (() => {
         overflow-y: auto !important;
       }
 
-      #${MODAL_ID}.tm-recepcao-coluna-abaixo > .modal-dialog.modal-dialog-total.modal-dialog22 {
+      #${MODAL_ID}.tm-recepcao-coluna-abaixo > .modal-dialog {
         width: 920px !important;
       }
 
@@ -7308,6 +7309,26 @@ const tmBookingModalWatch = (() => {
       #${MODAL_ID} .tm-recepcao-origem-col .input-group > :not(select) {
         flex: 0 0 auto !important;
       }
+
+      #${MODAL_ID} .tm-confirmation-add-procedure {
+        height: auto !important;
+        min-height: 0 !important;
+        margin-top: 12px !important;
+        margin-bottom: 0 !important;
+      }
+      #${MODAL_ID} .tm-confirmation-add-procedure > br { display: none !important; }
+      #${MODAL_ID} .tm-confirmation-date-row { position: relative; z-index: 20; }
+      #${MODAL_ID} .tm-confirmation-date-header { position: relative; z-index: 2; }
+      #${MODAL_ID} .tm-confirmation-occupy {
+        position: absolute;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        margin: 0 !important;
+      }
+      @media (max-width: 575px) {
+        #${MODAL_ID} .tm-confirmation-date-header { padding-right: 90px; }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -7316,6 +7337,33 @@ const tmBookingModalWatch = (() => {
     const label = Array.from(modal.querySelectorAll('small.form-text.text-muted'))
       .find((small) => small.closest('.modal') === modal && norm(small.textContent) === labelText);
     return label?.closest('.col') || null;
+  }
+
+  function arrangeConfirmationBookingControls(modal) {
+    if (modal.id !== 'novoAtendimentoConfirmacaoModal') return;
+    const header = modal.querySelector('.col-lg-8 > .row:first-child p.alert-primary');
+    const groups = Array.from(new Set(Array.from(modal.querySelectorAll('button.dropdown-toggle'))
+      .filter(button => button.closest('.modal') === modal && /^Ocupar\b/.test(norm(button.textContent)))
+      .map(button => button.closest('.btn-group')).filter(Boolean)));
+    // Vue pode recriar o controle em sua posição nativa durante uma atualização.
+    // Nesse caso, usar o novo (com estado/listeners atuais) e remover o anterior.
+    const occupy = groups.find(group => group.parentElement !== header) || groups[0];
+    if (header && occupy) {
+      setClass(header.closest('.row'), 'tm-confirmation-date-row', true);
+      setClass(header, 'tm-confirmation-date-header', true);
+      setClass(occupy, 'tm-confirmation-occupy', true);
+      for (const group of groups) if (group !== occupy) group.remove();
+      if (occupy.parentElement !== header) header.appendChild(occupy);
+    }
+    const input = modal.querySelector('input[placeholder^="Adicionar procedimento"]');
+    const field = input?.closest('.form-group')?.parentElement;
+    const observation = modal.querySelector('.tm-recepcao-observacao-col')?.closest('.form-row');
+    if (field && observation?.parentElement) {
+      setClass(field, 'tm-confirmation-add-procedure', true);
+      if (field.parentElement !== observation.parentElement || field.previousElementSibling !== observation) {
+        observation.parentElement.insertBefore(field, observation.nextSibling);
+      }
+    }
   }
 
   function receptionOriginField(modal, contactRow) {
@@ -7815,12 +7863,18 @@ const tmBookingModalWatch = (() => {
   }
 
   function receptionBookingComponent(modal) {
+    const origin = modal.id === 'novoAtendimentoConfirmacaoModal' ? 'confirm' : 'recep';
+    const matches = component => component?.origem === origin && typeof component.marcar === 'function';
+    // Na Confirmação, marcacao é filho do modal, não seu ancestral.
+    for (const child of modal.querySelectorAll?.('*') || []) {
+      if (matches(child.__vue__)) return child.__vue__;
+    }
     let element = modal;
     while (element) {
       const component = element.__vue__;
-      if (component?.origem === 'recep' && typeof component.marcar === 'function') return component;
+      if (matches(component)) return component;
       const marcacao = component?.$refs?.marcacao;
-      if (marcacao?.origem === 'recep' && typeof marcacao.marcar === 'function') return marcacao;
+      if (matches(marcacao)) return marcacao;
       element = element.parentElement;
     }
 
@@ -7828,7 +7882,7 @@ const tmBookingModalWatch = (() => {
     element = document.getElementById('filtro-medico');
     while (element) {
       const marcacao = element.__vue__?.$refs?.marcacao;
-      if (marcacao?.origem === 'recep' && typeof marcacao.marcar === 'function') return marcacao;
+      if (matches(marcacao)) return marcacao;
       element = element.parentElement;
     }
     return null;
@@ -7922,6 +7976,9 @@ const tmBookingModalWatch = (() => {
     const formButtons = Array.from(leftColumn?.querySelectorAll('button') || []);
     const backButton = formButtons.find((button) => norm(button.textContent) === 'Voltar');
     const concludeButton = formButtons.find((button) => norm(button.textContent) === 'Concluir');
+    leftColumn?.querySelectorAll('button.tm-recepcao-concluir-button').forEach(button =>
+      setClass(button, 'tm-recepcao-concluir-button', button === concludeButton));
+    if (concludeButton) setClass(concludeButton, 'tm-recepcao-concluir-button', true);
     const concludeSection = Array.from(leftColumn?.children || [])
       .find((section) => concludeButton && section.contains(concludeButton));
     leftColumn?.querySelectorAll(':scope > .tm-recepcao-concluir-section').forEach((section) =>
@@ -7962,6 +8019,7 @@ const tmBookingModalWatch = (() => {
       setClass(field, 'tm-recepcao-observacao-col', field === observation));
     if (cpf) setClass(cpf, 'tm-recepcao-cpf-col', true);
     if (observation) setClass(observation, 'tm-recepcao-observacao-col', true);
+    arrangeConfirmationBookingControls(modal);
     const firstTime = !!social;
     setClass(modal, 'tm-recepcao-primeira-vez', firstTime);
     hideRedundantReceptionPatientControls(modal,
@@ -8060,7 +8118,7 @@ const tmBookingModalWatch = (() => {
     const modal = button?.closest?.(`#${MODAL_ID}`);
     if (modal && openReceptionPatientProfile(modal, event)) return;
     if (modal && (norm(button.textContent) === 'Concluir' ||
-        button.closest('.tm-recepcao-concluir-section'))) {
+        button.classList.contains('tm-recepcao-concluir-button'))) {
       validateRequiredReceptionFields(modal, event);
     }
   }, true);
@@ -8094,6 +8152,8 @@ const tmBookingModalWatch = (() => {
   });
   discoveryObserver.observe(document.documentElement, { childList: true, subtree: true });
   observeModal(document.getElementById(MODAL_ID));
+  }
+  for (const id of ['novoAtendimento2Modal', 'novoAtendimentoConfirmacaoModal']) enhanceBookingModal(id);
 })();
 
 /* =========================
@@ -8380,7 +8440,7 @@ let tmAppointmentCalendarCore;
 
   // Núcleo independente da interface. Só conserva resumos; nunca pacientes.
   function createCalendarSource({ post, busy = () => false, paused = () => false, changed = () => {}, now = Date.now }) {
-    const days = new Map(), weeks = new Map(), holidays = new Map();
+    const days = new Map(), weeks = new Map(), holidays = new Map(), confirmedDays = new Map();
     const runs = new Map(), pendingDays = new Map(), pendingMetadata = new Map(), listeners = new Set();
     let activeContext = '', sequence = 0, invalidatedAt = 0, active = 0, wake = null;
     const stats = { requests: 0, queries: 0, joined: 0, cacheHits: 0 };
@@ -8416,13 +8476,22 @@ let tmAppointmentCalendarCore;
       const context = contextKey(doctor, unit), result = new Map();
       for (const date of dates) {
         const value = retained(days, dayKey(context, date));
+        // Vermelho só é definitivo depois de excluir pacientes na aba Bloqueados.
+        if (doctor && value?.kind === 'blocked' && !value.blockedChecked) {
+          const previous = retained(confirmedDays, dayKey(context, date));
+          if (previous !== undefined) result.set(date, previous);
+          continue;
+        }
         if (value !== undefined) result.set(date, value);
       }
       return result;
     }
     function freshCount(dates, doctor, unit) {
       const context = contextKey(doctor, unit);
-      return dates.filter((date) => fresh(days, dayKey(context, date)) !== undefined).length;
+      return dates.filter((date) => {
+        const value = fresh(days, dayKey(context, date));
+        return value !== undefined && (!doctor || value.blockedChecked);
+      }).length;
     }
     function stop() {
       runs.forEach((run) => {
@@ -8555,7 +8624,7 @@ let tmAppointmentCalendarCore;
       });
     }
     async function metadata(run, dates) {
-      const anchors = [...new Set(dates.map(weekAnchor))];
+      const anchors = run.doctor ? [...new Set(dates.map(weekAnchor))] : [];
       const years = [...new Set(dates.map((date) => date.slice(0, 4)))];
       const holidayKey = (year) => run.unit + '|' + year;
       const missingWeeks = anchors.filter((date) => fresh(weeks, dayKey(run.context, date)) === undefined);
@@ -8595,7 +8664,8 @@ let tmAppointmentCalendarCore;
           if (!Array.isArray(records)) throw new Error('Cadastro de feriados incompleto.');
           remember(holidays, holidayKey(year), records.map((h) => ({
             dt_inicio: h.dt_inicio, dt_termino: h.dt_termino,
-            fl_recorrente: h.fl_recorrente, fl_ativo: h.fl_ativo
+            fl_recorrente: h.fl_recorrente, fl_ativo: h.fl_ativo,
+            st_descricao: h.st_descricao
           })), run.stamp, 12);
         }));
       }
@@ -8677,10 +8747,73 @@ let tmAppointmentCalendarCore;
       });
       await daily(run, exceptions, scheduled);
     }
+    async function checkBlockedPatients(run, dates, ready) {
+      if (!run.doctor) return;
+      const needed = dates.filter(date => {
+        const value = fresh(days, dayKey(run.context, date));
+        return value?.blockedChecked !== true || (run.refresh && (value.blockedStamp || 0) < run.stamp);
+      });
+      const chunks = [];
+      for (const date of needed) {
+        const last = chunks[chunks.length - 1];
+        const next = last && new Date(last[last.length - 1] + 'T12:00:00');
+        if (next) next.setDate(next.getDate() + 1);
+        if (!last || last.length === 14 || iso(next) !== date) chunks.push([date]);
+        else last.push(date);
+      }
+      function consume(data, batch) {
+        if (!Array.isArray(data?.agendas) || data.paginate) throw new Error('Marcações bloqueadas incompletas.');
+        if ((data.parms?.inicio && data.parms.inicio.slice(0, 10) > batch[0]) ||
+            (data.parms?.fim && data.parms.fim.slice(0, 10) < batch[batch.length - 1]) ||
+            (data.parms?.data && (batch.length !== 1 || data.parms.data.slice(0, 10) !== batch[0]))) {
+          throw new Error('Período de bloqueados limitado pelo servidor.');
+        }
+        const occupied = new Set();
+        for (const entry of data.agendas) {
+          const date = entry.data || (batch.length === 1 ? batch[0] : '');
+          if (!batch.includes(date)) throw new Error('Data de marcação bloqueada inesperada.');
+          if (entry.marcacao) occupied.add(date);
+        }
+        for (const date of batch) {
+          const key = dayKey(run.context, date), current = days.get(key);
+          if (!current || (current.value.blockedStamp || 0) > run.stamp) continue;
+          const blockedPatient = occupied.has(date);
+          const kind = blockedPatient && current.value.kind !== 'attendance' ? 'booked' : current.value.kind;
+          remember(days, key, { ...current.value, blockedChecked: true, blockedPatient, blockedStamp: run.stamp,
+            kind
+          }, Math.max(current.stamp, run.stamp), 1008);
+          remember(confirmedDays, key, days.get(key).value, Math.max(current.stamp, run.stamp), 1008);
+          if (kind !== current.value.kind || (kind === 'blocked' && !current.value.blockedChecked)) notify();
+        }
+      }
+      for (let start = 0; start < chunks.length; start += 7) {
+        const batch = chunks.slice(start, start + 7);
+        try {
+          const response = await query(run, batch.map((dates, i) => ({ name: 'agendas.index', id: 'blocked' + i,
+            parms: { ...parms(run), status: 'B', livres: 0, inicio: dates[0], fim: dates[dates.length - 1] }
+          })));
+          await ready; // A consulta começa em paralelo; combinar apenas com a agenda normal já recebida.
+          if (run.cancelled) throw cancelled();
+          batch.forEach((dates, i) => consume(result(response, 'blocked' + i), dates));
+        } catch (error) {
+          if (run.cancelled) throw cancelled();
+          await ready; // Falha da agenda normal não deve disparar fallback de bloqueados.
+          // Se o período não vier completo, conferir cada dia; nunca concluir ausência pela primeira página.
+          const dates = batch.flat();
+          for (let offset = 0; offset < dates.length; offset += 7) {
+            const group = dates.slice(offset, offset + 7);
+            const response = await query(run, group.map((date, i) => ({ name: 'agendas.index', id: 'blocked' + i,
+              parms: { ...parms(run), status: 'B', livres: 0, data: date }
+            })));
+            group.forEach((date, i) => consume(result(response, 'blocked' + i), [date]));
+          }
+        }
+      }
+    }
     function ensure(dates, doctor, unit, component, { refresh = false, priority = 0 } = {}) {
       dates = [...new Set(dates)].sort();
       doctor = String(doctor || ''); unit = String(unit || '');
-      if (!doctor || !component || !dates.length) return Promise.resolve(new Map());
+      if (!component || !dates.length) return Promise.resolve(new Map());
       const context = contextKey(doctor, unit), key = context + '|' + dates.join(',');
       if (activeContext && activeContext !== context) stop();
       activeContext = context;
@@ -8694,7 +8827,8 @@ let tmAppointmentCalendarCore;
       }
       const needed = dates.filter((date) => refresh || fresh(days, dayKey(context, date)) === undefined);
       stats.cacheHits += dates.length - needed.length;
-      if (!needed.length) return Promise.resolve(read(dates, doctor, unit));
+      if (!needed.length && (!doctor || dates.every(date =>
+          fresh(days, dayKey(context, date))?.blockedChecked))) return Promise.resolve(read(dates, doctor, unit));
       const dependencies = new Set();
       const missing = needed.filter((date) => {
         const owner = pendingDays.get(dayKey(context, date));
@@ -8717,6 +8851,7 @@ let tmAppointmentCalendarCore;
           meta = await metadata(run, missing);
         } catch (error) {
           if (run.cancelled) throw cancelled();
+          if (!doctor) throw error; // Não consultar pacientes de todos os médicos como fallback.
           const scheduled = new Map();
           for (const anchor of new Set(missing.map(weekAnchor))) {
             const week = fresh(weeks, dayKey(context, anchor));
@@ -8725,6 +8860,21 @@ let tmAppointmentCalendarCore;
           }
           await daily(run, missing, scheduled);
           return read(dates, doctor, unit);
+        }
+        if (!doctor) {
+          // Sem profissional, o cadastro prova somente que é feriado, não que a agenda está fechada.
+          for (const date of missing) {
+            const matching = meta.records.filter(h =>
+              /^\d{4}-\d{2}-\d{2}/.test(h.dt_inicio || '') &&
+              /^\d{4}-\d{2}-\d{2}/.test(h.dt_termino || '') && holidayCandidate(date, [h]));
+            remember(days, dayKey(context, date), {
+              kind: matching.length ? 'holiday' : '',
+              holiday: [...new Set(matching.map(h => h.st_descricao || 'Feriado'))].join(' / '),
+              holidayClosed: false, block: false
+            }, run.stamp, 1008);
+            notify();
+          }
+          return;
         }
         // Dias previstos (inclusive lotados/bloqueados) e feriados são lidos
         // diretamente UMA vez. O período agrega somente as lacunas: evita
@@ -8755,13 +8905,21 @@ let tmAppointmentCalendarCore;
           await daily(run, missing, scheduled);
         }
       });
-      run.promise = Promise.allSettled([own, ...[...dependencies].map((owner) => owner.promise)])
-        .then((outcomes) => {
+      const blocked = Promise.resolve().then(() => checkBlockedPatients(run, dates.filter(date => {
+        const owner = pendingDays.get(dayKey(context, date));
+        return !owner || owner === run;
+      }), own));
+      run.promise = Promise.allSettled([own, blocked, ...[...dependencies].map((owner) => owner.promise)])
+        .then(async (outcomes) => {
           if (run.cancelled) throw cancelled();
           const failure = outcomes.find((item) => item.status === 'rejected');
           // Uma falha em datas de outro mês não invalida as datas já completas deste.
-          if (failure && needed.some((date) => fresh(days, dayKey(context, date)) === undefined)) throw failure.reason;
+          if (failure && needed.some((date) => {
+            const value = fresh(days, dayKey(context, date));
+            return value === undefined || (doctor && !value.blockedChecked);
+          })) throw failure.reason;
           if (outcomes[0].status === 'rejected') throw outcomes[0].reason;
+          if (outcomes[1].status === 'rejected') throw outcomes[1].reason;
           return read(dates, doctor, unit);
         }).finally(() => {
           if (runs.get(key) === run) runs.delete(key);
@@ -8776,7 +8934,7 @@ let tmAppointmentCalendarCore;
       stop();
       invalidatedAt = ++sequence;
       const prefix = doctor == null ? '' : contextKey(doctor, unit) + '|';
-      [days, weeks].forEach((map) => {
+      [days, weeks, confirmedDays].forEach((map) => {
         for (const key of map.keys()) if (key.startsWith(prefix)) map.delete(key);
       });
       holidays.clear();
@@ -8809,8 +8967,16 @@ let tmAppointmentCalendarCore;
           }
           const week = fresh(weeks, dayKey(context, weekAnchor(p.data)));
           if (!week) continue;
+          const previous = fresh(days, dayKey(context, p.data));
           const value = classify(compact(data), week.get(p.data));
+          if (previous?.blockedChecked) {
+            value.blockedChecked = true;
+            value.blockedPatient = previous.blockedPatient;
+            value.blockedStamp = previous.blockedStamp;
+            if (value.blockedPatient && value.kind !== 'attendance') value.kind = 'booked';
+          }
           remember(days, dayKey(context, p.data), value, stamp, 1008);
+          if (value.blockedChecked) remember(confirmedDays, dayKey(context, p.data), value, stamp, 1008);
           notify();
         } catch (_) { /* Resposta nativa desconhecida: conserva a busca independente. */ }
       }
@@ -8896,7 +9062,6 @@ let tmAppointmentCalendarCore;
       const current = context();
       if (!current?.component) return Promise.resolve();
       const { month, doctor, unit, component } = current;
-      if (!doctor) { stop(); source.stop(); return Promise.resolve(); }
       const nextKey = monthKey(month, doctor, unit);
       if (!force && key === nextKey && pending) return pending;
       key = nextKey;
@@ -8941,7 +9106,13 @@ let tmAppointmentCalendarCore;
     return { sync, stop };
   }
 
-  tmAppointmentCalendarCore = { source, prepare, createCalendarSource, createCalendarPreloader, calendarDates, iso, monthNames };
+  function refreshDay(date, doctor, unit, component) {
+    if (!component || !/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return Promise.resolve();
+    prepare(component);
+    return source.ensure([date], doctor, unit, component, { refresh: true });
+  }
+
+  tmAppointmentCalendarCore = { source, prepare, refreshDay, createCalendarSource, createCalendarPreloader, calendarDates, iso, monthNames };
   const supportedRoute = () => ['#/recepcao', '#/call-center/confirmacao'].includes(window.location.hash);
   window.addEventListener('hashchange', () => { if (!supportedRoute()) source.stop(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) source.stop(); });
@@ -9010,9 +9181,9 @@ let tmAppointmentCalendarCore;
     state.context = doctor + '|' + unit;
     state.days = source.read(dates, doctor, unit);
     state.error = '';
-    state.loading = !!doctor && source.freshCount(dates, doctor, unit) !== dates.length;
+    state.loading = !!component && source.freshCount(dates, doctor, unit) !== dates.length;
     render();
-    if (!doctor || !component) { preloader.sync(); state.loading = false; paintDays(); return; }
+    if (!component) { state.loading = false; paintDays(); return; }
     try {
       const days = await prefetchSelectedMonth(true);
       if (request === state.request && days) state.days = days;
@@ -9047,21 +9218,23 @@ let tmAppointmentCalendarCore;
       #${POPOVER_ID} .tm-cal-weekday { text-align: center; color: #667085; font-size: 11px;
         font-weight: 600; padding: 5px 0; }
       #${POPOVER_ID} .tm-cal-day { height: 34px; border: 1px solid transparent; border-radius: 5px;
-        background: #f5f7fa; color: #344054; }
+        background: #f5f7fa; color: #344054; font-weight: 400; }
       #${POPOVER_ID} .tm-cal-day:hover { background: #e2e6ea; }
-      #${POPOVER_ID} .tm-cal-day:focus:not(:focus-visible):not([data-today="true"]):not([data-selected="true"]) { outline: none; }
+      #${POPOVER_ID} .tm-cal-day:focus:not(:focus-visible):not([data-selected="true"]) { outline: none; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"] { background: #198754; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"] { background: #dc3545; color: #fff; font-weight: 700; }
-      #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #0d6efd; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #ffc107; color: #000; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"]:hover { background: #146c43; }
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"]:hover { background: #b02a37; }
-      #${POPOVER_ID} .tm-cal-day[data-kind="booked"]:hover { background: #0b5ed7; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="booked"]:hover { background: #d39e00; }
+      #${POPOVER_ID} .tm-cal-day[data-holiday="true"] { background: #000; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-holiday="true"]:hover { background: #212529; }
       #${POPOVER_ID} .tm-cal-day[data-today="true"],
+      #${POPOVER_ID} .tm-cal-day[data-today="true"]:hover { background: #03a9f4; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-selected="true"] {
-        outline: 3px solid #2B7FFF; outline-offset: -3px;
+        outline: 3px solid #03a9f4; outline-offset: -3px;
         box-shadow: none; position: relative; z-index: 1;
       }
-      #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline-color: #F6339A; }
       #${POPOVER_ID} .tm-cal-day[data-outside="true"] { opacity: .45; }
       #${POPOVER_ID} .tm-cal-footer { display: flex; align-items: center;
         justify-content: flex-start; gap: 10px; margin-top: 10px; }
@@ -9153,6 +9326,7 @@ let tmAppointmentCalendarCore;
 
   function dayTitle(detail) {
     if (!detail) return state.loading ? 'Data ainda em consulta' : 'Data não verificada';
+    if (detail.kind === 'holiday') return `Feriado: ${detail.holiday}`;
     return detail.kind === 'booked' && detail.holidayClosed
         ? `Paciente marcado no feriado: ${detail.holiday}`
         : detail?.kind === 'booked' && detail?.block
@@ -9176,6 +9350,7 @@ let tmAppointmentCalendarCore;
     popover.querySelectorAll('button[data-date]').forEach((day) => {
       const detail = state.days.get(day.dataset.date), kind = detail?.kind || '';
       if (day.dataset.kind !== kind) day.dataset.kind = kind;
+      day.dataset.holiday = String(!!detail?.holiday);
       const title = dayTitle(detail);
       if (detail && (detail.kind === 'blocked' || detail.block || detail.holiday)) {
         if (day.title !== title) day.title = title;
@@ -9338,7 +9513,9 @@ let tmAppointmentCalendarCore;
   document.addEventListener('click', (event) => {
     if (!automaticRefresh && isReceptionPage() && event.target instanceof Element && event.target.closest('#refresh-button')) {
       const component = receptionComponent();
-      source.invalidate(document.querySelector('#filtro-medico')?.value || '', String(component?.unidade_operacao || ''));
+      refreshDay(document.querySelector('#ref-data')?.value, document.querySelector('#filtro-medico')?.value || '',
+        String(component?.unidade_operacao || ''), component)
+        .catch(error => { if (!error.cancelled) console.warn('[TM] Atualização do dia no calendário:', error.message); });
     }
   }, true);
   document.addEventListener('visibilitychange', () => {
@@ -9457,7 +9634,7 @@ const tmConfirmationCalendarAdapter = (() => {
 (function () {
   'use strict';
 
-  const { source, prepare, createCalendarPreloader, calendarDates, iso, monthNames } = tmAppointmentCalendarCore;
+  const { source, prepare, refreshDay, createCalendarPreloader, calendarDates, iso, monthNames } = tmAppointmentCalendarCore;
   const STYLE_ID = 'tm-confirmacao-calendario-style';
   const POPOVER_ID = 'tm-confirmacao-calendario-popover';
   const BUTTON_CLASS = 'tm-confirmacao-calendario-botao';
@@ -9522,6 +9699,7 @@ const tmConfirmationCalendarAdapter = (() => {
 
   function dayTitle(detail) {
     if (!detail) return state.loading ? 'Data ainda em consulta' : 'Data não verificada';
+    if (detail.kind === 'holiday') return `Feriado: ${detail.holiday}`;
     if (detail.kind === 'booked') return 'Paciente marcado sem atendimento regular disponível';
     if (detail.kind === 'blocked') return detail.holidayClosed ? `Feriado: ${detail.holiday}` : 'Agenda bloqueada';
     if (detail.kind === 'attendance') return detail.holiday ?
@@ -9549,21 +9727,23 @@ const tmConfirmationCalendarAdapter = (() => {
       #${POPOVER_ID} .tm-cal-weekday { text-align: center; color: #667085; font-size: 11px;
         font-weight: 600; padding: 5px 0; }
       #${POPOVER_ID} .tm-cal-day { height: 34px; border: 1px solid transparent; border-radius: 5px;
-        background: #f5f7fa; color: #344054; }
+        background: #f5f7fa; color: #344054; font-weight: 400; }
       #${POPOVER_ID} .tm-cal-day:hover { background: #e2e6ea; }
-      #${POPOVER_ID} .tm-cal-day:focus:not(:focus-visible):not([data-today="true"]):not([data-selected="true"]) { outline: none; }
+      #${POPOVER_ID} .tm-cal-day:focus:not(:focus-visible):not([data-selected="true"]) { outline: none; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"] { background: #198754; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"] { background: #dc3545; color: #fff; font-weight: 700; }
-      #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #0d6efd; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="booked"] { background: #ffc107; color: #000; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-kind="attendance"]:hover { background: #146c43; }
       #${POPOVER_ID} .tm-cal-day[data-kind="blocked"]:hover { background: #b02a37; }
-      #${POPOVER_ID} .tm-cal-day[data-kind="booked"]:hover { background: #0b5ed7; }
+      #${POPOVER_ID} .tm-cal-day[data-kind="booked"]:hover { background: #d39e00; }
+      #${POPOVER_ID} .tm-cal-day[data-holiday="true"] { background: #000; color: #fff; font-weight: 700; }
+      #${POPOVER_ID} .tm-cal-day[data-holiday="true"]:hover { background: #212529; }
       #${POPOVER_ID} .tm-cal-day[data-today="true"],
+      #${POPOVER_ID} .tm-cal-day[data-today="true"]:hover { background: #03a9f4; color: #fff; font-weight: 700; }
       #${POPOVER_ID} .tm-cal-day[data-selected="true"] {
-        outline: 3px solid #2B7FFF; outline-offset: -3px;
+        outline: 3px solid #03a9f4; outline-offset: -3px;
         box-shadow: none; position: relative; z-index: 1;
       }
-      #${POPOVER_ID} .tm-cal-day[data-selected="true"] { outline-color: #F6339A; }
       #${POPOVER_ID} .tm-cal-day[data-outside="true"] { opacity: .45; }
       #${POPOVER_ID} .tm-cal-footer { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
       #${POPOVER_ID} .tm-cal-status { color: #667085; }
@@ -9592,6 +9772,7 @@ const tmConfirmationCalendarAdapter = (() => {
     popover.querySelectorAll('button[data-date]').forEach((day) => {
       const detail = painted ? state.days.get(day.dataset.date) : null;
       day.dataset.kind = detail?.kind || '';
+      day.dataset.holiday = String(!!detail?.holiday);
       const title = painted ? dayTitle(detail) : 'Selecionar data';
       if (detail && (detail.kind === 'blocked' || detail.block || detail.holiday)) {
         if (day.title !== title) day.title = title;
@@ -9662,9 +9843,9 @@ const tmConfirmationCalendarAdapter = (() => {
     prepare(componentFor(current));
     state.days = source.read(dates, doctor, unit);
     state.error = '';
-    state.loading = !!doctor && source.freshCount(dates, doctor, unit) !== dates.length;
+    state.loading = !!componentFor(current) && source.freshCount(dates, doctor, unit) !== dates.length;
     render();
-    if (!doctor || !componentFor(current)) { preload(); state.loading = false; paintDays(); return; }
+    if (!componentFor(current)) { state.loading = false; paintDays(); return; }
     try {
       const days = await preload(true);
       if (request === state.request && days) state.days = days;
@@ -9784,7 +9965,8 @@ const tmConfirmationCalendarAdapter = (() => {
   document.addEventListener('click', (event) => {
     const current = tmConfirmationCalendarAdapter.read();
     if (current && event.target instanceof Element && event.target.closest('#refresh-button')) {
-      source.invalidate(current.context.doctor, current.context.unit);
+      refreshDay(current.context.start, current.context.doctor, current.context.unit, componentFor(current))
+        .catch(error => { if (!error.cancelled) console.warn('[TM] Atualização do dia no calendário:', error.message); });
     }
   }, true);
   window.addEventListener('resize', positionPopover);
@@ -12337,172 +12519,7 @@ const tmConfirmationCalendarAdapter = (() => {
   }, ['#/recepcao']);
 })();
 
-/* RECEPÇÃO — filtros da própria aba sobrevivem ao recarregamento. */
-(function () {
-  'use strict';
-  const PREFIX = 'tm_reception_filters_v1:';
-  const FIELDS = ['referencia', 'medico', 'viewEspec', 'viewStatus', 'viewMode',
-    'tipo_proced', 'search', 'turno', 'faixa_hora', 'filtrar_faixa_hora',
-    'block_view_pacotes', 'filtro_teleatend', 'apenas_editados', 'id_fila_laudo'];
-  const TYPES = ['', 'marcado', 'extra', 'demanda'];
-  let active = null;
-
-  function receptionVue() {
-    if (window.location.hash.split('?')[0] !== '#/recepcao') return null;
-    for (let node = document.getElementById('refresh-button'); node; node = node.parentElement) {
-      const vue = node.__vue__;
-      if (vue?.$refs?.ini_atd && typeof vue.load === 'function' && vue.unidade_operacao !== undefined) return vue;
-    }
-    return null;
-  }
-
-  function keyFor(vue) {
-    const user = String(vue.$store?.state?.user?.id_usuario || '');
-    if (!user) return '';
-    const unit = String(vue.unidade_operacao || 'all');
-    const reception = String(vue.$util?.getCookie?.('id_recepcao') || '');
-    return PREFIX + [user, unit, reception].map(encodeURIComponent).join(':');
-  }
-
-  function scalar(value) {
-    return value === null || typeof value === 'boolean' ||
-      (typeof value === 'number' && Number.isFinite(value)) ||
-      (typeof value === 'string' && value.length <= 1000);
-  }
-
-  function typeControl() {
-    return document.querySelector('#tm-recepcao-tipo-filter select');
-  }
-
-  function snapshot(state) {
-    const values = {};
-    for (const field of FIELDS) {
-      if (Object.hasOwn(state.vue.$data, field) && scalar(state.vue[field])) values[field] = state.vue[field];
-    }
-    const ids = state.vue.filtro_lista_medicos;
-    if (Array.isArray(ids)) values.filtro_lista_medicos = ids.filter(id => /^\d+$/.test(String(id))).slice(0, 500);
-    const type = state.pendingType ?? typeControl()?.value ?? '';
-    return { version: 1, values, type: TYPES.includes(type) ? type : '' };
-  }
-
-  function save(state) {
-    if (!state?.initialized || state.restoring || keyFor(state.vue) !== state.key || state.vue._isDestroyed) return;
-    try {
-      const text = JSON.stringify(snapshot(state));
-      if (text !== state.last) {
-        sessionStorage.setItem(state.key, text);
-        state.last = text;
-      }
-    } catch (_) { /* Storage bloqueado não deve interferir na Recepção. */ }
-  }
-
-  function read(key) {
-    try {
-      const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
-      return saved?.version === 1 && saved.values && typeof saved.values === 'object' &&
-        !Array.isArray(saved.values) ? saved : null;
-    } catch (_) { return null; }
-  }
-
-  function validDate(value) {
-    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-    const [year, month, day] = value.split('-').map(Number);
-    const date = new Date(0);
-    date.setFullYear(year, month - 1, day);
-    return year > 0 && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
-  }
-
-  function restoreType(state) {
-    const control = typeControl();
-    if (state.pendingType === null || !control) return;
-    if (control.value !== state.pendingType) {
-      control.value = state.pendingType;
-      control.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-    state.pendingType = null;
-  }
-
-  function restore(state, saved) {
-    const vue = state.vue;
-    const options = document.getElementById('filtro-medico')?.options;
-    const available = options ? new Set(Array.from(options, option => option.value)) : null;
-    let changed = false;
-    for (const field of FIELDS) {
-      const value = saved.values[field];
-      if (!Object.hasOwn(saved.values, field) || !Object.hasOwn(vue.$data, field) || !scalar(value)) continue;
-      if (typeof vue[field] === 'boolean' && typeof value !== 'boolean') continue;
-      if (field === 'referencia' && !validDate(value)) continue;
-      if (field === 'medico' && value && available && !available.has(String(value))) continue;
-      if (vue[field] !== value) { vue[field] = value; changed = true; }
-    }
-    if (Object.hasOwn(vue.$data, 'filtro_lista_medicos') && Array.isArray(saved.values.filtro_lista_medicos)) {
-      const ids = saved.values.filtro_lista_medicos.filter(id => /^\d+$/.test(String(id)) &&
-        (!available || available.has(String(id)))).slice(0, 500);
-      if (JSON.stringify(vue.filtro_lista_medicos) !== JSON.stringify(ids)) {
-        vue.filtro_lista_medicos = ids;
-        changed = true;
-      }
-    }
-    state.pendingType = TYPES.includes(saved.type) ? saved.type : '';
-    restoreType(state);
-    return changed;
-  }
-
-  function dispose() {
-    if (!active) return;
-    save(active);
-    active.unwatch?.();
-    active.unwatchReady?.();
-    active = null;
-  }
-
-  function ensurePersistence() {
-    const vue = receptionVue();
-    const key = vue && keyFor(vue);
-    if (!vue || !key) { dispose(); return; }
-    if (!active || active.vue !== vue || active.key !== key) {
-      dispose();
-      const state = active = { vue, key, initialized: false, restoring: false,
-        interrupted: false, pendingType: null, last: null, unwatch: null, unwatchReady: null };
-      state.unwatch = vue.$watch(() => JSON.stringify(snapshot(state)), () => save(state));
-      state.unwatchReady = vue.$watch(() => vue.firstLoad && !vue.montando && !vue.$store.state.loading,
-        ready => { if (ready) tmRuntime.schedule(0); });
-    }
-    const state = active;
-    if (state.initialized) { restoreType(state); save(state); return; }
-    if (vue.montando || !vue.firstLoad || vue.$store.state.loading) return;
-    const explicitNavigation = Object.values(vue.$route?.params || {}).some(value =>
-      value !== null && value !== undefined && value !== '');
-    const saved = !state.interrupted && !explicitNavigation ? read(key) : null;
-    state.initialized = true;
-    let changed = false;
-    state.restoring = true;
-    try { if (saved) changed = restore(state, saved); }
-    finally { state.restoring = false; }
-    // Uma navegação específica não deve substituir a última configuração da barra.
-    if (explicitNavigation) state.last = JSON.stringify(snapshot(state));
-    // Sem histórico do contexto, guardar o que o Klingo já exibe, inclusive após trocar a unidade.
-    // Não redefinir filtros que a navegação nativa optou por conservar.
-    else save(state);
-    if (changed) vue.load(false);
-  }
-
-  function manualInteraction(event) {
-    if (!event.isTrusted || !active || receptionVue() !== active.vue) return;
-    const card = document.getElementById('refresh-button')?.closest('.card');
-    if (!card?.contains(event.target) && !event.target?.closest?.('#tm-recepcao-calendario-popover')) return;
-    const state = active;
-    if (!state.initialized) state.interrupted = true;
-    if (event.type === 'change' && event.target?.closest?.('#tm-recepcao-tipo-filter')) state.pendingType = null;
-    Promise.resolve().then(() => save(state));
-  }
-
-  for (const name of ['input', 'change', 'click']) document.addEventListener(name, manualInteraction, true);
-  window.addEventListener('pagehide', () => save(active));
-  tmRuntime.register('permanência dos filtros da Recepção', ensurePersistence, ['#/recepcao']);
-})();
-
-/* AUTORIZAÇÕES/RECEPÇÃO — Pendente usa o mesmo visual nativo de Autorizado Parcialmente. */
+/* AUTORIZAÇÕES/RECEPÇÃO/CONFIRMAÇÃO — Pendente usa o visual de Autorizado Parcialmente. */
 (function () {
   'use strict';
   const ATTRIBUTE = 'data-tm-pending-authorization';
@@ -12515,7 +12532,8 @@ const tmConfirmationCalendarAdapter = (() => {
     const route = window.location.hash.split('?')[0];
     const reception = /^#\/recepcao(?:\/|$)/.test(route);
     const authorization = /^#\/autorizacoes(?:\/|$)/.test(route);
-    const selector = reception ? '.tm-reception-authorization-button' : authorization ? '.badge' : null;
+    const confirmation = /^#\/call-center\/confirmacao(?:\/|$)/.test(route);
+    const selector = reception ? '.tm-reception-authorization-button' : authorization || confirmation ? '.badge' : null;
     watchedSelector = selector;
     if (!selector) {
       textObserver?.disconnect();
@@ -12558,5 +12576,1054 @@ const tmConfirmationCalendarAdapter = (() => {
     });
   }
 
-  tmRuntime.register('cor de autorização Pendente', ensurePendingColor, ['#/autorizacoes', '#/recepcao']);
+  tmRuntime.register('cor de autorização Pendente', ensurePendingColor,
+    ['#/autorizacoes', '#/recepcao', '#/call-center/confirmacao']);
+})();
+
+/* CONFIRMAÇÃO/RECEPÇÃO — destacar crianças e pacientes com80 anos ou mais. */
+(function () {
+  'use strict';
+  const AGE = 'span.badge[title="idade do paciente"], span.badge[data-original-title="idade do paciente"]';
+  const BAND = 'data-tm-age-band', EXTRA = 'data-tm-age-extra';
+  const STYLE = 'tm-patient-age-colors';
+  let observer = null, active = false;
+
+  function years(text) {
+    const match = text.trim().match(/^(\d+)\s*(a|m|d)$/i);
+    if (!match) return null;
+    return Number(match[1]) / ({ a: 1, m: 12, d: 365.2425 }[match[2].toLowerCase()]);
+  }
+
+  function update() {
+    active = /^#\/(?:recepcao|call-center\/confirmacao)(?:\/|$)/.test(window.location.hash.split('?')[0]);
+    const bands = new Map(), extras = new Set();
+    if (active) document.querySelectorAll(AGE).forEach(badge => {
+      if (badge.closest('.modal, nav.navbar')) return;
+      const age = years(badge.textContent);
+      if (age === null) return;
+      if (age < 14) bands.set(badge, 'child');
+      else if (age >= 80) {
+        bands.set(badge, 'elder');
+        badge.parentElement?.querySelectorAll('span.badge').forEach(other => {
+          if (other !== badge && other.textContent.trim() === '80+') extras.add(other);
+        });
+      }
+    });
+    document.querySelectorAll(`[${BAND}]`).forEach(badge => {
+      if (!bands.has(badge)) badge.removeAttribute(BAND);
+    });
+    document.querySelectorAll(`[${EXTRA}]`).forEach(badge => {
+      if (!extras.has(badge)) badge.removeAttribute(EXTRA);
+    });
+    if (active && !document.getElementById(STYLE)) {
+      const style = document.createElement('style'); style.id = STYLE;
+      style.textContent = `
+        .badge[${BAND}="child"] { background-color: #F4A8FF !important; color: #212529 !important; }
+        .badge[${BAND}="elder"] { background-color: #FFD230 !important; color: #212529 !important; }
+        [${EXTRA}="true"] { display: none !important; }
+      `;
+      document.head.appendChild(style);
+    }
+    bands.forEach((band, badge) => {
+      if (badge.getAttribute(BAND) !== band) badge.setAttribute(BAND, band);
+    });
+    extras.forEach(badge => {
+      if (badge.getAttribute(EXTRA) !== 'true') badge.setAttribute(EXTRA, 'true');
+    });
+    if (!active) { observer?.disconnect(); observer = null; }
+    else if (!observer && document.body) {
+      observer = new MutationObserver(records => {
+        if (active && records.some(record => record.target.parentElement?.closest(`${AGE}, [${EXTRA}]`))) {
+          tmRuntime.schedule(0);
+        }
+      });
+      observer.observe(document.body, { characterData: true, subtree: true });
+    }
+  }
+
+  tmRuntime.register('cores das idades dos pacientes', update, ['#/recepcao', '#/call-center/confirmacao']);
+})();
+
+/* Edição pelo fluxo nativo: manter bloqueio e liberar somente os campos de edição. */
+(function () {
+  'use strict';
+  const FIELDS = new Set(['e-mail', 'Telefone', 'Celular', 'Operadora / Plano', 'Recepção',
+    'Teleatendimento', 'Senha', 'Data de Liberação', 'Validade']);
+  let patched = null;
+  const menuButtons = new Map();
+  const planPatches = new Map();
+  const MENU = new Set(['Alterar Procedimento', 'Alterar Operadora/Plano']);
+  let menuObserver = null;
+  const onRoute = () => /^#\/(recepcao|call-center\/confirmacao)(\/|$)/.test(window.location.hash.split('?')[0]);
+
+  function permitted(cell, data) {
+    if (!onRoute() || !data || data.ch_estado_marcacao !== 'B' || data.id_atendimento ||
+        !/^[1-9]\d*$/.test(String(data.id_marcacao)) || !cell || cell.block_editar ||
+        cell.hor?.marcacao?.ch_estado_marcacao !== 'B' || cell.hor.marcacao.id_atendimento ||
+        String(cell.hor.marcacao.id_marcacao) !== String(data.id_marcacao)) return false;
+    for (let v = cell; v; v = v.$parent) if (v.viewonly || v._isDestroyed) return false;
+    return true;
+  }
+
+  function cardCell(card) {
+    return Array.from(card.querySelectorAll('*')).map(node => node.__vue__)
+      .find(v => v?.$options?._componentTag === 'celula-horarios-marcacao');
+  }
+
+  function restoreButton(button, entry) {
+    const data = cardCell(entry.card)?.hor?.marcacao;
+    button.disabled = data ? entry.label === 'Alterar Procedimento'
+      ? data.ch_estado_marcacao !== 'A'
+      : data.ch_estado_marcacao !== 'A' && !!data.id_paciente : entry.disabled;
+    menuButtons.delete(button);
+  }
+
+  function updateMenus() {
+    const active = new Set();
+    if (onRoute()) document.querySelectorAll('.dashcard').forEach(card => {
+      if (card.closest('.modal')) return;
+      const cell = cardCell(card), data = cell?.hor?.marcacao;
+      if (!permitted(cell, data)) return;
+      card.querySelectorAll('.dropleft .dropdown-menu button.dropdown-item').forEach(button => {
+        const label = button.textContent.trim();
+        if (!MENU.has(label)) return;
+        if (!menuButtons.has(button)) menuButtons.set(button, { disabled: button.disabled });
+        Object.assign(menuButtons.get(button), { card, id: String(data.id_marcacao), label });
+        active.add(button);
+        if (button.disabled) button.disabled = false;
+      });
+    });
+    for (const [button, entry] of menuButtons) if (!active.has(button)) restoreButton(button, entry);
+    if (!onRoute()) { menuObserver?.disconnect(); menuObserver = null; }
+    else if (!menuObserver && document.body) {
+      menuObserver = new MutationObserver(records => {
+        if (records.some(record => menuButtons.has(record.target) && record.target.disabled)) tmRuntime.schedule(0);
+      });
+      menuObserver.observe(document.body, { attributes: true, attributeFilter: ['disabled'], subtree: true });
+    }
+  }
+
+  function updatePlanModal() {
+    if (!onRoute()) {
+      for (const [vm, entry] of planPatches) if (vm.abrir === entry.wrapped) vm.abrir = entry.original;
+      planPatches.clear(); return;
+    }
+    document.querySelectorAll('.dashcard').forEach(card => {
+      for (let owner = cardCell(card); owner; owner = owner.$parent) {
+        const vm = owner.$refs?.alterar_plano;
+        if (!vm || typeof vm.abrir !== 'function' || planPatches.has(vm)) continue;
+        const original = vm.abrir;
+        const wrapped = function (appointment, ...args) {
+          if (!editable({ dados: appointment })) return original.call(this, appointment, ...args);
+          const util = this.$util;
+          if (typeof util?.load !== 'function') return original.call(this, appointment, ...args);
+          // O abridor nativo usa jQuery privado. Reutilizá-lo integralmente, fornecendo
+          // somente sua leitura lista_dia: ela exclui B, embora o modal suporte B.
+          const row = { ...appointment };
+          row.nome_paciente = row.nome_paciente || row.paciente?.search ||
+            row.paciente?.cadastro?.st_nome || row.cadastro_temporario?.st_nome || '';
+          const target = this, scoped = Object.create(util);
+          scoped.load = function (vm, options, ...rest) {
+            if (vm === target && options?.service === 'marcacoes' && options.func === 'lista_dia' &&
+                typeof options.loadTo === 'function') {
+              options.loadTo({ lista: [row] }); return Promise.resolve();
+            }
+            return util.load.call(util, vm, options, ...rest);
+          };
+          const descriptor = Object.getOwnPropertyDescriptor(this, '$util');
+          Object.defineProperty(this, '$util', { configurable: true, value: scoped, writable: true });
+          try { return original.call(this, appointment, ...args); }
+          finally {
+            if (descriptor) Object.defineProperty(this, '$util', descriptor);
+            else delete this.$util;
+          }
+        };
+        vm.abrir = wrapped; planPatches.set(vm, { original, wrapped });
+      }
+    });
+  }
+
+  document.addEventListener('click', event => {
+    const button = event.target.closest?.('button.dropdown-item'), entry = menuButtons.get(button);
+    if (!entry) return;
+    const cell = cardCell(entry.card), data = cell?.hor?.marcacao;
+    if (!permitted(cell, data) || String(data.id_marcacao) !== entry.id) {
+      event.preventDefault(); event.stopImmediatePropagation(); tmRuntime.schedule(0);
+    }
+    // Quando válido, o próprio listener nativo abre o modal com o objeto original.
+  }, true);
+
+  function editable(vm) {
+    const data = vm.dados;
+    if (!onRoute() || !data || data.ch_estado_marcacao !== 'B' || data.id_atendimento ||
+        !/^[1-9]\d*$/.test(String(data.id_marcacao))) return false;
+    for (const card of document.querySelectorAll('.dashcard')) {
+      const cell = Array.from(card.querySelectorAll('*')).map(node => node.__vue__).find(v =>
+        v?.$options?._componentTag === 'celula-horarios-marcacao' &&
+        String(v.hor?.marcacao?.id_marcacao) === String(data.id_marcacao));
+      if (permitted(cell, data)) return true;
+    }
+    return false;
+  }
+
+  function unlockFields(node) {
+    if (!node || typeof node !== 'object') return;
+    const component = node.componentOptions;
+    const props = component?.propsData;
+    // Nome/CPF e campos fixos permanecem protegidos. Não alterar marcacao_ativa ou dados.
+    if (props?.edicao === false &&
+        ((component.tag === 'az-input' && FIELDS.has(props.label)) || component.tag === 'medico-solicitante')) {
+      props.edicao = true;
+    }
+    node.children?.forEach(unlockFields);
+    component?.children?.forEach(unlockFields);
+  }
+
+  function restore() {
+    if (!patched) return;
+    const { vm, original, wrapped } = patched;
+    if (vm.$options.render === wrapped) {
+      vm.$options.render = original;
+      if (!vm._isDestroyed) vm.$forceUpdate();
+    }
+    patched = null;
+  }
+
+  function update() {
+    // Compatibilidade com a versão anterior: retirar os itens duplicados do submenu.
+    document.querySelectorAll('.tm-blocked-appointment-actions').forEach(group => group.remove());
+    updateMenus();
+    updatePlanModal();
+    if (!onRoute()) { restore(); return; }
+    let modal = document.getElementById('editarMarcacaoModal'), vm = null;
+    for (let node = modal; node; node = node.parentElement) {
+      const candidate = node.__vue__;
+      if (candidate?.$options?.methods?.abrir && candidate.$options.methods.atualizar &&
+          candidate.$options.computed?.marcacao_ativa) { vm = candidate; break; }
+    }
+    if (!vm || vm._isDestroyed) { restore(); return; }
+    if (patched?.vm === vm) return;
+    restore();
+    const original = vm.$options.render;
+    if (typeof original !== 'function') return;
+    const wrapped = function (...args) {
+      const tree = original.apply(this, args);
+      if (editable(this)) unlockFields(tree);
+      return tree;
+    };
+    vm.$options.render = wrapped;
+    patched = { vm, original, wrapped };
+    vm.$forceUpdate();
+  }
+  tmRuntime.register('ações em marcações bloqueadas', update, ['#/recepcao', '#/call-center/confirmacao']);
+})();
+
+/* Padrão aplicado antes da criação do checkbox nativo; o usuário pode desmarcar. */
+(function () {
+  'use strict';
+  let patch = null;
+  const onRoute = () => /^#\/(recepcao|call-center\/confirmacao)(\/|$)/.test(window.location.hash.split('?')[0]);
+
+  function cleanup() {
+    if (patch && patch.vm.remarcar === patch.wrapped) patch.vm.remarcar = patch.original;
+    patch = null;
+  }
+
+  function update() {
+    if (!onRoute()) { cleanup(); return; }
+    let vm = null;
+    for (let node = document.getElementById('remarcarComboModal'); node; node = node.parentElement) {
+      const candidate = node.__vue__;
+      if (candidate?.$options?.methods?.remarcar && 'dados' in candidate) { vm = candidate; break; }
+    }
+    if (!vm || vm._isDestroyed) { cleanup(); return; }
+    if (patch?.vm === vm) return;
+    cleanup();
+    const original = vm.remarcar;
+    const wrapped = function (id, trocarMedico, options) {
+      if (!onRoute()) return original.apply(this, arguments);
+      // O 3º argumento nativo é mesclado à resposta ANTES de montar os campos.
+      return original.call(this, id, trocarMedico, { ...options, manter_mesma_unidade: true });
+    };
+    vm.remarcar = wrapped;
+    patch = { vm, original, wrapped };
+  }
+  tmRuntime.register('remarcar na mesma unidade por padrão', update, ['#/recepcao', '#/call-center/confirmacao']);
+})();
+
+/* Manter o perfil aberto quando sua marcação é editada pelo fluxo nativo. */
+(function () {
+  'use strict';
+  let patch = null, stack = null, observer = null;
+  function bootstrap(element) {
+    if (!element) return null;
+    for (const key of Object.keys(element)) {
+      if (key.startsWith('jQuery') && element[key]?.['bs.modal']?._element === element) {
+        return element[key]['bs.modal'];
+      }
+    }
+    return null;
+  }
+  const shown = element => !!element?.classList.contains('show');
+  const zSnapshot = element => [element.style.getPropertyValue('z-index'), element.style.getPropertyPriority('z-index')];
+  function restoreZ(element, saved) {
+    if (!element || !saved) return;
+    if (saved[0]) element.style.setProperty('z-index', saved[0], saved[1]);
+    else element.style.removeProperty('z-index');
+  }
+  function setZ(element, value) {
+    if (element && element.style.getPropertyValue('z-index') !== String(value)) {
+      element.style.setProperty('z-index', String(value));
+    }
+  }
+  function clearStack() {
+    if (!stack) return;
+    const s = stack; stack = null;
+    restoreZ(s.edit, s.editZ); restoreZ(s.backdrop, s.backdropZ);
+    if (!s.inert) s.profile.removeAttribute('inert');
+    if (s.ariaHidden === null) s.profile.removeAttribute('aria-hidden');
+    else s.profile.setAttribute('aria-hidden', s.ariaHidden);
+    if (shown(s.profile)) {
+      document.body.classList.add('modal-open');
+      const bs = bootstrap(s.profile);
+      if (bs?._config?.focus !== false) {
+        bs?._enforceFocus?.();
+        const target = s.focus?.isConnected && s.profile.contains(s.focus) ? s.focus : s.profile;
+        target.focus({ preventScroll: true });
+      }
+    }
+  }
+  function maintainStack() {
+    if (!stack) return;
+    const s = stack, bs = bootstrap(s.edit);
+    if (!s.profile.isConnected || !shown(s.profile) || !s.edit.isConnected ||
+        (!shown(s.edit) && !bs?._isShown && getComputedStyle(s.edit).display === 'none')) {
+      clearStack(); return;
+    }
+    setZ(s.edit, s.base + 20);
+    const backdrop = bs?._backdrop;
+    if (backdrop && s.backdrop !== backdrop) {
+      restoreZ(s.backdrop, s.backdropZ);
+      s.backdrop = backdrop; s.backdropZ = zSnapshot(backdrop);
+    }
+    setZ(backdrop, s.base + 10);
+    if (shown(s.edit)) {
+      s.profile.setAttribute('inert', '');
+      s.profile.setAttribute('aria-hidden', 'true');
+    }
+  }
+  function restorePatch() {
+    if (patch && patch.vm.abrir === patch.wrapped) patch.vm.abrir = patch.original;
+    patch = null; observer?.disconnect(); observer = null;
+  }
+  function update() {
+    const edit = document.getElementById('editarMarcacaoModal');
+    let vm = null;
+    for (let node = edit; node; node = node.parentElement) {
+      if (node.__vue__?.$options?.methods?.atualizar && typeof node.__vue__.abrir === 'function') {
+        vm = node.__vue__; break;
+      }
+    }
+    if (!vm || vm._isDestroyed) { clearStack(); restorePatch(); return; }
+    if (patch?.vm !== vm) {
+      clearStack(); restorePatch();
+      const original = vm.abrir;
+      const wrapped = function (...args) {
+        const profile = document.getElementById('perfilPacienteModal'), bs = bootstrap(profile);
+        if (!shown(profile) || typeof bs?.hide !== 'function') return original.apply(this, args);
+        clearStack();
+        const descriptor = Object.getOwnPropertyDescriptor(bs, 'hide');
+        Object.defineProperty(bs, 'hide', { configurable: true, writable: true, value() {} });
+        const focus = document.activeElement;
+        let result;
+        try { result = original.apply(this, args); }
+        finally {
+          if (descriptor) Object.defineProperty(bs, 'hide', descriptor);
+          else delete bs.hide;
+        }
+        const base = Math.max(1050, ...Array.from(document.querySelectorAll('.modal.show'))
+          .filter(element => element !== edit).map(element => Number.parseInt(getComputedStyle(element).zIndex, 10) || 1050));
+        stack = { profile, edit, base, editZ: zSnapshot(edit), inert: profile.hasAttribute('inert'),
+          ariaHidden: profile.getAttribute('aria-hidden'), focus };
+        tmRuntime.schedule(0);
+        return result;
+      };
+      vm.abrir = wrapped; patch = { vm, original, wrapped };
+      observer = new MutationObserver(() => tmRuntime.schedule(0));
+      observer.observe(edit, { attributes: true, attributeFilter: ['class', 'style'] });
+      const profile = document.getElementById('perfilPacienteModal');
+      if (profile) observer.observe(profile, { attributes: true, attributeFilter: ['class'] });
+    }
+    maintainStack();
+    if (!stack && shown(document.getElementById('perfilPacienteModal'))) document.body.classList.add('modal-open');
+  }
+  tmRuntime.register('edição de marcação sobre o perfil', update);
+  return () => { clearStack(); restorePatch(); };
+})();
+
+/* Corrigir o seletor de conclusão e o cache do diálogo Bootstrap da Confirmação. */
+(function () {
+  'use strict';
+  const ID = 'novoAtendimentoConfirmacaoModal';
+  let patch = null;
+
+  function normalize(node) {
+    if (!node || typeof node !== 'object') return;
+    const component = node.componentOptions, props = component?.propsData;
+    if (component?.tag === 'marcacao' && props?.origem === 'confirm' && props.modalName === ID) {
+      props.modalName = '#' + ID;
+    }
+    node.children?.forEach(normalize);
+    component?.children?.forEach(normalize);
+  }
+
+  function repairDialog(modal) {
+    const dialog = modal.querySelector(':scope > .modal-dialog');
+    if (!dialog) return;
+    for (const key of Object.keys(modal)) {
+      const bs = key.startsWith('jQuery') && modal[key]?.['bs.modal'];
+      if (!bs || bs._element !== modal || bs._dialog === dialog) continue;
+      // modal('hide') pode criar a instância antes de Vue montar o diálogo.
+      // Sem _dialog, a transição de show nunca termina e hide passa a ser ignorado.
+      bs._dialog = dialog;
+      if (bs._isShown && modal.classList.contains('show')) bs._isTransitioning = false;
+    }
+  }
+
+  function restore() {
+    if (patch && patch.vm.$options.render === patch.wrapped) patch.vm.$options.render = patch.original;
+    patch = null;
+  }
+
+  function update() {
+    const modal = document.getElementById(ID);
+    if (!modal) { restore(); return; }
+    repairDialog(modal);
+    let vm = null;
+    for (let node = modal; node; node = node.parentElement) {
+      const candidate = node.__vue__;
+      if (typeof candidate?.$options?.methods?.novoAtendimento === 'function' &&
+          typeof candidate.$options.methods.fechar_modal === 'function') { vm = candidate; break; }
+    }
+    if (!vm || vm._isDestroyed) { restore(); return; }
+    if (patch?.vm === vm) return;
+    restore();
+    const original = vm.$options.render;
+    if (typeof original !== 'function') return;
+    const wrapped = function (...args) {
+      const tree = original.apply(this, args); normalize(tree); return tree;
+    };
+    vm.$options.render = wrapped; patch = { vm, original, wrapped };
+    vm.$forceUpdate();
+  }
+  tmRuntime.register('fechamento do agendamento da Confirmação', update, ['#/call-center/confirmacao']);
+  return restore;
+})();
+
+/* Cancelamento sobre o perfil: campo estável durante a carga e dismiss isolado. */
+(function () {
+  'use strict';
+  let patch = null, stack = null, observer = null;
+  const shown = element => !!element?.classList.contains('show');
+  function restoreProfile() {
+    if (!stack) return;
+    const s = stack; stack = null;
+    if (shown(s.profile)) {
+      document.body.classList.add('modal-open');
+      for (const key of Object.keys(s.profile)) {
+        const bs = key.startsWith('jQuery') && s.profile[key]?.['bs.modal'];
+        if (bs?._element === s.profile && bs._config?.focus !== false) {
+          bs._enforceFocus?.();
+          const target = s.focus?.isConnected && s.profile.contains(s.focus) ? s.focus : s.profile;
+          target.focus({ preventScroll: true });
+          break;
+        }
+      }
+    }
+  }
+  function captureProfile() {
+    const profile = document.getElementById('perfilPacienteModal');
+    if (stack || !shown(profile)) return;
+    stack = { profile, focus: document.activeElement };
+  }
+  function addPendingReason(tree, owner) {
+    if (!tree || owner.motivos?.length || !owner.marcacao || owner.$store?.state?.user?.st_tipo !== 'U') return;
+    const walk = node => {
+      if (!node) return;
+      if ((node.data?.staticClass || '').split(/\s+/).includes('modal-body')) {
+        const children = node.children || [], index = children.findIndex(child =>
+          child.componentOptions?.propsData?.label === 'Motivo de Cancelamento' ||
+          child.data?.attrs?.label === 'Motivo de Cancelamento');
+        if (index < 0) return;
+        const h = owner.$createElement.bind(owner);
+        const row = h('div', { staticClass: 'row' }, [h('div', { staticClass: 'col col-12' }, [
+          h('az-input', { attrs: { label: 'Motivo', type: 'select', optionsList: [], optionsData: 'id_motivo',
+            placeholder: 'Carregando motivos...', edicao: false, required: '', validate: owner.validate },
+            model: { value: owner.id_motivo, callback: value => { owner.id_motivo = value; }, expression: 'id_motivo' } })
+        ])]);
+        // Replace the native conditional comment: no extra field when the response arrives.
+        if (children[index - 1]?.isComment) children[index - 1] = row;
+        else children.splice(index, 0, row);
+        return;
+      }
+      for (const child of node.children || []) walk(child);
+    };
+    walk(tree);
+  }
+  function detach() {
+    restoreProfile();
+    if (patch) {
+      const p = patch;
+      if (p.vm.$options.render === p.render) p.vm.$options.render = p.originalRender;
+      if (p.vm.cancelar === p.open) p.vm.cancelar = p.originalOpen;
+      p.modal.removeEventListener('click', p.dismiss);
+      p.modal.removeEventListener('keydown', p.escape);
+    }
+    patch = null; observer?.disconnect(); observer = null;
+  }
+  function update() {
+    const modal = document.getElementById('cancAtdPepModal');
+    let owner = null;
+    for (let node = modal; node; node = node.parentElement) {
+      if (node.__vue__?.$options?.methods?.confirmar && typeof node.__vue__.cancelar === 'function') {
+        owner = node.__vue__; break;
+      }
+    }
+    if (!owner || owner._isDestroyed) { detach(); return; }
+    if (patch?.vm !== owner || patch?.modal !== modal) {
+      detach();
+      const originalRender = owner.$options.render, originalOpen = owner.cancelar;
+      const render = function (...args) {
+        const tree = originalRender.apply(this, args); addPendingReason(tree, this); return tree;
+      };
+      const open = function (...args) {
+        captureProfile();
+        try { return originalOpen.apply(this, args); }
+        catch (error) { restoreProfile(); throw error; }
+        finally { tmRuntime.schedule(0); }
+      };
+      // Bootstrap handles dismiss on this same modal. Stop only its propagation to the outer profile.
+      const dismiss = event => {
+        if (event.target?.closest?.('.modal') === modal && event.target.closest('[data-dismiss="modal"]')) {
+          event.stopPropagation();
+        }
+      };
+      const escape = event => {
+        if (event.key === 'Escape' && shown(modal) && event.target?.closest?.('.modal') === modal) event.stopPropagation();
+      };
+      owner.$options.render = render; owner.cancelar = open;
+      modal.addEventListener('click', dismiss); modal.addEventListener('keydown', escape);
+      patch = { vm: owner, modal, render, open, originalRender, originalOpen, dismiss, escape };
+      observer = new MutationObserver(() => tmRuntime.schedule(0));
+      observer.observe(modal, { attributes: true, attributeFilter: ['class', 'style'] });
+      owner.$forceUpdate();
+    }
+    if (shown(modal)) {
+      captureProfile();
+      // The cancellation modal is a descendant: inert/aria-hidden on the profile would hide it too.
+    } else {
+      restoreProfile();
+      if (shown(document.getElementById('perfilPacienteModal'))) document.body.classList.add('modal-open');
+    }
+  }
+  tmRuntime.register('cancelamento no perfil', update);
+  return detach;
+})();
+
+/* Sinalizador junto ao horário e observação em linha própria nos dois agendamentos. */
+(function () {
+  'use strict';
+  const targets = new Map([
+    ['novoAtendimento2Modal', 'recep'], ['novoAtendimentoConfirmacaoModal', 'confirm']
+  ]);
+  const patches = new Map();
+  const STYLE_ID = 'tm-booking-attendance-flag-style';
+  function injectStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style'); style.id = STYLE_ID;
+    style.textContent = Array.from(targets.keys()).map(id => `
+      @media (min-width: 768px) {
+        #${id} .tm-booking-flag-row > .tm-booking-flag-col {
+          flex: 0 0 25% !important; max-width: 25% !important; min-width: 0;
+        }
+      }
+      #${id} .tm-booking-observation-row > .tm-recepcao-observacao-col {
+        flex: 0 0 100% !important; max-width: 100% !important;
+      }
+      #${id} .tm-booking-observation-row textarea.form-control {
+        height: calc(3em + 1rem + 4px) !important;
+        min-height: calc(3em + 1rem + 4px) !important;
+        width: 100% !important; box-sizing: border-box;
+      }
+      #${id} .tm-booking-flag-col .input-group { flex-wrap: nowrap; }
+      #${id} .tm-booking-flag-col select { min-width: 0; }
+    `).join('\n');
+    document.head.appendChild(style);
+  }
+  function hasSignal(node) {
+    return !!node && (node.data?.attrs?.service === 'sinalizadores.index' ||
+      node.componentOptions?.propsData?.service === 'sinalizadores.index' ||
+      (node.children || []).some(hasSignal));
+  }
+  function addSignal(tree, owner) {
+    const h = owner.$createElement.bind(owner);
+    const visit = (node, parent) => {
+      if (!node) return;
+      if ((node.data?.staticClass || '').split(/\s+/).includes('tm-booking-observation-row')) return;
+      const columns = node.children || [];
+      if ((node.data?.staticClass || '').split(/\s+/).includes('form-row')) {
+        const index = columns.findIndex(col => (col.children || []).some(field =>
+          field.data?.model?.expression === 'st_observacoes'));
+        if (index >= 0 && parent?.children) {
+          let signal = columns.find(hasSignal);
+          if (!signal) {
+            const input = h('az-input', {
+            attrs: { sizing: 'sm', type: 'select', optionsMode: 'aql', service: 'sinalizadores.index', optionsParm: { ativos: true } },
+            scopedSlots: { 'button-pre': () => [h('div', { staticClass: 'input-group-prepend' }, [
+              h('span', { staticClass: 'input-group-text' }, [h('i', {
+                class: owner.sinalizador_atendimento ?
+                  (owner.sinalizador_atendimento.st_icon || 'fas fa-flag') + ' fa-fw text-' + owner.sinalizador_atendimento.st_cor :
+                  'fa-fw fas fa-question text-muted', attrs: { 'aria-hidden': 'true' }
+              })])
+            ])] },
+            model: { value: owner.sinalizador_atendimento, callback: value => { owner.sinalizador_atendimento = value; },
+              expression: 'sinalizador_atendimento' }
+          });
+            signal = h('div', { staticClass: 'col col-12 tm-booking-flag-col' }, [
+              h('az-sub-title', { attrs: { title: 'Sinalizador' } }), input
+            ]);
+          } else {
+            signal.data ||= {};
+            signal.data.staticClass = 'col col-12 tm-booking-flag-col';
+            const title = signal.children?.find(child => child.data?.attrs?.title || child.componentOptions?.propsData?.title);
+            if (title?.data?.attrs?.title) title.data.attrs.title = 'Sinalizador';
+            if (title?.componentOptions?.propsData) title.componentOptions.propsData.title = 'Sinalizador';
+          }
+          const observation = columns[index];
+          const input = observation.children.find(field => field.data?.model?.expression === 'st_observacoes');
+          input.data.attrs = { ...input.data.attrs, type: 'textarea', rows: '2' };
+          if (input.componentOptions?.propsData) {
+            input.componentOptions.propsData.type = 'textarea'; input.componentOptions.propsData.rows = '2';
+          }
+          observation.data.staticClass = 'col col-12'; observation.data.class = null;
+          if (signal !== observation && columns.includes(signal)) columns.splice(columns.indexOf(signal), 1);
+          columns.splice(columns.indexOf(observation), 1, signal);
+          if (!node.data.staticClass.includes('tm-booking-flag-row')) node.data.staticClass += ' tm-booking-flag-row';
+          parent.children.splice(parent.children.indexOf(node) + 1, 0,
+            h('div', { staticClass: 'form-row tm-booking-observation-row' }, [observation]));
+          return;
+        }
+      }
+      for (const child of columns) visit(child, node);
+    };
+    visit(tree);
+  }
+  function restore(id) {
+    const p = patches.get(id);
+    if (p && p.owner.$options.render === p.render) p.owner.$options.render = p.original;
+    patches.delete(id);
+  }
+  function update() {
+    for (const [id, origin] of targets) {
+      const modal = document.getElementById(id);
+      let owner = null;
+      const matches = v => v?.origem === origin && typeof v.marcar === 'function' && !v._isDestroyed;
+      for (const child of modal?.querySelectorAll('*') || []) if (matches(child.__vue__)) { owner = child.__vue__; break; }
+      for (let node = modal; !owner && node; node = node.parentElement) {
+        if (matches(node.__vue__)) owner = node.__vue__;
+        else if (matches(node.__vue__?.$refs?.marcacao)) owner = node.__vue__.$refs.marcacao;
+      }
+      if (!owner) { restore(id); continue; }
+      if (patches.get(id)?.owner === owner) continue;
+      restore(id); injectStyle();
+      const original = owner.$options.render;
+      const render = function (...args) {
+        const tree = original.apply(this, args); addSignal(tree, this); return tree;
+      };
+      owner.$options.render = render;
+      patches.set(id, { owner, original, render }); owner.$forceUpdate();
+    }
+  }
+  tmRuntime.register('sinalizador nos modais de agendamento', update);
+  return () => { for (const id of targets.keys()) restore(id); };
+})();
+
+/* Procedimentos adicionais na Recepção, usando autocomplete e inclusão nativos. */
+(function () {
+  'use strict';
+  const ID = 'novoAtendimento2Modal';
+  let patch = null;
+  function include(owner, target) {
+    const values = Array.isArray(owner.novoProcedimento) ? [...owner.novoProcedimento] : [owner.novoProcedimento];
+    const descriptor = Object.getOwnPropertyDescriptor(owner, 'procedimentos');
+    const bridge = !owner.procedimentos?.length;
+    // A Recepção só monta a lista final em adicao_direta(). Não chamar essa ação nem o gravador aqui.
+    // A inclusão nativa requer lista não vazia mesmo quando recebe o alvo explicitamente.
+    if (bridge) Object.defineProperty(owner, 'procedimentos', { configurable: true, writable: true, value: [target] });
+    try {
+      for (const value of values) {
+        if (!value?.id_procedimento) continue;
+        if (!target.outros_procedimentos) owner.$set(target, 'outros_procedimentos', []);
+        owner.novoProcedimento = value;
+        owner.incluirProcedimento(target);
+      }
+    } finally {
+      if (bridge) {
+        if (descriptor) Object.defineProperty(owner, 'procedimentos', descriptor);
+        else delete owner.procedimentos;
+      }
+    }
+  }
+  function fields(owner) {
+    const h = owner.$createElement.bind(owner), target = owner.dados;
+    const rows = (target.outros_procedimentos || []).map((item, index) => h('div', { key: index }, [
+      h('az-input', {
+        attrs: { sizing: 'sm', edicao: false },
+        scopedSlots: {
+          'button-pre': () => [h('div', { staticClass: 'input-group-prepend' }, [h('button', {
+            staticClass: 'btn btn-outline-danger', attrs: { type: 'button', title: 'Remover procedimento' },
+            on: { click: () => owner.removerElemento(target.outros_procedimentos, index) }
+          }, [h('i', { staticClass: 'fa fa-minus fa-fw', attrs: { 'aria-hidden': 'true' } })])])],
+          buttonposb: () => [
+            ...(item.duracao ? [h('span', { staticClass: 'input-group-text small' }, [item.duracao + ' min'])] : []),
+            ...(item.js_complementos?.length ? [h('div', { staticClass: 'input-group-append' }, [
+              h('button', { staticClass: 'btn btn-sm btn-secondary dropdown-toggle',
+                attrs: { type: 'button', 'data-toggle': 'dropdown', 'aria-haspopup': 'true', 'aria-expanded': 'false' } },
+              [item.st_regiao || 'Região...']),
+              h('div', { staticClass: 'dropdown-menu dropdown-menu-scroll' }, item.js_complementos.map(region =>
+                h('a', { staticClass: 'dropdown-item', class: owner.regiao_tem(item, region) ? 'active' : '',
+                  attrs: { href: '#' }, on: { click: event => { event.preventDefault(); owner.regiao_add(item, region); } } }, [region])))
+            ])] : []),
+            ...(item.in_quantidade > 1 ? [h('span', { staticClass: 'input-group-text' }, ['x' + item.in_quantidade])] : [])
+          ]
+        },
+        model: { value: item.search, callback: value => owner.$set(item, 'search', value), expression: 'proced.search' }
+      })
+    ]));
+    rows.push(h('az-input', {
+      ref: 'tm_reception_add_procedure',
+      attrs: { placeholder: 'Adicionar procedimento...', sizing: 'sm', icon: 'fas fa-plus fa-fw', type: 'autocomplete',
+        optionsMode: 'aql', service: 'procedimentos.index', optionsParm: { agenda: true, agenda_add: true, ativos: true,
+          id_medico: target.medico.id_pessoa, id_operadora: target.plano.id_operadora, id_plano: target.plano.id_plano,
+          cc: owner.cc ? 1 : 0, infusao: owner.infusao ? 1 : 0 }, procsigla: true },
+      on: { selecionado: () => include(owner, target) },
+      model: { value: owner.novoProcedimento, callback: value => { owner.novoProcedimento = value; }, expression: 'novoProcedimento' }
+    }));
+    return h('div', { staticClass: 'mt-2 tm-reception-add-procedure' }, rows);
+  }
+  function insert(tree, owner) {
+    if (!owner.dados?.procedimento || !owner.dados.medico || !owner.dados.plano || owner.marcacao_alterar_proc ||
+        owner.dados.regiao_cd || owner.dados.procedimento.cfm) return;
+    const visit = node => {
+      const children = node?.children || [];
+      const index = children.findIndex(child => (child.data?.staticClass || '').split(/\s+/).includes('tm-booking-observation-row'));
+      if (index >= 0) { children.splice(index + 1, 0, fields(owner)); return true; }
+      return children.some(visit);
+    };
+    visit(tree);
+  }
+  function restore() {
+    if (patch && patch.owner.$options.render === patch.render) patch.owner.$options.render = patch.original;
+    patch = null;
+  }
+  function update() {
+    const modal = document.getElementById(ID);
+    const owner = Array.from(modal?.querySelectorAll('*') || []).map(e => e.__vue__)
+      .find(v => v?.origem === 'recep' && typeof v.marcar === 'function' && typeof v.incluirProcedimento === 'function' && !v._isDestroyed);
+    if (!owner) { restore(); return; }
+    if (patch?.owner === owner) return;
+    restore();
+    const original = owner.$options.render;
+    const render = function (...args) { const tree = original.apply(this, args); insert(tree, this); return tree; };
+    owner.$options.render = render; patch = { owner, original, render }; owner.$forceUpdate();
+  }
+  tmRuntime.register('adicionar procedimento na Recepção', update);
+  return restore;
+})();
+
+/* Remarcação nativa sobre a listagem, sem trocar a rota da Recepção/Confirmação. */
+(function () {
+  'use strict';
+  const ID = 'tm-reschedule-modal';
+  const FILTERS = ['medico', 'referencia', 'referencia_fim', 'refUnidOper', 'status', 'status_confirmacao',
+    'turno', 'search', 'especialidade', 'paciente', 'page', 'filtro_lista_medicos', 'viewEspec', 'viewStatus',
+    'viewMode', 'tipo_proced', 'faixa_hora', 'block_view_pacotes', 'filtro_teleatend', 'apenas_editados', 'id_fila_laudo'];
+  let patch = null, bridge = null, active = null;
+  const onRoute = () => /^#\/(recepcao|call-center\/confirmacao)(\/|$)/.test(window.location.hash.split('?')[0]);
+  const context = origin => [origin.$store.state.user?.id_usuario || '', origin.unidade_operacao ?? origin.refUnidOper ?? '',
+    origin.$util?.getCookie?.('id_recepcao') || ''].join(':');
+  function originVue() {
+    for (let node = document.getElementById('refresh-button'); node; node = node.parentElement) {
+      const v = node.__vue__;
+      if (typeof v?.load === 'function' && (v.$refs?.ini_atd || v.$options?.components?.Marcacao)) return v;
+    }
+    return null;
+  }
+  function snapshot(origin) {
+    const filters = {};
+    for (const key of FILTERS) {
+      const computed = origin.$options.computed?.[key];
+      if (key in origin && (!computed || typeof computed.set === 'function')) filters[key] = origin[key];
+    }
+    const scroll = [];
+    for (let e = origin.$el; e; e = e.parentElement) scroll.push([e, e.scrollTop, e.scrollLeft]);
+    return { filters, scroll, x: window.scrollX, y: window.scrollY, focus: document.activeElement,
+      overflow: document.body.style.overflow, inert: origin.$el.hasAttribute('inert') };
+  }
+  function restorePosition(s) {
+    if (s.origin._isDestroyed || window.location.hash !== s.hash || context(s.origin) !== s.context) return;
+    for (const [element, top, left] of s.snapshot.scroll) if (element.isConnected) {
+      element.scrollTop = top; element.scrollLeft = left;
+    }
+    window.scrollTo(s.snapshot.x, s.snapshot.y);
+  }
+  function restoreRouter() {
+    if (!bridge) return;
+    const b = bridge; bridge = null; window.clearTimeout(b.timer);
+    if (b.vm.$router === b.router) {
+      if (b.descriptor) Object.defineProperty(b.vm, '$router', b.descriptor);
+      else delete b.vm.$router;
+    }
+  }
+  function hideOwnedModals(s) {
+    const root = s.host?.$el;
+    for (const element of root?.querySelectorAll('.modal') || []) {
+      for (const key of Object.keys(element)) {
+        const bs = key.startsWith('jQuery') && element[key]?.['bs.modal'];
+        if (bs?._element !== element) continue;
+        // Encerramento definitivo desta instância: não deixar backdrop/foco presos à árvore removida.
+        element.classList.remove('fade'); bs._backdrop?.classList.remove('fade');
+        if (bs._isShown) { bs._isTransitioning = false; bs.hide(); }
+        bs._backdrop?.remove();
+        break;
+      }
+    }
+    if (!document.querySelector('.modal.show')) document.body.classList.remove('modal-open');
+  }
+  function maskSourceModals(s) {
+    const ids = new Set(Array.from(s.host?.$el?.querySelectorAll('.modal[id]') || [], e => e.id));
+    for (const element of s.origin.$el.querySelectorAll('.modal[id]')) {
+      if (!ids.has(element.id) || element.classList.contains('show')) continue;
+      const id = element.id, replacement = ID + '-source-' + s.masked.length;
+      s.masked.push({ element, id, replacement }); element.id = replacement;
+    }
+  }
+  function close(s, force = false) {
+    if (!s || active !== s || (s.ui.saving && !force)) return false;
+    active = null; s.closed = true;
+    const child = s.host?.$refs.booking;
+    if (!s.ui.saved && child?.horarios && child.hora_selecionada && typeof child.voltar === 'function') {
+      // Mesmo descarte de seleção/reserva temporária usado pelo botão Voltar nativo.
+      try { child.voltar(); } catch (error) { console.warn('[TM] Falha ao liberar a seleção temporária.', error); }
+    }
+    if (child?.aviso_final) window.clearTimeout(child.aviso_final);
+    if (child?.tmaInterval) window.clearInterval(child.tmaInterval);
+    hideOwnedModals(s);
+    s.host?.$destroy(); (s.host?.$el || s.element)?.remove();
+    for (const entry of s.masked) if (entry.element.isConnected && entry.element.id === entry.replacement) entry.element.id = entry.id;
+    document.body.style.overflow = s.snapshot.overflow;
+    if (!s.snapshot.inert) s.origin.$el.removeAttribute('inert');
+    if (!s.origin._isDestroyed && window.location.hash === s.hash && context(s.origin) === s.context) {
+      for (const [key, value] of Object.entries(s.snapshot.filters)) if (s.origin[key] !== value) s.origin[key] = value;
+      if (s.ui.saved) s.origin.load(false);
+      s.origin.$nextTick(() => {
+        restorePosition(s);
+        const focus = s.snapshot.focus;
+        if (focus?.isConnected && !focus.closest?.('.modal')) focus.focus({ preventScroll: true });
+        else {
+          const target = s.origin.$el.querySelector?.('#filtro-medico') || s.origin.$el.querySelector?.('#refresh-button') || s.origin.$el;
+          const previous = target.getAttribute('tabindex');
+          target.setAttribute('tabindex', '-1'); target.focus({ preventScroll: true });
+          if (previous === null) target.removeAttribute('tabindex'); else target.setAttribute('tabindex', previous);
+        }
+      });
+      if (s.ui.saved && s.origin.$watch) {
+        let stop, timer;
+        const done = () => { stop?.(); window.clearTimeout(timer); s.origin.$nextTick(() => restorePosition(s)); };
+        stop = s.origin.$watch(() => s.origin.$store.state.loading, loading => { if (!loading) done(); });
+        timer = window.setTimeout(done, 5000);
+      }
+    }
+    return true;
+  }
+  function style() {
+    if (document.getElementById(ID + '-style')) return;
+    const el = document.createElement('style'); el.id = ID + '-style';
+    el.textContent = `
+      #${ID}{position:fixed;inset:0;z-index:1045;background:rgba(0,0,0,.5);padding:16px;
+        display:flex;align-items:center;justify-content:center;}
+      #${ID}>.tm-reschedule-dialog{width:1500px;max-width:100%;max-height:calc(100dvh - 32px);
+        background:#ecf0f5;border-radius:4px;box-shadow:0 8px 32px #0005;display:flex;flex-direction:column;}
+      #${ID} .tm-reschedule-header{display:flex;align-items:center;justify-content:space-between;
+        padding:12px 16px;background:white;border-bottom:1px solid #dee2e6;flex:0 0 auto;}
+      #${ID} .tm-reschedule-content{padding:12px;overflow:auto;max-height:calc(100dvh - 92px);position:relative;}
+      #${ID} .tm-reschedule-content>.container{max-width:100%;}
+      #${ID} .tm-reschedule-note{padding:0 12px 8px;font-size:.875rem;color:#495057;}
+      @media(max-width:575px){#${ID}{padding:6px;}#${ID}>.tm-reschedule-dialog{max-height:calc(100dvh - 12px);}}
+    `;
+    document.head.appendChild(el);
+  }
+  function open(origin, location) {
+    if (active) return;
+    const Native = origin.$options.components?.Marcacao || origin.$refs?.marcacao?.constructor;
+    const options = Native?.options || Native, Base = origin.$options._base;
+    if (!Native || !Base || typeof options?.methods?.marcar !== 'function') throw new Error('Marcação nativa indisponível.');
+    style();
+    const ui = Base.observable({ saving: false, saved: false });
+    const s = active = { origin, hash: window.location.hash, context: context(origin), snapshot: snapshot(origin), ui, closed: false,
+      submitStarted: false, finishing: false, external: false, masked: [] };
+    const router = Object.create(origin.$router);
+    router.go = () => { if (!s.finishing) close(s); };
+    router.push = (...args) => {
+      if (s.closed) return Promise.resolve();
+      if (s.ui.saving) return Promise.resolve();
+      close(s); return origin.$router.push(...args);
+    };
+    const routeRoot = { _router: router, _route: { ...origin.$route, path: '/call-center', name: 'call-center',
+      fullPath: '/call-center', params: { ...location.params } } };
+    const Local = {
+      extends: Native,
+      beforeCreate() {
+        const originalAxios = this.axios;
+        if (!originalAxios?.post) return;
+        const localAxios = Object.create(originalAxios);
+        localAxios.post = (...args) => {
+          const saving = args[1]?.q?.some(q => q.name === 'agendas.store');
+          if (!saving) return originalAxios.post(...args);
+          if (s.closed || s.ui.saved) return Promise.reject(new Error('Remarcação já concluída ou encerrada.'));
+          if (s.pendingSave) return s.pendingSave;
+          s.ui.saving = true;
+          try {
+            s.pendingSave = Promise.resolve(originalAxios.post(...args)).then(response => {
+              if (response?.data?.marcar?.status === 200) s.ui.saved = true;
+              return response;
+            }).finally(() => {
+              s.ui.saving = false; s.submitStarted = false; s.pendingSave = null;
+              if (s.external) window.setTimeout(() => close(s, true), 0);
+            });
+            return s.pendingSave;
+          } catch (error) { s.ui.saving = false; s.submitStarted = false; throw error; }
+        };
+        Object.defineProperty(this, 'axios', { configurable: true, value: localAxios });
+      },
+      methods: {
+        marcar(...args) {
+          if (s.closed || s.ui.saved || s.ui.saving || s.submitStarted) return;
+          s.submitStarted = true;
+          try { return options.methods.marcar.apply(this, args); }
+          finally { this.$nextTick(() => { if (!s.ui.saving) s.submitStarted = false; }); }
+        },
+        avancar_aviso_final(...args) {
+          if (s.closed || !s.ui.saved || s.ui.saving) return;
+          s.finishing = true;
+          try { return options.methods.avancar_aviso_final.apply(this, args); }
+          finally { s.finishing = false; Promise.resolve().then(() => close(s)); }
+        }
+      }
+    };
+    try {
+      const element = s.element = document.createElement('div');
+      document.body.insertBefore(element, document.body.firstChild);
+      s.origin.$el.setAttribute('inert', ''); document.body.style.overflow = 'hidden';
+      s.host = new Base({
+        parent: origin.$root,
+        beforeCreate() { this._routerRoot = routeRoot; },
+        render(h) {
+          return h('div', { attrs: { id: ID, role: 'dialog', tabindex: '-1', 'aria-modal': 'true', 'aria-label': 'Remarcar' } }, [
+            h('div', { staticClass: 'tm-reschedule-dialog', attrs: { role: 'document' } }, [
+              h('div', { staticClass: 'tm-reschedule-header' }, [h('strong', ['Remarcar']),
+                h('button', { staticClass: 'close', attrs: { type: 'button', disabled: ui.saving, 'aria-label': 'Fechar remarcação' },
+                  on: { click: () => close(s) } }, ['×'])]),
+              h('div', { staticClass: 'tm-reschedule-content' }, [h(Local, { ref: 'booking',
+                props: { remarcacao: location.params.remarcacao, params: location.params } })]),
+              ...(ui.saving ? [h('div', { staticClass: 'tm-reschedule-note', attrs: { role: 'status' } }, ['Salvando remarcação…'])] : [])
+            ])
+          ]);
+        }
+      });
+      s.host.$mount(element);
+      maskSourceModals(s);
+      origin.$nextTick(() => { if (active === s && !s.closed) s.host.$el?.focus({ preventScroll: true }); });
+    } catch (error) { close(s, true); throw error; }
+  }
+  function unpatch() {
+    restoreRouter();
+    if (patch && patch.vm.selecionar === patch.wrapped) patch.vm.selecionar = patch.original;
+    patch = null;
+  }
+  function update() {
+    if (active && (!onRoute() || active.hash !== window.location.hash || active.origin._isDestroyed || context(active.origin) !== active.context)) {
+      if (active.ui.saving) active.external = true;
+      else close(active, true);
+    }
+    if (active && !active.external) maskSourceModals(active);
+    if (!onRoute()) { unpatch(); return; }
+    let combo;
+    for (let node = document.getElementById('remarcarComboModal'); node; node = node.parentElement) {
+      if (typeof node.__vue__?.selecionar === 'function' && node.__vue__?.$options?.methods?.remarcar) { combo = node.__vue__; break; }
+    }
+    if (!combo || combo._isDestroyed) { unpatch(); return; }
+    if (patch?.vm === combo) return;
+    unpatch();
+    const original = combo.selecionar;
+    const wrapped = function (...args) {
+      if (active || bridge) return;
+      const origin = originVue();
+      if (!onRoute() || !origin || this.dados?.cc || this.dados?.infusao) return original.apply(this, args);
+      const real = this.$router, descriptor = Object.getOwnPropertyDescriptor(this, '$router');
+      const local = Object.create(real);
+      local.push = location => {
+        restoreRouter();
+        if (location?.name !== 'call-center' || !location.params?.remarcacao || !onRoute()) return real.push(location);
+        try { open(origin, location); return Promise.resolve(); }
+        catch (error) {
+          console.error('[TM] Não foi possível abrir a remarcação em modal.', error);
+          origin.$toast?.add({ severity: 'error', summary: 'Remarcação', detail: 'Não foi possível abrir a remarcação. Tente novamente.', life: 5000 });
+          return Promise.resolve();
+        }
+      };
+      bridge = { vm: this, router: local, descriptor, timer: null };
+      Object.defineProperty(this, '$router', { configurable: true, value: local });
+      bridge.timer = window.setTimeout(restoreRouter, 2000);
+      try { return original.apply(this, args); }
+      catch (error) { restoreRouter(); throw error; }
+    };
+    combo.selecionar = wrapped; patch = { vm: combo, original, wrapped };
+  }
+  const escape = event => {
+    if (!active || document.querySelector('.modal.show')) return;
+    if (event.key === 'Tab') {
+      const root = active.host?.$el;
+      const controls = Array.from(root?.querySelectorAll('a[href],button,input,select,textarea,[tabindex]') || [])
+        .filter(e => e.tabIndex >= 0 && !e.disabled && e.getClientRects().length);
+      const first = controls[0] || root, last = controls[controls.length - 1] || root;
+      if (!root?.contains(document.activeElement) || (event.shiftKey ? document.activeElement === first || document.activeElement === root : document.activeElement === last)) {
+        event.preventDefault(); (event.shiftKey ? last : first)?.focus({ preventScroll: true });
+      }
+      return;
+    }
+    if (event.key !== 'Escape') return;
+    if (close(active)) { event.preventDefault(); event.stopPropagation(); }
+  };
+  document.addEventListener('keydown', escape, true);
+  tmRuntime.register('remarcação nativa em modal', update);
+  return () => { if (active) close(active, true); unpatch(); document.removeEventListener('keydown', escape, true); };
+})();
+
+/* Perfil em tela inteira, sem a compensação lateral de scrollbar do Bootstrap. */
+(function () {
+  'use strict';
+  const STYLE_ID = 'tm-profile-fullscreen-style';
+  function injectStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      /* O perfil já possui rolagem interna; a página ao fundo não precisa de outra. */
+      html:has(#perfilPacienteModal.show) { overflow: hidden !important; }
+      #perfilPacienteModal { padding: 0 !important; }
+    `;
+    document.head.appendChild(style);
+  }
+  tmRuntime.register('perfil em tela inteira', injectStyle);
 })();
