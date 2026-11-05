@@ -1,4 +1,4 @@
-/* Exibir o sinalizador nativo na Recepção e na Confirmação, junto à observação. */
+/* Sinalizador junto ao horário e observação em linha própria nos dois agendamentos. */
 (function () {
   'use strict';
   const targets = new Map([
@@ -11,10 +11,17 @@
     const style = document.createElement('style'); style.id = STYLE_ID;
     style.textContent = Array.from(targets.keys()).map(id => `
       @media (min-width: 768px) {
-        #${id} .tm-booking-flag-row > .tm-recepcao-observacao-col,
         #${id} .tm-booking-flag-row > .tm-booking-flag-col {
-          flex: 1 1 0% !important; max-width: none !important; min-width: 0;
+          flex: 0 0 25% !important; max-width: 25% !important; min-width: 0;
         }
+      }
+      #${id} .tm-booking-observation-row > .tm-recepcao-observacao-col {
+        flex: 0 0 100% !important; max-width: 100% !important;
+      }
+      #${id} .tm-booking-observation-row textarea.form-control {
+        height: calc(3em + 1rem + 4px) !important;
+        min-height: calc(3em + 1rem + 4px) !important;
+        width: 100% !important; box-sizing: border-box;
       }
       #${id} .tm-booking-flag-col .input-group { flex-wrap: nowrap; }
       #${id} .tm-booking-flag-col select { min-width: 0; }
@@ -28,14 +35,17 @@
   }
   function addSignal(tree, owner) {
     const h = owner.$createElement.bind(owner);
-    const visit = node => {
+    const visit = (node, parent) => {
       if (!node) return;
+      if ((node.data?.staticClass || '').split(/\s+/).includes('tm-booking-observation-row')) return;
       const columns = node.children || [];
       if ((node.data?.staticClass || '').split(/\s+/).includes('form-row')) {
         const index = columns.findIndex(col => (col.children || []).some(field =>
           field.data?.model?.expression === 'st_observacoes'));
-        if (index >= 0 && !hasSignal(node)) {
-          const input = h('az-input', {
+        if (index >= 0 && parent?.children) {
+          let signal = columns.find(hasSignal);
+          if (!signal) {
+            const input = h('az-input', {
             attrs: { sizing: 'sm', type: 'select', optionsMode: 'aql', service: 'sinalizadores.index', optionsParm: { ativos: true } },
             scopedSlots: { 'button-pre': () => [h('div', { staticClass: 'input-group-prepend' }, [
               h('span', { staticClass: 'input-group-text' }, [h('i', {
@@ -47,14 +57,32 @@
             model: { value: owner.sinalizador_atendimento, callback: value => { owner.sinalizador_atendimento = value; },
               expression: 'sinalizador_atendimento' }
           });
-          columns.splice(index + 1, 0, h('div', { staticClass: 'col col-12 tm-booking-flag-col' }, [
-            h('az-sub-title', { attrs: { title: 'Sinalizador de atendimento' } }), input
-          ]));
-          node.data.staticClass += ' tm-booking-flag-row';
+            signal = h('div', { staticClass: 'col col-12 tm-booking-flag-col' }, [
+              h('az-sub-title', { attrs: { title: 'Sinalizador' } }), input
+            ]);
+          } else {
+            signal.data ||= {};
+            signal.data.staticClass = 'col col-12 tm-booking-flag-col';
+            const title = signal.children?.find(child => child.data?.attrs?.title || child.componentOptions?.propsData?.title);
+            if (title?.data?.attrs?.title) title.data.attrs.title = 'Sinalizador';
+            if (title?.componentOptions?.propsData) title.componentOptions.propsData.title = 'Sinalizador';
+          }
+          const observation = columns[index];
+          const input = observation.children.find(field => field.data?.model?.expression === 'st_observacoes');
+          input.data.attrs = { ...input.data.attrs, type: 'textarea', rows: '2' };
+          if (input.componentOptions?.propsData) {
+            input.componentOptions.propsData.type = 'textarea'; input.componentOptions.propsData.rows = '2';
+          }
+          observation.data.staticClass = 'col col-12'; observation.data.class = null;
+          if (signal !== observation && columns.includes(signal)) columns.splice(columns.indexOf(signal), 1);
+          columns.splice(columns.indexOf(observation), 1, signal);
+          if (!node.data.staticClass.includes('tm-booking-flag-row')) node.data.staticClass += ' tm-booking-flag-row';
+          parent.children.splice(parent.children.indexOf(node) + 1, 0,
+            h('div', { staticClass: 'form-row tm-booking-observation-row' }, [observation]));
           return;
         }
       }
-      for (const child of columns) visit(child);
+      for (const child of columns) visit(child, node);
     };
     visit(tree);
   }
