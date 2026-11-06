@@ -1,5 +1,7 @@
 # Klingo userscript
 
+Na versão de testes **2.11**, marcações faltosas na ficha do paciente recebem **Editar** à direita de **Remarcar**. O botão chama o editor nativo, mantendo a ficha ao fundo pelo mecanismo existente; não altera o estado da marcação ao abrir. A associação usa o objeto do próprio card e é revalidada no clique. Não aparece para histórico, impressão, usuário externo, marcação cancelada/bloqueada ou com atendimento. Testes automatizados cobrem renderização, associação e cliques obsoletos; a gravação no servidor e a validação visual no Chrome permanecem para validação manual.
+
 O código-fonte fica em `src/`, na ordem numérica. Para gerar os dois arquivos finais:
 
 ```powershell
