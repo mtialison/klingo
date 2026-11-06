@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      2.12
+// @version      2.13
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -13766,7 +13766,9 @@ const tmConfirmationCalendarAdapter = (() => {
   }
   function component() {
     const root = document.getElementById('app')?.__vue__;
-    const queue = root ? [root] : [], seen = new Set();
+    // O Vue pode substituir o elemento de montagem: #app não permanece no DOM do Klingo.
+    const queue = root ? [root] : Array.from(document.querySelectorAll('body *'), node => node.__vue__).filter(Boolean);
+    const seen = new Set();
     for (let i = 0; i < queue.length; i++) {
       const owner = queue[i];
       if (!owner || seen.has(owner) || owner._isDestroyed) continue;

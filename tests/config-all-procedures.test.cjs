@@ -55,7 +55,8 @@ function fixture(options = {}) {
   const original = owner.load, render = owner.$options.render, descriptor = Object.getOwnPropertyDescriptor(owner, 'axios');
   const root = { $children: [owner] };
   const cleanup = vm.runInNewContext(source, { window: { location: { get hash() { return route; } } },
-    document: { getElementById: id => id === 'app' ? { __vue__: root } : null },
+    document: { getElementById: id => id === 'app' && !options.noAppId ? { __vue__: root } : null,
+      querySelectorAll: () => [{ __vue__: root }, owner.$el] },
     tmRuntime: { register: (_name, fn) => job = fn } });
   return { owner, client, requests, contexts, original, render, descriptor, cleanup,
     update: () => job(), tree: () => owner.$options.render.call(owner),
@@ -116,4 +117,10 @@ test('consultas de outros componentes não são ampliadas pelo cliente compartil
   } }] };
   f.client.post('/aql', body); assert.equal(f.requests.at(-1).body, body);
   assert.equal(f.requests.at(-1).body.q[0].parms.where.id_especialidade, -1);
+});
+test('encontra a página quando o Vue substitui o ponto de montagem e o DOM já não possui #app', () => {
+  const f = fixture({ noAppId: true }); f.update();
+  assert.equal(f.requests.length, 1);
+  assert.equal(f.requests[0].body.q[0].parms.where.id_especialidade, undefined);
+  assert.equal(f.tree().children[0].componentOptions.propsData.placeholder, 'Todas as especialidades');
 });

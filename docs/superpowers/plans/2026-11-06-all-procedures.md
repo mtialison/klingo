@@ -13,3 +13,8 @@
 - [x] Build2.12, 351 testes, sintaxe e diff-check; preparar publicação em testes-codex e conferir o remoto após o envio.
 
 Validação no servidor da clínica depende de sessão conectada; Playwright disponível está isolado e não possui a sessão do usuário. Em teste de integração isolado, Vue2.6.14 com render/load originais do chunk público e transporte fictício exibiu2procedimentos de especialidades7/8, enviou where:{} comsize100, exibiu placeholderTodas e removeu o pedido de seleção. Nenhuma consulta clínica nem gravação foi feita.
+
+## Correção2.13 após retorno do usuário
+- O teste anterior preservava artificialmente id=app no render raiz. O bootstrap público do Klingo usa mount(#app) e render de componente, podendo substituí-lo. Sem o ID, o módulo nem era ativado.
+- Regressão RED sem #app confirmada; descoberta de instâncias Vue no DOM resolve a ativação sem depender do ID.
+- Integração isolada com montagem substituindo #app: mountPointRemains=false antes; após correção calls=1/where={}/rows=2/prompt=false/allSpecialties=true. Não substitui teste com resposta real da clínica.

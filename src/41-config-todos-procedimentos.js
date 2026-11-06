@@ -43,7 +43,9 @@
   }
   function component() {
     const root = document.getElementById('app')?.__vue__;
-    const queue = root ? [root] : [], seen = new Set();
+    // O Vue pode substituir o elemento de montagem: #app não permanece no DOM do Klingo.
+    const queue = root ? [root] : Array.from(document.querySelectorAll('body *'), node => node.__vue__).filter(Boolean);
+    const seen = new Set();
     for (let i = 0; i < queue.length; i++) {
       const owner = queue[i];
       if (!owner || seen.has(owner) || owner._isDestroyed) continue;
