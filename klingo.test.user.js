@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      2.13
+// @version      2.14
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -7215,11 +7215,10 @@ const tmBookingModalWatch = (() => {
         font-size: 13.125px !important; font-weight: 400 !important;
         color: #495057 !important; line-height: 1.2 !important;
       }
-      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-name {
-        flex: 0 0 50% !important; max-width: 50% !important;
-      }
+      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-name,
       #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-birth,
-      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-cpf {
+      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-cpf,
+      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-sex {
         flex: 0 0 25% !important; max-width: 25% !important;
       }
       #${MODAL_ID} .tm-recepcao-existing-identity-row .form-control,
@@ -7495,11 +7494,24 @@ const tmBookingModalWatch = (() => {
     label.textContent = labelText;
     const group = document.createElement('div');
     group.className = 'input-group';
-    const input = document.createElement('input');
+    const input = key === 'sex' ? document.createElement('select') : document.createElement('input');
     input.className = 'form form-control';
-    input.type = key === 'birth' ? 'date' : 'text';
-    input.readOnly = true;
-    input.setAttribute('aria-readonly', 'true');
+    if (key === 'sex') {
+      input.required = true;
+      input.setAttribute('aria-required', 'true');
+      for (const [value, text] of [['', 'Selecione uma opção'], ['M', 'Masculino'],
+        ['F', 'Feminino'], ['I', 'Indefinido']]) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        if (!value) option.disabled = true;
+        input.appendChild(option);
+      }
+    } else {
+      input.type = key === 'birth' ? 'date' : 'text';
+      input.readOnly = true;
+      input.setAttribute('aria-readonly', 'true');
+    }
     group.appendChild(input);
     if (key === 'name') {
       const append = document.createElement('div');
@@ -7547,6 +7559,7 @@ const tmBookingModalWatch = (() => {
     const name = identityField(row, 'name', 'Nome');
     const birth = identityField(row, 'birth', 'Data de Nascimento');
     const cpf = identityField(row, 'cpf', 'CPF');
+    const sex = identityField(row, 'sex', 'Sexo');
     const values = [
       patientIdentity(patient, ['st_nome', 'nome', 'nm_pessoa', 'st_nome_paciente']),
       displayBirth(patientBirth(patient)),
@@ -7556,6 +7569,32 @@ const tmBookingModalWatch = (() => {
       const input = field.querySelector('input');
       if (input.value !== values[index]) input.value = values[index];
     });
+    const sexSelect = sex.querySelector('select');
+    const sexValue = String(patient?.cadastro?.ch_sexo || patient?.ch_sexo || '').trim().toUpperCase();
+    const validSex = ['M', 'F', 'I'].includes(sexValue) ? sexValue : '';
+    if (sexSelect.value !== validSex) sexSelect.value = validSex;
+    if (sexSelect.dataset.tmReceptionSexBinding !== '1') {
+      sexSelect.dataset.tmReceptionSexBinding = '1';
+      sexSelect.addEventListener('change', () => {
+        const activeComponent = receptionBookingComponent(modal);
+        const activePatient = activeComponent?.dados?.paciente;
+        if (!(Number(activePatient?.id_pessoa) > 0)) return;
+        if (!activePatient.cadastro) {
+          const cadastro = {};
+          if (typeof activeComponent?.$set === 'function') {
+            activeComponent.$set(activePatient, 'cadastro', cadastro);
+          } else {
+            activePatient.cadastro = cadastro;
+          }
+        }
+        if (typeof activeComponent?.$set === 'function') {
+          activeComponent.$set(activePatient.cadastro, 'ch_sexo', sexSelect.value);
+        } else {
+          activePatient.cadastro.ch_sexo = sexSelect.value;
+        }
+        refreshReceptionWarnings(modal);
+      });
+    }
     const value = values[1];
     const parts = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     const age = birth.querySelector('.tm-recepcao-identity-age');
@@ -7699,7 +7738,7 @@ const tmBookingModalWatch = (() => {
     const fields = firstTime ? [
       ['Nome', 'input'], ['Data de Nascimento', 'input'], ['CPF', 'input'],
       ['Sexo', 'select'], ['Celular', 'input'], ['Origem do Agendamento', 'select']
-    ] : [['Celular', 'input'], ['Origem do Agendamento', 'select']];
+    ] : [['Sexo', 'select'], ['Celular', 'input'], ['Origem do Agendamento', 'select']];
     return fields.map(([name, selector]) => {
       const field = fieldByLabel(modal, name);
       const control = field?.querySelector(selector) || null;

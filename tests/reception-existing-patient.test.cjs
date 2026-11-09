@@ -16,6 +16,9 @@ class Element {
     this.className = '';
     this.textContent = '';
     this.value = '';
+    this.dataset = {};
+    this.listeners = {};
+    this.attributes = {};
     this.style = { display: '' };
     this.classList = {
       add: (...classes) => { this.className += ` ${classes.join(' ')}`; },
@@ -36,7 +39,8 @@ class Element {
     const index = next ? this.children.indexOf(next) : this.children.length;
     this.children.splice(index, 0, child); child.parentElement = this;
   }
-  setAttribute(name, value) { this[name] = value; }
+  setAttribute(name, value) { this.attributes[name] = value; this[name] = value; }
+  addEventListener(name, handler) { this.listeners[name] = handler; }
   querySelector(selector) {
     const match = (item) => selector.startsWith('.') ? item.className.split(/\s+/).includes(selector.slice(1)) :
       item.tagName.toLowerCase() === selector;
@@ -76,10 +80,60 @@ test('ficha existente mostra Nome, Nascimento e CPF como leitura, antes do conta
   assert.match(fields[1].querySelector('.tm-recepcao-identity-age').textContent, /^\d+a$/);
 });
 
+test('ficha existente exibe Sexo e grava a seleção no cadastro que o Klingo valida', () => {
+  const root = new Element('div');
+  const contact = new Element('div');
+  root.appendChild(contact);
+  const patient = { id_pessoa: 42, st_nome: 'Paciente teste',
+    cadastro: { dt_nascimento: '1981-03-14', st_cpf: '08486445736', ch_sexo: '' } };
+  const updates = [];
+  const component = { dados: { paciente: patient }, $set(target, key, value) {
+    updates.push({ target, key, value }); target[key] = value;
+  } };
+  const context = vm.createContext({ document: { createElement: tag => new Element(tag) },
+    receptionBookingComponent: () => component, lastEnteredCpf: new WeakMap(),
+    refreshReceptionWarnings() {} });
+  vm.runInContext(section('patientIdentity', 'requiredReceptionCpf'), context);
+  vm.runInContext('showExistingIdentity', context)(root, contact);
+
+  const row = root.querySelector('.tm-recepcao-existing-identity-row');
+  const sexField = row.querySelector('.tm-recepcao-identity-sex');
+  const select = sexField?.querySelector('select');
+  assert.ok(select, 'o campo Sexo deve ser exibido como seletor');
+  assert.equal(select.required, true);
+  assert.deepEqual(select.children.map(option => [option.value, option.textContent]), [
+    ['', 'Selecione uma opção'], ['M', 'Masculino'], ['F', 'Feminino'], ['I', 'Indefinido']
+  ]);
+
+  select.value = 'F';
+  select.listeners.change();
+  assert.equal(patient.cadastro.ch_sexo, 'F');
+  assert.deepEqual(updates.map(({ key, value }) => [key, value]), [['ch_sexo', 'F']]);
+});
+
+test('ficha existente mantém o sexo cadastrado selecionado e deixa o campo editável', () => {
+  const root = new Element('div');
+  const contact = new Element('div');
+  root.appendChild(contact);
+  const patient = { id_pessoa: 42, cadastro: { ch_sexo: 'M' } };
+  const context = vm.createContext({ document: { createElement: tag => new Element(tag) },
+    receptionBookingComponent: () => ({ dados: { paciente: patient }, $set(target, key, value) { target[key] = value; } }),
+    lastEnteredCpf: new WeakMap(), refreshReceptionWarnings() {} });
+  vm.runInContext(section('patientIdentity', 'requiredReceptionCpf'), context);
+  vm.runInContext('showExistingIdentity', context)(root, contact);
+  const select = root.querySelector('.tm-recepcao-identity-sex')?.querySelector('select');
+  assert.equal(select?.value, 'M');
+  assert.equal(select?.disabled, undefined);
+});
+
 test('identificação da ficha usa tamanho e tipografia dos campos nativos da Recepção', () => {
   assert.match(source, /\.tm-recepcao-existing-identity-row \.form-control,[\s\S]*?font-size: \.875rem !important/);
   assert.match(source, /\.tm-recepcao-existing-identity-row \.form-control,[\s\S]*?height: calc\(1\.5em \+ \.5rem \+ 2px\) !important/);
   assert.match(source, /\.tm-recepcao-perfil-append button \{[\s\S]*?font-size: \.875rem !important;[\s\S]*?height: calc\(1\.5em \+ \.5rem \+ 2px\) !important/);
+});
+
+test('identificação existente distribui Nome, nascimento, CPF e Sexo em quatro colunas', () => {
+  assert.match(source, /\.tm-recepcao-identity-name,[\s\S]*?\.tm-recepcao-identity-sex \{\s*flex: 0 0 25% !important; max-width: 25% !important;/);
 });
 
 test('abrir histórico chama o perfil sem executar o clique nativo que fecha o agendamento', () => {
