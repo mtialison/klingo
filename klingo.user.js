@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo
 // @namespace    http://tampermonkey.net/klingo
-// @version      1.2
+// @version      1.3
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/main/klingo.user.js
@@ -7215,11 +7215,10 @@ const tmBookingModalWatch = (() => {
         font-size: 13.125px !important; font-weight: 400 !important;
         color: #495057 !important; line-height: 1.2 !important;
       }
-      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-name {
-        flex: 0 0 50% !important; max-width: 50% !important;
-      }
+      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-name,
       #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-birth,
-      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-cpf {
+      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-cpf,
+      #${MODAL_ID} .tm-recepcao-existing-identity-row .tm-recepcao-identity-sex {
         flex: 0 0 25% !important; max-width: 25% !important;
       }
       #${MODAL_ID} .tm-recepcao-existing-identity-row .form-control,
@@ -7495,11 +7494,24 @@ const tmBookingModalWatch = (() => {
     label.textContent = labelText;
     const group = document.createElement('div');
     group.className = 'input-group';
-    const input = document.createElement('input');
+    const input = key === 'sex' ? document.createElement('select') : document.createElement('input');
     input.className = 'form form-control';
-    input.type = key === 'birth' ? 'date' : 'text';
-    input.readOnly = true;
-    input.setAttribute('aria-readonly', 'true');
+    if (key === 'sex') {
+      input.required = true;
+      input.setAttribute('aria-required', 'true');
+      for (const [value, text] of [['', 'Selecione uma opção'], ['M', 'Masculino'],
+        ['F', 'Feminino'], ['I', 'Indefinido']]) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        if (!value) option.disabled = true;
+        input.appendChild(option);
+      }
+    } else {
+      input.type = key === 'birth' ? 'date' : 'text';
+      input.readOnly = true;
+      input.setAttribute('aria-readonly', 'true');
+    }
     group.appendChild(input);
     if (key === 'name') {
       const append = document.createElement('div');
@@ -7547,6 +7559,7 @@ const tmBookingModalWatch = (() => {
     const name = identityField(row, 'name', 'Nome');
     const birth = identityField(row, 'birth', 'Data de Nascimento');
     const cpf = identityField(row, 'cpf', 'CPF');
+    const sex = identityField(row, 'sex', 'Sexo');
     const values = [
       patientIdentity(patient, ['st_nome', 'nome', 'nm_pessoa', 'st_nome_paciente']),
       displayBirth(patientBirth(patient)),
@@ -7556,6 +7569,32 @@ const tmBookingModalWatch = (() => {
       const input = field.querySelector('input');
       if (input.value !== values[index]) input.value = values[index];
     });
+    const sexSelect = sex.querySelector('select');
+    const sexValue = String(patient?.cadastro?.ch_sexo || patient?.ch_sexo || '').trim().toUpperCase();
+    const validSex = ['M', 'F', 'I'].includes(sexValue) ? sexValue : '';
+    if (sexSelect.value !== validSex) sexSelect.value = validSex;
+    if (sexSelect.dataset.tmReceptionSexBinding !== '1') {
+      sexSelect.dataset.tmReceptionSexBinding = '1';
+      sexSelect.addEventListener('change', () => {
+        const activeComponent = receptionBookingComponent(modal);
+        const activePatient = activeComponent?.dados?.paciente;
+        if (!(Number(activePatient?.id_pessoa) > 0)) return;
+        if (!activePatient.cadastro) {
+          const cadastro = {};
+          if (typeof activeComponent?.$set === 'function') {
+            activeComponent.$set(activePatient, 'cadastro', cadastro);
+          } else {
+            activePatient.cadastro = cadastro;
+          }
+        }
+        if (typeof activeComponent?.$set === 'function') {
+          activeComponent.$set(activePatient.cadastro, 'ch_sexo', sexSelect.value);
+        } else {
+          activePatient.cadastro.ch_sexo = sexSelect.value;
+        }
+        refreshReceptionWarnings(modal);
+      });
+    }
     const value = values[1];
     const parts = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     const age = birth.querySelector('.tm-recepcao-identity-age');
@@ -7699,7 +7738,7 @@ const tmBookingModalWatch = (() => {
     const fields = firstTime ? [
       ['Nome', 'input'], ['Data de Nascimento', 'input'], ['CPF', 'input'],
       ['Sexo', 'select'], ['Celular', 'input'], ['Origem do Agendamento', 'select']
-    ] : [['Celular', 'input'], ['Origem do Agendamento', 'select']];
+    ] : [['Sexo', 'select'], ['Celular', 'input'], ['Origem do Agendamento', 'select']];
     return fields.map(([name, selector]) => {
       const field = fieldByLabel(modal, name);
       const control = field?.querySelector(selector) || null;
@@ -13626,4 +13665,189 @@ const tmConfirmationCalendarAdapter = (() => {
     document.head.appendChild(style);
   }
   tmRuntime.register('perfil em tela inteira', injectStyle);
+})();
+
+/* Oferece o editor nativo também nas marcações faltosas da ficha do paciente. */
+(function () {
+  'use strict';
+  let patch = null;
+  const hasClass = (node, name) => (node?.data?.staticClass || '').split(/\s+/).includes(name);
+  function find(node, predicate) {
+    if (!node) return null;
+    if (predicate(node)) return node;
+    for (const child of node.children || []) {
+      const match = find(child, predicate);
+      if (match) return match;
+    }
+    return null;
+  }
+  function eligible(owner, appointment) {
+    return !owner._isDestroyed && !owner.historico && !owner.imprimindo && !owner.readonly &&
+      owner.$store?.state?.user?.st_tipo === 'U' &&
+      Array.isArray(owner.lista) && owner.lista.includes(appointment) &&
+      appointment?.item_status?.valor === 'faltoso' &&
+      Number.isSafeInteger(Number(appointment.id_marcacao)) && Number(appointment.id_marcacao) > 0 &&
+      !appointment.id_atendimento && !['B', 'C'].includes(appointment.ch_estado_marcacao);
+  }
+  function addButtons(tree, owner, profile) {
+    if (!tree) return;
+    if (hasClass(tree, 'card')) {
+      // A referência vem do próprio card, sem associar pacientes pelo texto ou posição da lista.
+      const view = find(tree, node => node.componentOptions?.tag === 'pre-atendimento-view' ||
+        /(?:^|-)pre-atendimento-view$/.test(node.tag || ''));
+      const appointment = view?.componentOptions?.propsData?.marcacao;
+      if (!eligible(owner, appointment)) return;
+      const group = find(tree, node => hasClass(node, 'justify-content-between') &&
+        find(node, child => hasClass(child, 'fa-calendar-times')) &&
+        find(node, child => child.tag === 'button' && child.children?.some(t => t.text?.trim() === 'Remarcar')));
+      if (!group) return;
+      const actions = find(group, node => node.children?.some(child => child.tag === 'button' &&
+        child.children?.some(t => t.text?.trim() === 'Remarcar')));
+      if (!actions || actions.children.some(node => node.data?.attrs?.['data-tm-edit-no-show'])) return;
+      const index = actions.children.findIndex(node => node.tag === 'button' &&
+        node.children?.some(t => t.text?.trim() === 'Remarcar'));
+      const reschedule = actions.children[index];
+      const disabled = reschedule.data?.attrs?.disabled;
+      if (typeof reschedule.data?.on?.click !== 'function' || (disabled != null && disabled !== false)) return;
+      const id = String(appointment.id_marcacao);
+      const button = owner.$createElement('button', {
+        key: 'tm-edit-no-show-' + appointment.id_marcacao,
+        staticClass: 'btn btn-outline-primary ml-2',
+        attrs: { type: 'button', 'data-tm-edit-no-show': 'true' },
+        on: { click: () => {
+          // O perfil e seus cards podem ser reutilizados enquanto o editor carrega.
+          if (patch?.vm !== owner || !profile.isConnected || !profile.classList.contains('show') ||
+              !owner.$el?.isConnected || !profile.contains(owner.$el) || String(appointment.id_marcacao) !== id ||
+              !eligible(owner, appointment)) return;
+          return owner.editar_marcacao(appointment);
+        } }
+      }, ['Editar']);
+      actions.children.splice(index + 1, 0, button);
+      return;
+    }
+    for (const child of tree.children || []) addButtons(child, owner, profile);
+  }
+  function detach() {
+    if (!patch) return;
+    const p = patch; patch = null;
+    if (p.vm.$options.render === p.render) {
+      p.vm.$options.render = p.original;
+      if (!p.vm._isDestroyed) p.vm.$forceUpdate();
+    }
+  }
+  function update() {
+    const profile = document.getElementById('perfilPacienteModal');
+    if (patch && patch.profile === profile && !patch.vm._isDestroyed &&
+        patch.vm.$el?.isConnected && profile?.contains(patch.vm.$el)) return;
+    detach();
+    if (!profile) return;
+    for (const element of [profile, ...profile.querySelectorAll('*')]) {
+      const owner = element.__vue__;
+      if (!owner || owner._isDestroyed || !Array.isArray(owner.lista) ||
+          typeof owner.editar_marcacao !== 'function' || typeof owner.filtrar !== 'function' ||
+          typeof owner.$options?.render !== 'function') continue;
+      const original = owner.$options.render;
+      const render = function (...args) {
+        const tree = original.apply(this, args); addButtons(tree, this, profile); return tree;
+      };
+      owner.$options.render = render;
+      patch = { vm: owner, profile, original, render };
+      owner.$forceUpdate();
+      break;
+    }
+  }
+  tmRuntime.register('editar faltosos no perfil', update);
+  return detach;
+})();
+
+/* Configurações: filtro vazio lista procedimentos de todas as especialidades. */
+(function () {
+  'use strict';
+  let patch = null;
+  const onRoute = () => /^#\/config\/procedimentos(?:\/|\?|$)/.test(window.location.hash);
+  const allMode = owner => !owner.setup && !owner.link && !owner.id_procedimento && !owner.especialidade;
+  function queryAll(url, body) {
+    if (typeof url !== 'string' || !/^\/aql(?:\?|$)/.test(url) || !Array.isArray(body?.q)) return body;
+    let changed = false;
+    const q = body.q.map(query => {
+      const p = query.parms;
+      if (query.name !== 'procedimentos.index' || query.id !== 'lista' || !p?.cadastro ||
+          !p.lista_cadastro || p.where?.id_especialidade !== -1) return query;
+      const where = { ...p.where }; delete where.id_especialidade; changed = true;
+      return { ...query, parms: { ...p, where } };
+    });
+    return changed ? { ...body, q } : body;
+  }
+  function adjustRender(tree, owner) {
+    if (!tree || owner.setup || owner.link || owner.id_procedimento) return tree;
+    if (tree.data?.model?.expression === 'especialidade') {
+      if (tree.componentOptions) tree.componentOptions.propsData = {
+        ...tree.componentOptions.propsData, placeholder: 'Todas as especialidades'
+      };
+      else tree.data.attrs = { ...tree.data.attrs, placeholder: 'Todas as especialidades' };
+    }
+    if (allMode(owner)) {
+      if (tree.data?.ref === 'info_procedimento') return null;
+      if ((tree.componentOptions?.propsData?.msg ?? tree.data?.attrs?.msg) === 'Selecione a Especialidade') {
+        return owner.$createElement('az-empty-state', { attrs: { icon: 'fa fa-search',
+          msg: owner.$store.state.loading ? 'Carregando procedimentos...' : 'Nenhum procedimento encontrado' } });
+      }
+    }
+    if (tree.children) tree.children = tree.children.map(node => adjustRender(node, owner)).filter(Boolean);
+    return tree;
+  }
+  function detach() {
+    if (!patch) return;
+    const p = patch; patch = null;
+    if (p.vm.load === p.load) p.vm.load = p.originalLoad;
+    if (p.vm.$options.render === p.render) p.vm.$options.render = p.originalRender;
+    if (!p.vm._isDestroyed) p.vm.$forceUpdate();
+  }
+  function component() {
+    const root = document.getElementById('app')?.__vue__;
+    // O Vue pode substituir o elemento de montagem: #app não permanece no DOM do Klingo.
+    const queue = root ? [root] : Array.from(document.querySelectorAll('body *'), node => node.__vue__).filter(Boolean);
+    const seen = new Set();
+    for (let i = 0; i < queue.length; i++) {
+      const owner = queue[i];
+      if (!owner || seen.has(owner) || owner._isDestroyed) continue;
+      seen.add(owner);
+      if (typeof owner.load === 'function' && typeof owner.incluir_procedimento === 'function' &&
+          typeof owner.buscarItems === 'function' && typeof owner.editar === 'function' &&
+          typeof owner.$options?.render === 'function' && !owner.setup && !owner.id_procedimento && !owner.link) return owner;
+      queue.push(...(owner.$children || []));
+    }
+    return null;
+  }
+  function update() {
+    if (!onRoute()) { detach(); return; }
+    if (patch && !patch.vm._isDestroyed && patch.vm.$el?.isConnected) return;
+    detach();
+    const owner = component();
+    if (!owner) return;
+    const originalLoad = owner.load, originalRender = owner.$options.render;
+    const load = function (...args) {
+      if (!onRoute() || !allMode(this)) return originalLoad.apply(this, args);
+      const client = this.axios, descriptor = Object.getOwnPropertyDescriptor(this, 'axios');
+      // A fachada existe somente durante o load síncrono; nenhuma alteração no Axios compartilhado.
+      const facade = Object.create(client);
+      Object.defineProperty(facade, 'post', { value: (url, body, ...options) =>
+        client.post(url, queryAll(url, body), ...options) });
+      Object.defineProperty(this, 'axios', { configurable: true, value: facade });
+      try { return originalLoad.apply(this, args); }
+      finally {
+        if (descriptor) Object.defineProperty(this, 'axios', descriptor);
+        else delete this.axios;
+      }
+    };
+    const render = function (...args) { return adjustRender(originalRender.apply(this, args), this); };
+    owner.load = load; owner.$options.render = render;
+    patch = { vm: owner, load, render, originalLoad, originalRender };
+    owner.page = 1;
+    if (owner.especialidade) owner.especialidade = ''; // O watcher nativo chama load ao limpar a seleção anterior.
+    else owner.load();
+    owner.$forceUpdate();
+  }
+  tmRuntime.register('configuração de todos os procedimentos', update, ['#/config/procedimentos']);
+  return detach;
 })();
