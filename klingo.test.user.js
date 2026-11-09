@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      2.14
+// @version      2.15
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -7573,28 +7573,6 @@ const tmBookingModalWatch = (() => {
     const sexValue = String(patient?.cadastro?.ch_sexo || patient?.ch_sexo || '').trim().toUpperCase();
     const validSex = ['M', 'F', 'I'].includes(sexValue) ? sexValue : '';
     if (sexSelect.value !== validSex) sexSelect.value = validSex;
-    if (sexSelect.dataset.tmReceptionSexBinding !== '1') {
-      sexSelect.dataset.tmReceptionSexBinding = '1';
-      sexSelect.addEventListener('change', () => {
-        const activeComponent = receptionBookingComponent(modal);
-        const activePatient = activeComponent?.dados?.paciente;
-        if (!(Number(activePatient?.id_pessoa) > 0)) return;
-        if (!activePatient.cadastro) {
-          const cadastro = {};
-          if (typeof activeComponent?.$set === 'function') {
-            activeComponent.$set(activePatient, 'cadastro', cadastro);
-          } else {
-            activePatient.cadastro = cadastro;
-          }
-        }
-        if (typeof activeComponent?.$set === 'function') {
-          activeComponent.$set(activePatient.cadastro, 'ch_sexo', sexSelect.value);
-        } else {
-          activePatient.cadastro.ch_sexo = sexSelect.value;
-        }
-        refreshReceptionWarnings(modal);
-      });
-    }
     const value = values[1];
     const parts = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     const age = birth.querySelector('.tm-recepcao-identity-age');
@@ -7606,6 +7584,39 @@ const tmBookingModalWatch = (() => {
     const text = years != null && years >= 0 && years < 130 ? `${years}a` : '';
     if (age.textContent !== text) age.textContent = text;
     age.parentElement.style.display = text ? '' : 'none';
+  }
+
+  function syncExistingPatientSex(modal, select) {
+    const value = String(select?.value || '').trim().toUpperCase();
+    if (!['M', 'F', 'I'].includes(value)) return false;
+    const component = receptionBookingComponent(modal);
+    const patient = component?.dados?.paciente;
+    if (!(Number(patient?.id_pessoa) > 0)) return false;
+    if (!patient.cadastro) {
+      const cadastro = {};
+      if (typeof component?.$set === 'function') component.$set(patient, 'cadastro', cadastro);
+      else patient.cadastro = cadastro;
+    }
+    if (patient.cadastro.ch_sexo !== value) {
+      if (typeof component?.$set === 'function') component.$set(patient.cadastro, 'ch_sexo', value);
+      else patient.cadastro.ch_sexo = value;
+    }
+    return patient.cadastro.ch_sexo === value;
+  }
+
+  function handleReceptionFieldEvent(modal, event) {
+    if (event.target?.matches?.('select') &&
+        event.target.closest?.('.tm-recepcao-existing-identity-row .tm-recepcao-identity-sex')) {
+      syncExistingPatientSex(modal, event.target);
+    }
+    if (event.target === fieldByLabel(modal, 'CPF')?.querySelector('input')) {
+      if (String(event.target.value || '').replace(/\D/g, '').length === 11) {
+        lastEnteredCpf.set(modal, event.target.value);
+      } else {
+        lastEnteredCpf.delete(modal);
+      }
+    }
+    refreshReceptionWarnings(modal);
   }
 
   function openReceptionPatientProfile(modal, event) {
@@ -8167,17 +8178,9 @@ const tmBookingModalWatch = (() => {
   }, true);
   for (const eventName of ['input', 'change']) {
     document.addEventListener(eventName, (event) => {
-      if (observationStopped) return;
       const modal = event.target?.closest?.(`#${MODAL_ID}`);
       if (modal) {
-        if (event.target === fieldByLabel(modal, 'CPF')?.querySelector('input')) {
-          if (String(event.target.value || '').replace(/\D/g, '').length === 11) {
-            lastEnteredCpf.set(modal, event.target.value);
-          } else {
-            lastEnteredCpf.delete(modal);
-          }
-        }
-        refreshReceptionWarnings(modal);
+        handleReceptionFieldEvent(modal, event);
       }
       if (event.target?.matches?.('input#ref-data[type="date"]')) {
         applyReceptionLayout();

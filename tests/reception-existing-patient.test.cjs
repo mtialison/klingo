@@ -106,9 +106,56 @@ test('ficha existente exibe Sexo e grava a seleção no cadastro que o Klingo va
   ]);
 
   select.value = 'F';
-  select.listeners.change();
+  assert.equal(vm.runInContext('syncExistingPatientSex', context)(root, select), true);
   assert.equal(patient.cadastro.ch_sexo, 'F');
   assert.deepEqual(updates.map(({ key, value }) => [key, value]), [['ch_sexo', 'F']]);
+  vm.runInContext('showExistingIdentity', context)(root, contact);
+  assert.equal(select.value, 'F', 'a escolha deve sobreviver à atualização visual do modal');
+});
+
+test('seleção de Sexo sincroniza o modelo pelo fluxo delegado do modal', () => {
+  const patient = { id_pessoa: 42, cadastro: { ch_sexo: '' } };
+  const updates = [];
+  const component = { dados: { paciente: patient }, $set(target, key, value) {
+    updates.push([key, value]); target[key] = value;
+  } };
+  const select = { value: 'F' };
+  const context = vm.createContext({ receptionBookingComponent: () => component });
+  vm.runInContext(section('patientIdentity', 'requiredReceptionCpf'), context);
+
+  const sync = vm.runInContext('syncExistingPatientSex', context);
+  assert.equal(sync({}, select), true);
+  assert.equal(patient.cadastro.ch_sexo, 'F');
+  assert.deepEqual(updates, [['ch_sexo', 'F']]);
+  assert.match(source, /function handleReceptionFieldEvent\(modal, event\) \{[\s\S]*?syncExistingPatientSex\(modal, event\.target\)/);
+  assert.match(source, /for \(const eventName of \['input', 'change'\]\) \{[\s\S]*?handleReceptionFieldEvent\(modal, event\)/);
+});
+
+test('seleção de Sexo continua sendo salva quando os ajustes visuais estão suspensos', () => {
+  const patient = { id_pessoa: 42, cadastro: { ch_sexo: '' } };
+  const updates = [];
+  const component = { dados: { paciente: patient }, $set(target, key, value) {
+    updates.push([key, value]); target[key] = value;
+  } };
+  const select = { value: 'F', matches: selector => selector === 'select',
+    closest: selector => selector.includes('.tm-recepcao-identity-sex') ? {} : null };
+  const context = vm.createContext({
+    receptionBookingComponent: () => component,
+    fieldByLabel: () => null,
+    lastEnteredCpf: new WeakMap(),
+    refreshReceptionWarnings() {},
+    observationStopped: true
+  });
+  vm.runInContext(section('syncExistingPatientSex', 'openReceptionPatientProfile'), context);
+
+  assert.equal(vm.runInContext('handleReceptionFieldEvent', context)({}, { target: select }), undefined);
+  assert.equal(patient.cadastro.ch_sexo, 'F');
+  assert.deepEqual(updates, [['ch_sexo', 'F']]);
+  const listenerStart = source.indexOf("for (const eventName of ['input', 'change']) {");
+  const listenerEnd = source.indexOf('const discoveryObserver', listenerStart);
+  const listeners = source.slice(listenerStart, listenerEnd);
+  assert.match(listeners, /handleReceptionFieldEvent\(modal, event\)/);
+  assert.doesNotMatch(listeners, /if\s*\(observationStopped\)\s*return/);
 });
 
 test('ficha existente mantém o sexo cadastrado selecionado e deixa o campo editável', () => {
