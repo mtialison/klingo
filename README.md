@@ -1,5 +1,7 @@
 # Klingo userscript
 
+Na versão de testes **2.16**, Configurações → Agendas recarrega a lista ao voltar da página de logs com um médico já restaurado no filtro. A chamada respeita o médico selecionado e só acontece quando a nova tela ainda está sem dados.
+
 Na versão de testes **2.13**, a detecção de Configurações → Procedimentos funciona também depois que o Vue substitui o elemento `#app` de montagem. A versão 2.12 dependia desse ID e podia deixar de ativar o ajuste. O caso foi reproduzido com Vue2 e o render/load públicos nativos: sem `#app`, a correção fez uma consulta sem especialidade e exibiu a listagem fictícia. Nenhum dado clínico foi consultado ou gravado nessa validação.
 
 Na versão de testes **2.12**, Configurações → Procedimentos abre com **Todas as especialidades**. A consulta nativa deixa de enviar `id_especialidade:-1` quando não há seleção. Busca, classificação, paginação de 100 itens e Ativos/Todos são preservados; selecionar uma especialidade continua filtrando normalmente. Inclusão e ações em lote que exigem especialidade continuam seguindo a regra nativa. Testado com o render/load públicos do Klingo e Vue2 em navegador isolado, com duas especialidades fictícias; leitura no servidor da clínica permanece para validação manual.
