@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         klingo (testes)
 // @namespace    http://tampermonkey.net/klingo-testes
-// @version      2.17
+// @version      2.18
 // @description  🐒
 // @match        https://*.klingo.app/*
 // @updateURL    https://raw.githubusercontent.com/mtialison/klingo/testes-codex/klingo.test.user.js
@@ -11801,6 +11801,8 @@ const tmConfirmationCalendarAdapter = (() => {
 (function () {
   'use strict';
   const COMBINED_STATUS = 'tm-open-sent';
+  let optionObserver = null;
+  let optionObserverHost = null;
 
   async function fetchCombinedStatusPage(axios, filters, cancelToken) {
     const compare = combinedComparator(filters);
@@ -11979,13 +11981,55 @@ const tmConfirmationCalendarAdapter = (() => {
     vue.load = wrapped;
   }
 
+  function isNativeStatusSelect(select) {
+    if (!select?.options) return false;
+    const labels = new Set(Array.from(select.options, option => option.textContent.trim()));
+    return labels.has('Todos os Status Ativos...') && labels.has('Aberto') && labels.has('Enviado');
+  }
+
+  function containsNativeStatusSelect(node) {
+    if (!node || (node.nodeType !== 1 && node.nodeType !== 11)) return false;
+    if (node.matches?.('select') && isNativeStatusSelect(node)) return true;
+    return Array.from(node.querySelectorAll?.('select') || []).some(isNativeStatusSelect);
+  }
+
+  function isStatusSelectMutation(record) {
+    const target = record.target?.nodeType === 1 ? record.target : record.target?.parentElement;
+    if (isNativeStatusSelect(target?.closest?.('select'))) return true;
+    return [...record.addedNodes, ...record.removedNodes].some(containsNativeStatusSelect);
+  }
+
+  function stopObservingStatusOptions() {
+    optionObserver?.disconnect();
+    optionObserver = null;
+    optionObserverHost = null;
+  }
+
+  function observeStatusOptions(host) {
+    if (typeof MutationObserver === 'undefined') return;
+    if (optionObserver && optionObserverHost === host) return;
+    stopObservingStatusOptions();
+    optionObserverHost = host;
+    optionObserver = new MutationObserver(records => {
+      if (records.some(isStatusSelectMutation)) ensureCombinedStatus();
+    });
+    optionObserver.observe(host, { childList: true, subtree: true });
+  }
+
   function ensureCombinedStatus() {
     const active = document.querySelector('.nav-pills .nav-link.active');
-    if (active?.textContent.trim() !== 'Autorizações') return;
+    if (active?.textContent.trim() !== 'Autorizações') {
+      stopObservingStatusOptions();
+      return;
+    }
     const card = document.getElementById('refresh-button')?.closest('.card');
+    if (!card) {
+      stopObservingStatusOptions();
+      return;
+    }
+    observeStatusOptions(card);
     const select = Array.from(card?.querySelectorAll('select') || []).find(select => {
-      const labels = Array.from(select.options, option => option.textContent.trim());
-      return labels.includes('Todos os Status Ativos...') && labels.includes('Aberto') && labels.includes('Enviado');
+      return isNativeStatusSelect(select);
     });
     if (!select) return;
     let vue = null;
